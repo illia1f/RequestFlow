@@ -1,0 +1,64 @@
+# .gitignore — RequestFlow
+# Modern SDK-style .NET library solution (.slnx), multi-target
+# netstandard2.0;net8.0;net10.0. NuGet-published. No project.json /
+# packages.config legacy cruft on purpose.
+
+# ── Build output ─────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+# net8+ artifacts output layout (<UseArtifactsOutput>) → repo-root artifacts/
+artifacts/
+
+# ── Visual Studio / Rider / VS Code (per-machine) ────────────
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+*.sln.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ── NuGet package output ─────────────────────────────────────
+# Packing RequestFlow / RequestFlow.Cqrs. Symbols too (.snupkg).
+*.nupkg
+*.snupkg
+
+# ── Test results & coverage ──────────────────────────────────
+# Unit test project + coverage (v1 checklist #7).
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# ── BenchmarkDotNet ──────────────────────────────────────────
+# Dispatch-cost benchmarks vs MediatR (plan §"Targets and quality bar").
+BenchmarkDotNet.Artifacts/
+
+# ── MSBuild / binary logs ────────────────────────────────────
+*.binlog
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# ── ReSharper / user settings ────────────────────────────────
+_ReSharper*/
+*.DotSettings.user
+
+# ── OS junk ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Keep tracked (public API surface is committed, not ignored) ──
+# Microsoft.CodeAnalysis.PublicApiAnalyzers locks the API in these files.
+!**/PublicAPI.Shipped.txt
+!**/PublicAPI.Unshipped.txt
