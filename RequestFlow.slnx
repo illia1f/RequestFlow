@@ -1,4 +1,12 @@
 <Solution>
-  <Project Path="src/RequestFlow.Cqrs/RequestFlow.Cqrs.csproj" />
-  <Project Path="src/RequestFlow/RequestFlow.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/RequestFlow.Abstractions/RequestFlow.Abstractions.csproj" Id="27f5d4e3-f8fc-491c-b221-d870df727eae" />
+    <Project Path="src/RequestFlow.Cqrs/RequestFlow.Cqrs.csproj" />
+    <Project Path="src/RequestFlow/RequestFlow.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RequestFlow.Tests.ValidationFixtures/RequestFlow.Tests.ValidationFixtures.csproj" />
+    <Project Path="tests/RequestFlow.Cqrs.Tests.Unit/RequestFlow.Cqrs.Tests.Unit.csproj" Id="7c22705e-0b73-4769-950c-e4ec7b3c8ef9" />
+    <Project Path="tests/RequestFlow.Tests.Unit/RequestFlow.Tests.Unit.csproj" Id="28aa02f8-015d-4a9e-84e2-049aa9fcf333" />
+  </Folder>
 </Solution>

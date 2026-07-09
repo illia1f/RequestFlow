@@ -5,7 +5,7 @@ A small, fast request/handler and pipeline library for .NET. You define a reques
 The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, add the `RequestFlow.Cqrs` package.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-in%20design-orange)
+![Status](https://img.shields.io/badge/status-in%20development-orange)
 ![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net8.0%20%7C%20net10.0-512BD4)
 
 > **Status:** in development, nothing on NuGet yet.
@@ -22,10 +22,11 @@ None of them pair low-allocation dispatch with a command/query split the type sy
 
 ## Planned packages
 
-| Package            | What it gives you                                                               |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `RequestFlow`      | `IRequest`, `IRequestHandler`, `IRequestStage`, `IRequestDispatcher`, DI registration |
-| `RequestFlow.Cqrs` | `ICommand`, `IQuery`, CQRS handler contracts, typed dispatchers                 |
+- **`RequestFlow.Abstractions`** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestStage`, `IRequestDispatcher`, `NoResult`. Depends on nothing.
+- **`RequestFlow`** is the runtime: dispatcher, stage pipeline, `AddRequestFlow` with assembly scanning. Depends on Abstractions and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+- **`RequestFlow.Cqrs`** adds `ICommand`, `IQuery`, CQRS handler contracts, typed dispatchers. Same dependencies as the runtime.
+
+Contracts live in their own package so your domain layer, and any future add-on package, can reference the interfaces without taking a dependency on the runtime. Everything shares the `RequestFlow` namespace.
 
 ## Contributing
 

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\RequestFlow.Abstractions\RequestFlow.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
