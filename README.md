@@ -1,6 +1,6 @@
 # RequestFlow
 
-A small, fast request/handler and pipeline library for .NET. You define a request and its handler, then move cross-cutting concerns like validation, logging, authorization, and performance monitoring into composable pipeline behaviors instead of scattering them through the handler.
+A small, fast request/handler and pipeline library for .NET. You define a request and its handler, then move cross-cutting concerns like validation, logging, authorization, and performance monitoring into composable stages instead of scattering them through the handler. A request flows through its stages, then into the handler, and the response flows back out.
 
 The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, add the `RequestFlow.Cqrs` package.
 
@@ -17,14 +17,14 @@ The core library stays unopinionated about how you name your requests. If you wa
 None of them pair low-allocation dispatch with a command/query split the type system enforces. RequestFlow aims at that gap:
 
 1. No reflection on the hot path; handler lookup is cached.
-2. Pipeline chains composed once, no LINQ in dispatch.
+2. Stage pipeline composed once, no LINQ in dispatch.
 3. CQRS as an opt-in package, not a convention.
 
 ## Planned packages
 
 | Package            | What it gives you                                                               |
 | ------------------ | ------------------------------------------------------------------------------- |
-| `RequestFlow`      | `IRequest`, `IRequestHandler`, pipelines, `IRequestDispatcher`, DI registration |
+| `RequestFlow`      | `IRequest`, `IRequestHandler`, `IRequestStage`, `IRequestDispatcher`, DI registration |
 | `RequestFlow.Cqrs` | `ICommand`, `IQuery`, CQRS handler contracts, typed dispatchers                 |
 
 ## Contributing
