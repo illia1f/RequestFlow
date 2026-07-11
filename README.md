@@ -28,6 +28,13 @@ None of them pair low-allocation dispatch with a command/query split the type sy
 
 Contracts live in their own package so your domain layer, and any future add-on package, can reference the interfaces without taking a dependency on the runtime. Everything shares the `RequestFlow` namespace.
 
+## Documentation
+
+- [Getting started](docs/getting-started.md): install, first request and handler, dispatching
+- [Registration](docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
+- [Service lifetimes](docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
+- [Exceptions](docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
+
 ## Contributing
 
 Design feedback is the most useful contribution right now.

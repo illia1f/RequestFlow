@@ -6,12 +6,12 @@ Anything past v1 is direction, not commitment.
 
 Deliberately minimal: request/response dispatch, the stage pipeline, and the CQRS layer.
 
-- [ ] Core abstractions: `IRequest`, `IRequestHandler<,>`, `NoResult`
-- [ ] `IRequestDispatcher` and the dispatcher with cached handler wrappers
+- [x] Core abstractions: `IRequest`, `IRequestHandler<,>`, `NoResult`
+- [x] `IRequestDispatcher` and the dispatcher over a frozen dispatch map
 - [ ] `IRequestStage` with open, constrained, and closed generic registration
 - [ ] `RequestFlow.Cqrs`: `ICommand`/`IQuery`, handler contracts, typed dispatchers
-- [ ] `AddRequestFlow` registration with assembly scanning
-- [ ] Exceptions and startup validation
+- [x] `AddRequestFlow` registration with assembly scanning and generic handler closings
+- [x] Exceptions and startup validation (`ValidateRequestFlow`)
 - [ ] NuGet publish and package ID prefix reservation
 
 Targets: `netstandard2.0;net8.0;net10.0`.
