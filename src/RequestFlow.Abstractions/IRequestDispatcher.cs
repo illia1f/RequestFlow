@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,10 +12,16 @@ public interface IRequestDispatcher
     /// <summary>
     /// Dispatches <paramref name="request"/> to its handler and returns the response.
     /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="HandlerNotFoundException"/>
+    /// <exception cref="ResponseTypeMismatchException"/>
     Task<TResponse> SendAsync<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Dispatches a void <paramref name="request"/> to its handler.
     /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="HandlerNotFoundException"/>
+    /// <exception cref="ResponseTypeMismatchException"/>
     Task SendAsync(IRequest request, CancellationToken cancellationToken = default);
 }

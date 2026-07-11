@@ -5,7 +5,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// Handles a single request type and produces its response. Exactly one handler is
-/// registered per closed request/response pair; the dispatcher resolves and invokes it.
+/// registered per request type; the dispatcher resolves and invokes it.
 /// </summary>
 /// <typeparam name="TRequest">The request handled.</typeparam>
 /// <typeparam name="TResponse">The response produced.</typeparam>
