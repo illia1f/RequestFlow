@@ -1,14 +1,20 @@
 # RequestFlow
 
-A small, fast request/handler and pipeline library for .NET. You define a request and its handler, then move cross-cutting concerns like validation, logging, authorization, and performance monitoring into composable stages instead of scattering them through the handler. A request flows through its stages, then into the handler, and the response flows back out.
+A small, fast request/handler library for .NET. You define a request and its handler, register them with one call, and dispatch through a single interface. Handler lookup is validated at startup and served from a frozen map, so nothing on the dispatch path uses reflection.
 
-The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, add the `RequestFlow.Cqrs` package.
+Composable stages for cross-cutting concerns (validation, logging, authorization) are the next planned piece: a request will flow through its stages, then into the handler, and the response back out. They are not in the current preview.
+
+The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, install `RequestFlow.Cqrs` instead; it already contains the core package.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-in%20development-orange)
+![Status](https://img.shields.io/badge/status-preview-orange)
 ![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net8.0%20%7C%20net10.0-512BD4)
 
-> **Status:** in development, nothing on NuGet yet.
+> **Status:** preview on NuGet. The request/handler core, startup validation, and the CQRS package are live; stages are still in development. Install with the `--prerelease` flag:
+>
+> ```
+> dotnet add package RequestFlow --prerelease
+> ```
 
 ## Why
 
@@ -17,16 +23,17 @@ The core library stays unopinionated about how you name your requests. If you wa
 None of them pair low-allocation dispatch with a command/query split the type system enforces. RequestFlow aims at that gap:
 
 1. No reflection on the hot path; handler lookup is cached.
-2. Stage pipeline composed once, no LINQ in dispatch.
-3. CQRS as an opt-in package, not a convention.
+2. CQRS as an opt-in package, not a convention.
+3. Stage pipeline composed once, no LINQ in dispatch (planned, not in the current preview).
 
-## Planned packages
+## Packages
 
-- **`RequestFlow.Abstractions`** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestStage`, `IRequestDispatcher`, `NoResult`. Depends on nothing.
-- **`RequestFlow`** is the runtime: dispatcher, stage pipeline, `AddRequestFlow` with assembly scanning. Depends on Abstractions and `Microsoft.Extensions.DependencyInjection.Abstractions`.
-- **`RequestFlow.Cqrs`** adds `ICommand`, `IQuery`, CQRS handler contracts, typed dispatchers. Same dependencies as the runtime.
+- **`RequestFlow.Abstractions`** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestDispatcher`, `NoResult`. Depends on nothing. `IRequestStage` joins this package when stages ship.
+- **`RequestFlow`** is the runtime: dispatcher, `AddRequestFlow` with assembly scanning, startup validation. Depends on Abstractions and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+- **`RequestFlow.Cqrs.Abstractions`** holds the CQRS contracts: `ICommand`, `IQuery`, their handler interfaces, `ICommandDispatcher`, `IQueryDispatcher`. Depends on `RequestFlow.Abstractions` only.
+- **`RequestFlow.Cqrs`** is the CQRS runtime: typed dispatcher implementations, registered with `AddRequestFlow(...).AddCqrs()`. Depends on the contracts package and the core runtime.
 
-Contracts live in their own package so your domain layer, and any future add-on package, can reference the interfaces without taking a dependency on the runtime. Everything shares the `RequestFlow` namespace.
+Contracts live in their own packages so your domain layer, and any future add-on package, can reference the interfaces without taking a dependency on a runtime. Install a runtime package at the composition root and the matching contracts arrive transitively. Core types share the `RequestFlow` namespace; the CQRS types live in `RequestFlow.Cqrs`.
 
 ## Documentation
 

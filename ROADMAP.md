@@ -9,7 +9,7 @@ Deliberately minimal: request/response dispatch, the stage pipeline, and the CQR
 - [x] Core abstractions: `IRequest`, `IRequestHandler<,>`, `NoResult`
 - [x] `IRequestDispatcher` and the dispatcher over a frozen dispatch map
 - [ ] `IRequestStage` with open, constrained, and closed generic registration
-- [ ] `RequestFlow.Cqrs`: `ICommand`/`IQuery`, handler contracts, typed dispatchers
+- [x] CQRS layer: `ICommand`/`IQuery` and handler contracts in `RequestFlow.Cqrs.Abstractions`, typed dispatchers and `AddCqrs` registration in `RequestFlow.Cqrs`
 - [x] `AddRequestFlow` registration with assembly scanning and generic handler closings
 - [x] Exceptions and startup validation (`ValidateRequestFlow`)
 - [ ] NuGet publish and package ID prefix reservation
