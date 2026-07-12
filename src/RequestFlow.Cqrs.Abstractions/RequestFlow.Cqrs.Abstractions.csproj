@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<TargetFrameworks>netstandard2.0;net8.0;net10.0</TargetFrameworks>
+	<LangVersion>latest</LangVersion>
+	<Nullable>enable</Nullable>
+	<Description>CQRS contracts for RequestFlow: ICommand, IQuery, handler and dispatcher interfaces. No runtime dependency, safe to reference from domain and application layers.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RequestFlow.Abstractions\RequestFlow.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

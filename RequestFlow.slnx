@@ -2,6 +2,7 @@
   <Folder Name="/samples/" />
   <Folder Name="/src/">
     <Project Path="src/RequestFlow.Abstractions/RequestFlow.Abstractions.csproj" Id="27f5d4e3-f8fc-491c-b221-d870df727eae" />
+    <Project Path="src/RequestFlow.Cqrs.Abstractions/RequestFlow.Cqrs.Abstractions.csproj" Id="bc85fd84-7040-4b88-b157-78df2303eb95" />
     <Project Path="src/RequestFlow.Cqrs/RequestFlow.Cqrs.csproj" />
     <Project Path="src/RequestFlow/RequestFlow.csproj" />
   </Folder>

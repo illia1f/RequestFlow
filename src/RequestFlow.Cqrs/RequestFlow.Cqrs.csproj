@@ -1,13 +1,23 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net8.0;net10.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <Description>Opt-in, type-enforced command/query split for RequestFlow: typed dispatcher implementations and AddCqrs registration on top of the RequestFlow runtime. Contracts live in RequestFlow.Cqrs.Abstractions.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\RequestFlow.Abstractions\RequestFlow.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RequestFlow.Cqrs.Abstractions\RequestFlow.Cqrs.Abstractions.csproj" />
+    <ProjectReference Include="..\RequestFlow\RequestFlow.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RequestFlow.Cqrs.Tests.Unit" Key="$(RequestFlowPublicKey)" />
   </ItemGroup>
 
 </Project>
