@@ -6,7 +6,7 @@ Composable stages for cross-cutting concerns (validation, logging, authorization
 
 The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, install `RequestFlow.Cqrs` instead; it already contains the core package.
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/illia1f/RequestFlow/blob/main/LICENSE)
 ![Status](https://img.shields.io/badge/status-preview-orange)
 ![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net8.0%20%7C%20net10.0-512BD4)
 
@@ -37,10 +37,10 @@ Contracts live in their own packages so your domain layer, and any future add-on
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md): install, first request and handler, dispatching
-- [Registration](docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
-- [Service lifetimes](docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
-- [Exceptions](docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
+- [Getting started](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md): install, first request and handler, dispatching
+- [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
+- [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
+- [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
 
 ## Contributing
 
@@ -48,4 +48,4 @@ Design feedback is the most useful contribution right now.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/illia1f/RequestFlow/blob/main/LICENSE).
