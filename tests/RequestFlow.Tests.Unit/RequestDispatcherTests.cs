@@ -96,6 +96,74 @@ public sealed class RequestDispatcherTests
             () => _sut.SendAsync<string>(null!));
     }
 
+    [Fact]
+    public async Task Given_Null_Void_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
+    {
+        await Should.ThrowAsync<ArgumentNullException>(
+            () => _sut.SendAsync((IRequest)null!));
+    }
+
+    [Fact]
+    public async Task Given_Faulted_Handler_Task_When_Sending_Request_Then_Handler_Exception_Propagates()
+    {
+        var failure = new InvalidOperationException("boom");
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<string>(failure));
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => _sut.SendAsync(new Ping("bob")));
+
+        exception.ShouldBeSameAs(failure);
+    }
+
+    [Fact]
+    public async Task Given_Faulted_Void_Handler_Task_When_Sending_Request_Then_Handler_Exception_Propagates()
+    {
+        var failure = new InvalidOperationException("boom");
+        _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(failure));
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => _sut.SendAsync(new Log("hi")));
+
+        exception.ShouldBeSameAs(failure);
+    }
+
+    [Fact]
+    public async Task Given_Asynchronously_Completing_Void_Handler_When_Sending_Request_Then_Task_Completes_After_Handler()
+    {
+        var completion = new TaskCompletionSource<object?>();
+        _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
+            .Returns(completion.Task);
+
+        Task<NoResult> result = _sut.SendAsync<NoResult>(new Log("hi"));
+
+        result.ShouldNotBeSameAs(NoResult.Task);
+        result.IsCompleted.ShouldBeFalse();
+        completion.SetResult(null);
+        (await result).ShouldBe(NoResult.Value);
+    }
+
+    [Fact]
+    public async Task Given_Cancellation_Token_When_Sending_Request_Then_Handler_Receives_Same_Token()
+    {
+        using var cts = new CancellationTokenSource();
+
+        await _sut.SendAsync(new Ping("bob"), cts.Token);
+
+        await _pingHandler.Received(1).HandleAsync(Arg.Any<Ping>(), cts.Token);
+    }
+
+    [Fact]
+    public async Task Given_Cancellation_Token_When_Sending_Void_Request_Then_Handler_Receives_Same_Token()
+    {
+        using var cts = new CancellationTokenSource();
+
+        await _sut.SendAsync(new Log("hi"), cts.Token);
+
+        await _logHandler.Received(1).HandleAsync(Arg.Any<Log>(), cts.Token);
+    }
+
     #region Initialization
 
     private readonly IRequestHandler<Ping, string> _pingHandler;
