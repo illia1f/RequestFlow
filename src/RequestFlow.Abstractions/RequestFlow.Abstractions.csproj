@@ -4,6 +4,7 @@
 	<TargetFrameworks>netstandard2.0;net8.0;net10.0</TargetFrameworks>
 	<LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <Description>Zero-dependency contracts for RequestFlow: requests, handlers, and dispatch abstractions. Reference this from application layers; the RequestFlow package provides the runtime.</Description>
   </PropertyGroup>
 
 </Project>

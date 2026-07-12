@@ -1,0 +1,30 @@
+<Project>
+
+  <PropertyGroup>
+    <Version>1.0.0-preview.1</Version>
+    <Authors>Illia Filippov</Authors>
+    <Company>Illia Filippov</Company>
+    <Copyright>Copyright Illia Filippov</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/illia1f/RequestFlow</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/illia1f/RequestFlow</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>mediator;cqrs;pipeline;dispatch;request;dotnet</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)RequestFlow.snk</AssemblyOriginatorKeyFile>
+    <RequestFlowPublicKey>0024000004800000140100000602000000240000525341310008000001000100f14a878288aef3a3fb12a8f09ad6a1c518fe7b2b7ca5ff7e03cdecfb0ab9536980cd3286a6b32f7f023f360142ec05809a2196b89b2d7ae6a9a333c2a24d36273a48ba1d4618f7f279fa9f29343e422e812e1a40acdbf881a29a227fe13ce8fcd00ca8623bd7a861205e0372dead23d3e0a43edab1050362f02d50cbc6e4cae05d1feb3a99dc1b6262a14b124893d72a71c83fecde50cea1991d9fcffab314e119e61f6455cccea86e98a2b2391a232c4ca05aac048f01d5a1df77247a3b6586fa6fc71678851663c88bd99bbddd2ef1bf0b652cb2af497d867defe233f8f9c3a804806c7586479f5b227a5aa69a892c996efa77010768fe43413e092f6f3bbc</RequestFlowPublicKey>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

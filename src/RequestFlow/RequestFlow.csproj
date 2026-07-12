@@ -4,6 +4,7 @@
     <TargetFrameworks>netstandard2.0;net8.0;net10.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <Description>Small, fast request/handler mediator for .NET: assembly scanning registration, startup validation, and reflection-free frozen-map dispatch. Free MIT alternative to MediatR.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="RequestFlow.Tests.Unit" />
+    <InternalsVisibleTo Include="RequestFlow.Tests.Unit" Key="$(RequestFlowPublicKey)" />
   </ItemGroup>
 
 </Project>
