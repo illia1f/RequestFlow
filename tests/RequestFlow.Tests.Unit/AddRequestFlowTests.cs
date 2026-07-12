@@ -78,6 +78,20 @@ public sealed class AddRequestFlowTests : IDisposable
     #endregion
 }
 
+public sealed class AddRequestFlowBuilderTests
+{
+    [Fact]
+    public void Given_Service_Collection_When_Registering_Request_Flow_Then_Returns_Builder_Exposing_Same_Services()
+    {
+        var services = new ServiceCollection();
+
+        RequestFlowBuilder builder = services.AddRequestFlow(
+            o => o.RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>());
+
+        builder.Services.ShouldBeSameAs(services);
+    }
+}
+
 public sealed class AddRequestFlowValidationTests
 {
     [Fact]

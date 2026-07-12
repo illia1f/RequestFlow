@@ -19,11 +19,12 @@ public static class ServiceCollectionExtensions
     /// on its first dispatcher resolution, throwing
     /// <see cref="RequestFlowValidationException"/> listing every registration problem:
     /// invalid generic handler declarations, constraint violations, missing handlers, and
-    /// duplicate handlers.
+    /// duplicate handlers. Returns a <see cref="RequestFlowBuilder"/> for chaining optional
+    /// feature registrations.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
-    public static IServiceCollection AddRequestFlow(
+    public static RequestFlowBuilder AddRequestFlow(
         this IServiceCollection services, Action<RequestFlowOptions> configure)
     {
         if (services is null)
@@ -53,7 +54,7 @@ public static class ServiceCollectionExtensions
         services.TryAdd(new ServiceDescriptor(
             typeof(IRequestDispatcher), typeof(RequestDispatcher), options.DispatcherLifetime));
 
-        return services;
+        return new RequestFlowBuilder(services);
     }
 
     private static List<GenericHandlerClosing> Expand(IReadOnlyList<GenericHandlerDeclaration> declarations)
