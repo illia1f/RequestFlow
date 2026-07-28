@@ -1,5 +1,4 @@
 using System.Reflection;
-using NSubstitute.ExceptionExtensions;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
@@ -68,12 +67,7 @@ public sealed class HandlerScannerTests
     [Fact]
     public void Given_Assembly_With_Unloadable_Types_When_Scanning_Then_Loadable_Types_Are_Still_Scanned()
     {
-        var assembly = Substitute.For<Assembly>();
-        assembly.GetTypes().Throws(new ReflectionTypeLoadException(
-            [typeof(ScanPingHandler), typeof(ScanPing), null],
-            [new TypeLoadException("Could not load type 'Broken'.")]));
-
-        ScanResult result = HandlerScanner.Scan([assembly]);
+        ScanResult result = HandlerScanner.Scan([new PartiallyLoadableAssembly()]);
 
         result.Handlers.ShouldContain(h => h.ImplementationType == typeof(ScanPingHandler));
         result.RequestTypes.ShouldContain(typeof(ScanPing));
@@ -103,6 +97,16 @@ public sealed class HandlerScannerTests
     public abstract class AbstractHandler : IRequestHandler<ScanPing, int>
     {
         public abstract Task<int> HandleAsync(ScanPing request, CancellationToken cancellationToken);
+    }
+
+    // Castle cannot proxy Assembly on .NET Framework (ISerializable without a deserialization constructor),
+    // so this is a real subclass instead of a substitute.
+    private sealed class PartiallyLoadableAssembly : Assembly
+    {
+        public override Type[] GetTypes()
+            => throw new ReflectionTypeLoadException(
+                [typeof(ScanPingHandler), typeof(ScanPing), null],
+                [new TypeLoadException("Could not load type 'Broken'.")]);
     }
 
     #endregion

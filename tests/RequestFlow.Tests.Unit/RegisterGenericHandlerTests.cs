@@ -128,7 +128,8 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains(handlerType.Name.Split('`')[0]));
+        string handlerName = handlerType.Name.Split('`')[0];
+        exception.Problems.ShouldContain(p => p.Contains(handlerName));
     }
 
     [Fact]

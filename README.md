@@ -8,7 +8,7 @@ The core library stays unopinionated about how you name your requests. If you wa
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/illia1f/RequestFlow/blob/main/LICENSE)
 ![Status](https://img.shields.io/badge/status-preview-orange)
-![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net8.0%20%7C%20net10.0-512BD4)
+![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net462%20%7C%20net8.0%20%7C%20net10.0-512BD4)
 
 > **Status:** preview on NuGet. The request/handler core, startup validation, and the CQRS package are live; stages are still in development. Install with the `--prerelease` flag:
 >
