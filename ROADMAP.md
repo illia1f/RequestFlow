@@ -14,7 +14,7 @@ Deliberately minimal: request/response dispatch, the stage pipeline, and the CQR
 - [x] Exceptions and startup validation (`ValidateRequestFlow`)
 - [ ] NuGet publish and package ID prefix reservation
 
-Targets: `netstandard2.0;net8.0;net10.0`.
+Targets: `netstandard2.0;net462;net8.0;net10.0`.
 
 ## v1.x
 

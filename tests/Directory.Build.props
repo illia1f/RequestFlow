@@ -1,14 +1,39 @@
 <Project>
 
-  <Import Project="..\Directory.Build.props" Condition="Exists('..\Directory.Build.props')" />
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <!-- net462 matches the library's oldest target, so tests exercise that exact build.
+         .NET Framework only runs on Windows. Requires the xunit runner pinned at 2.8.2. -->
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(TargetFrameworks);net462</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- ValidationFixtures lives here too, but it is a scanned library rather than a test host,
+         so it must not pull in the runner. -->
+    <IsUnitTestProject Condition="'$(IsUnitTestProject)' == '' And $(MSBuildProjectName.EndsWith('.Tests.Unit'))">true</IsUnitTestProject>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsUnitTestProject)' == 'true'">
+    <PackageReference Include="coverlet.collector" Version="10.0.1" PrivateAssets="all" />
+    <PackageReference Include="coverlet.msbuild" Version="10.0.1" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="Shouldly" Version="4.3.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <!-- Pinned: 2.8.2 is the last runner that targets net462; 3.x needs net472+. -->
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IsUnitTestProject)' == 'true'">
+    <Using Include="NSubstitute" />
+    <Using Include="Shouldly" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <Compile Include="$(MSBuildThisFileDirectory)Compat\*.cs" LinkBase="Compat" />
+  </ItemGroup>
 
 </Project>
