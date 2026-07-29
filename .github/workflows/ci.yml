@@ -3,8 +3,18 @@ name: ci
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.editorconfig'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.editorconfig'
 
 permissions:
   contents: read
@@ -20,16 +30,25 @@ env:
 
 jobs:
   build:
+    # net462 tests only run on Windows.
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
+          # global.json pins the SDK to 10.0.100. 8.0.x is here for the net8.0 test runtime.
           dotnet-version: |
             8.0.x
             10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.*.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
 
       - name: Restore
         run: dotnet restore
@@ -38,34 +57,25 @@ jobs:
         run: dotnet build --no-restore -c Release
 
       - name: Test
+        if: github.event_name == 'pull_request'
+        run: dotnet test --no-build -c Release --logger trx
+
+      - name: Test with coverage
+        if: github.event_name != 'pull_request'
         run: dotnet test --no-build -c Release --logger trx --collect:"XPlat Code Coverage"
 
+      - name: Pack
+        run: dotnet pack --no-build -c Release -o artifacts/packages
+
       - name: Upload test results
-        if: always()
+        if: failure() || github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: "**/TestResults/**"
-
-  pack:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      # Packing the solution would also restore and build every test project.
-      - name: Pack
-        run: |
-          for project in src/*/*.csproj; do
-            dotnet pack "$project" -c Release -o artifacts/packages
-          done
+          path: tests/*/TestResults/**
 
       - name: Upload packages
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: packages
