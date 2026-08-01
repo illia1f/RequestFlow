@@ -1,0 +1,164 @@
+name: release
+
+# A tag push builds, packs and publishes to nuget.org. Run the workflow by hand to do
+# everything except the publish, then download the release-packages artifact and inspect it.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: true
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    # net462 tests only run on Windows.
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          # global.json pins the SDK to 10.0.100. 8.0.x is here for the net8.0 test runtime.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.*.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore
+
+      # Manual runs have no tag to compare against: github.ref_name is a branch name there.
+      - name: Verify tag matches package version
+        if: github.event_name == 'push'
+        run: |
+          $expected = '${{ github.ref_name }}'.TrimStart('v')
+          $actual = (dotnet msbuild src/RequestFlow/RequestFlow.csproj -getProperty:Version).Trim()
+          if ($actual -ne $expected) {
+            Write-Error "Tag says $expected but the projects build as $actual. Update src/Directory.Build.props and re-tag."
+            exit 1
+          }
+
+      # Extracted here, before the publish job runs, because a package pushed to nuget.org
+      # cannot be replaced or deleted. Everything that can fail has to fail first.
+      - name: Extract release notes from CHANGELOG
+        if: github.event_name == 'push'
+        run: >
+          ./.github/scripts/Get-ReleaseNotes.ps1
+          -Version '${{ github.ref_name }}'
+          -OutputPath artifacts/release-notes.md
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release --logger trx
+
+      - name: Pack
+        run: dotnet pack --no-build -c Release -o artifacts/packages
+
+      - name: List packed files
+        run: Get-ChildItem artifacts/packages | Select-Object Name, Length
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          # The .snupkg symbol packages ride along so the publish job can push both.
+          path: artifacts/packages/*
+          # An empty pack output is a regression, not a warning to scroll past.
+          if-no-files-found: error
+
+      - name: Upload release notes
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: artifacts/release-notes.md
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    # Only a tag push publishes. Manual runs stop here, having built, tested and packed.
+    if: github.event_name == 'push'
+    environment: nuget
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Trusted Publishing: NuGet/login exchanges the GitHub OIDC token for a short-lived API key.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: artifacts/packages
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Get short-lived NuGet API key
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: illia1f
+
+      - name: Push to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        # The wildcard is quoted so dotnet expands it, not the shell. Each .nupkg push
+        # also sends the .snupkg sitting next to it.
+        run: >
+          dotnet nuget push 'artifacts/packages/*.nupkg'
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+  release:
+    # Runs last so the Release entry never points at packages that failed to upload.
+    needs: [build, publish]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Creating the Release is the only thing here that writes to the repository.
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: artifacts/packages
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: artifacts
+
+      - name: Create GitHub Release
+        # Pinned to a commit, not a tag: this is the one third-party action here, and it
+        # runs with contents: write. A moved tag would be a silent code swap.
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body_path: artifacts/release-notes.md
+          # Any tag with a suffix (v1.0.0-preview.2) is a prerelease, which also keeps it
+          # off the Latest badge. Only a bare v1.0.0 becomes the headline release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: artifacts/packages/*
+          fail_on_unmatched_files: true
