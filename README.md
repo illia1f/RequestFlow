@@ -1,4 +1,4 @@
-# RequestFlow
+# ![R](https://raw.githubusercontent.com/illia1f/RequestFlow/main/assets/RequestFlowLetterR-49x36.png)equestFlow
 
 A small, fast request/handler library for .NET. You define a request and its handler, register them with one call, and dispatch through a single interface. All the wiring happens at runtime, once at startup, with no compiler plugin and no build-time code generation: if a project can reference a NuGet package, it can run RequestFlow.
 

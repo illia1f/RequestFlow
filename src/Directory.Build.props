@@ -21,6 +21,7 @@
     <PackageProjectUrl>https://github.com/illia1f/RequestFlow</PackageProjectUrl>
     <PackageTags>mediator;cqrs;pipeline;dispatch;request;dotnet</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
 
   <PropertyGroup Label="Package output">
@@ -36,6 +37,7 @@
 
   <ItemGroup>
     <None Include="$(RepoRoot)README.md" Pack="true" PackagePath="\" />
+    <None Include="$(RepoRoot)assets\RequestFlowIcon-128x75.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 
 </Project>
