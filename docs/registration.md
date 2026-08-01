@@ -17,6 +17,8 @@ services.AddRequestFlow(o => o
 | `RegisterHandlersFromAssemblyContaining<T>()` | Scans the assembly containing `T`                                              |
 | `RegisterHandlersFromAssembly(assembly)`      | Scans the given assembly                                                        |
 | `RegisterGenericHandler(handlerType, ...)`    | Closes an open generic handler over the declared types                          |
+| `AddStage(stageType, configure?)`             | Wraps applicable handlers in a stage (see [stages.md](stages.md))               |
+| `DisallowUnusedStages()`                      | Fails startup validation when a stage reaches no request (see [stages.md](stages.md)) |
 | `AllowUnhandledRequests()`                    | Skips the missing-handler check at startup validation                           |
 | `WithHandlerLifetime(lifetime)`               | Lifetime for this call's handlers, transient by default (see [lifetimes.md](lifetimes.md)) |
 | `WithTransientDispatcher()`                   | Registers the dispatcher transient instead of scoped (see [lifetimes.md](lifetimes.md))    |

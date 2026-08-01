@@ -1,0 +1,36 @@
+using System;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+
+namespace RequestFlow;
+
+/// <summary>
+/// Rejects a null task returned by a handler with an <see cref="InvalidOperationException"/>
+/// that names the request type.
+/// </summary>
+internal static class NullTaskGuard
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Task<TResponse> ThrowIfNull<TResponse>(Task<TResponse> task, Type requestType)
+    {
+        if (task is null)
+            throw new InvalidOperationException(HandlerMessage(requestType));
+
+        return task;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Task ThrowIfNull(Task task, Type requestType)
+    {
+        if (task is null)
+            throw new InvalidOperationException(HandlerMessage(requestType));
+
+        return task;
+    }
+
+    /// <summary>
+    /// The error message for a handler that returned a null task, shared by every dispatch path.
+    /// </summary>
+    public static string HandlerMessage(Type requestType)
+        => $"The handler for '{requestType.FullName}' returned a null task from HandleAsync.";
+}

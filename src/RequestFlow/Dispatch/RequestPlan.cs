@@ -18,6 +18,7 @@ internal sealed class RequestPlan<TRequest, TResponse> : RequestPlan<TResponse>
         IRequest<TResponse> request, IServiceProvider services, CancellationToken cancellationToken)
     {
         var handler = services.GetRequiredService<IRequestHandler<TRequest, TResponse>>();
-        return handler.HandleAsync((TRequest)request, cancellationToken);
+        return NullTaskGuard.ThrowIfNull(
+            handler.HandleAsync((TRequest)request, cancellationToken), typeof(TRequest));
     }
 }
