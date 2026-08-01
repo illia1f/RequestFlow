@@ -8,6 +8,12 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 ## [Unreleased]
 
+## [1.0.0-preview.3] - 2026-08-02
+
+### Added
+
+- An embedded package icon on all four packages. nuget.org and the Visual Studio package manager show the RequestFlow logo instead of the default placeholder.
+
 ## [1.0.0-preview.2] - 2026-08-01
 
 ### Added
@@ -26,6 +32,7 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
-[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.2...HEAD
+[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.3...HEAD
+[1.0.0-preview.3]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.2...v1.0.0-preview.3
 [1.0.0-preview.2]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.1...v1.0.0-preview.2
 [1.0.0-preview.1]: https://github.com/illia1f/RequestFlow/releases/tag/v1.0.0-preview.1

@@ -13,7 +13,7 @@
     <!-- These two compose Version (1.0.0-preview.1). The release workflow reads Version back
          from the project and fails unless the pushed tag matches, so bump it here, then tag. -->
     <VersionPrefix>1.0.0</VersionPrefix>
-    <VersionSuffix>preview.2</VersionSuffix>
+    <VersionSuffix>preview.3</VersionSuffix>
     <Authors>Illia Filippov</Authors>
     <Company>Illia Filippov</Company>
     <Copyright>Copyright Illia Filippov</Copyright>
