@@ -17,13 +17,8 @@ internal sealed class VoidRequestPlan<TRequest> : RequestPlan<NoResult>
         IRequest<NoResult> request, IServiceProvider services, CancellationToken cancellationToken)
     {
         var handler = services.GetRequiredService<IRequestHandler<TRequest>>();
-        Task task = handler.HandleAsync((TRequest)request, cancellationToken);
-        return task.Status == TaskStatus.RanToCompletion ? NoResult.Task : AwaitAsync(task);
-    }
-
-    private static async Task<NoResult> AwaitAsync(Task task)
-    {
-        await task.ConfigureAwait(false);
-        return NoResult.Value;
+        Task task = NullTaskGuard.ThrowIfNull(
+            handler.HandleAsync((TRequest)request, cancellationToken), typeof(TRequest));
+        return NoResultBridge.Complete(task);
     }
 }

@@ -16,11 +16,9 @@ public static class ServiceCollectionExtensions
     /// Registers RequestFlow: scans the configured assemblies and registers the discovered
     /// handlers. Calls are additive; assemblies and closings already registered by an
     /// earlier call are skipped. The dispatch map is validated and built once per provider,
-    /// on its first dispatcher resolution, throwing
-    /// <see cref="RequestFlowValidationException"/> listing every registration problem:
-    /// invalid generic handler declarations, constraint violations, missing handlers, and
-    /// duplicate handlers. Returns a <see cref="RequestFlowBuilder"/> for chaining optional
-    /// feature registrations.
+    /// on its first dispatcher resolution, throwing a
+    /// <see cref="RequestFlowValidationException"/> that lists every registration problem.
+    /// Returns a <see cref="RequestFlowBuilder"/> for chaining optional feature registrations.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
@@ -45,10 +43,17 @@ public static class ServiceCollectionExtensions
         ScanResult scan = HandlerScanner.Scan(newAssemblies);
 
         List<HandlerRegistration> handlers = CollectHandlers(scan, closed);
-        List<string> problems = [.. declarations.Problems, .. closed.Problems];
+
+        StageDeclarationResult stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
+        registry.AddStageDeclarations(stages.ValidDeclarations);
+        if (options.UnusedStagesDisallowed)
+            registry.DisallowUnusedStages();
+
+        List<string> problems = [.. declarations.Problems, .. closed.Problems, .. stages.Problems];
         registry.Add(handlers, scan.RequestTypes, problems);
 
         RegisterHandlers(services, handlers, options.HandlerLifetime);
+        RegisterStages(services, registry.StageDeclarations, registry.Handlers, registry.ClosingCache);
 
         services.TryAddSingleton(_ => registry.BuildDispatchMap());
         services.TryAdd(new ServiceDescriptor(
@@ -101,6 +106,39 @@ public static class ServiceCollectionExtensions
                 ? typeof(IRequestHandler<>).MakeGenericType(handler.RequestType)
                 : typeof(IRequestHandler<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
             services.Add(new ServiceDescriptor(service, handler.ImplementationType, lifetime));
+        }
+    }
+
+    // Walks the whole accumulated cross product on every call rather than a delta, so a stage
+    // declared by an earlier call reaches requests scanned by a later one; the closing cache
+    // makes the repeated pairs cheap. Skipping a type that is already present leaves a stage
+    // the consumer registered themselves on its own lifetime; a keyed descriptor is a
+    // different service, so it does not count as present.
+    private static void RegisterStages(
+        IServiceCollection services,
+        IReadOnlyList<StageDeclaration> declarations,
+        IReadOnlyList<HandlerRegistration> handlers,
+        StageClosingCache closings)
+    {
+        HashSet<Type> registered = [];
+        foreach (var descriptor in services)
+        {
+            if (!descriptor.IsKeyedService)
+                registered.Add(descriptor.ServiceType);
+        }
+
+        foreach (var declaration in declarations)
+        {
+            foreach (var handler in handlers)
+            {
+                if (!closings.TryClose(declaration, handler, out Type closedStageType))
+                    continue;
+
+                if (!registered.Add(closedStageType))
+                    continue;
+
+                services.Add(new ServiceDescriptor(closedStageType, closedStageType, ServiceLifetime.Transient));
+            }
         }
     }
 }

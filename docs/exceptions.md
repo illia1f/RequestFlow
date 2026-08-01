@@ -9,6 +9,8 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 | `RequestFlowValidationException` | Startup validation       | Any registration problem; one throw lists all of them          |
 | `HandlerNotFoundException`       | `SendAsync`              | The dispatched request type has no registered handler          |
 | `ResponseTypeMismatchException`  | `SendAsync`              | The call site's response type differs from the registered one  |
+| `InvalidOperationException`      | `SendAsync`              | A handler or stage returned a null task, or a stage overlapped two `next` calls |
+| `InvalidOperationException`      | `WhereHandlerImplements` | A second handler filter added to one stage                     |
 | `ArgumentNullException`          | All public entry points  | A required argument is null                                    |
 | `ArgumentException`              | `RegisterGenericHandler` | `closingTypes` contains a null element                         |
 
@@ -29,6 +31,19 @@ Thrown when RequestFlow validates everything registered: the first time a dispat
 | `Generic handler '...' declares no closing types...` | `RegisterGenericHandler(typeof(AuditHandler<>))` with no closings              | Declare at least one closing type                                       |
 | `Closing type '...' ... is not a closed type.`       | An open generic passed as a closing type                                       | Close it first: `typeof(Audit<Order>)`, not `typeof(Audit<>)`           |
 | `Generic handler '...' cannot be closed over '...'...` | The closing type violates the handler's generic constraints                  | Pick a closing type that satisfies the `where` clauses                  |
+
+Stages registered with `AddStage` bring their own checks (see [stages.md](stages.md)); their problems land in the same exception:
+
+| Problem message starts with                              | Cause                                                                        | Fix                                                                     |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `'...' is an interface; only concrete stage classes...`  | An interface passed to `AddStage`                                              | Register the implementing class                                          |
+| `'...' is abstract; only concrete stage classes...`      | An abstract class passed to `AddStage`                                         | Register a concrete stage class                                          |
+| `'...' is partially closed...`                           | A stage type with some type parameters bound and some open                     | Pass the open definition or a fully closed type                           |
+| `'...' does not implement IRequestStage...`              | The registered type is not a stage                                             | Implement `IRequestStage<TRequest, TResponse>` or `IRequestStage<TRequest>` |
+| `'...' declares generic parameters <...> that its IRequestStage implementation does not use...` | An open generic stage whose contract does not name its own parameters as the request | Implement the contract with the stage's own parameters, request first    |
+| `Stage '...' from assembly '...' is registered more than once...` | The same stage type in two `AddStage` calls                             | Remove the duplicate; a handler filter does not make it distinct          |
+| `Stages '...' and '...' both resolve to '...'` / `Stages '...' and '...' are the same stage class...` | An open definition registered next to its own closed form, or two closings of one class reaching the same request | Remove one of the two `AddStage` calls |
+| `Stage '...' from assembly '...' applies to no registered request...` | `DisallowUnusedStages` is on and the stage reached nothing            | Widen its constraints, scan the assembly holding its requests, or drop the opt-in |
 
 Example: a contracts assembly scanned without its handlers fails at startup, not per request.
 
@@ -112,6 +127,19 @@ public sealed class SyncInventory : IRequest, IRequest<SyncReport> { }
 
 With a handler registered as `IRequestHandler<SyncInventory, SyncReport>`, the natural call `SendAsync(new SyncInventory())` cannot infer `TResponse` from two candidate interfaces. It silently binds the void `SendAsync(IRequest)` overload, asks for `NoResult`, and throws. The fix belongs in the model, not the call site: give each request type exactly one `IRequest<TResponse>` interface, and split it in two if both shapes are needed.
 
+## InvalidOperationException
+
+Plain `InvalidOperationException` signals a broken handler or stage contract. Three cases surface at dispatch, one at registration:
+
+| Message starts with                                        | Thrown from                | Fix                                                                      |
+| ----------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------- |
+| `The handler for '...' returned a null task from HandleAsync.` | `SendAsync`             | Return a task from every path; use `Task.CompletedTask` or `Task.FromResult` for synchronous results |
+| `Stage '...' returned a null task from HandleAsync...`      | `SendAsync`                 | Return the task from `next`, or a completed task when short-circuiting      |
+| `Stage '...' called next while the task from its earlier call was still running.` | `SendAsync` | Await each `next` call before calling it again; each call runs the rest of the chain |
+| `This stage already filters on '...'`                       | `AddStage` configure delegate | One `WhereHandlerImplements` per stage; give the target handlers one shared contract |
+
+The null-task checks exist so the failure names the handler or stage at fault instead of surfacing as a `NullReferenceException` at the await. The overlap check stops a stage from running the rest of the chain twice at the same time; a sequential second call, the retry shape, is allowed (see [stages.md](stages.md)).
+
 ## Argument validation
 
 Argument checks at the public surface throw immediately at the call site:
@@ -123,11 +151,12 @@ Argument checks at the public surface throw immediately at the call site:
 | `RegisterHandlersFromAssembly`        | `ArgumentNullException` | `assembly` is null                      |
 | `RegisterGenericHandler`              | `ArgumentNullException` | `handlerType` or `closingTypes` is null |
 | `RegisterGenericHandler`              | `ArgumentException`     | `closingTypes` contains a null element  |
+| `AddStage`                            | `ArgumentNullException` | `stageType` is null                     |
 | `ValidateRequestFlow`                 | `ArgumentNullException` | `provider` is null                      |
 
 ## What RequestFlow never wraps
 
-Handler exceptions propagate as thrown. The dispatcher adds no try/catch and no wrapper exception, so `await dispatcher.SendAsync(...)` observes exactly what `HandleAsync` threw.
+Handler and stage exceptions propagate as thrown. The dispatcher and the stage chain add no try/catch and no wrapper exception, so `await dispatcher.SendAsync(...)` observes exactly what the failing `HandleAsync` threw. A stage that wants to translate exceptions does so itself, in a try/catch around `next`.
 
 Cancellation follows the same rule. The token passes to `HandleAsync` untouched, and an `OperationCanceledException` surfaces from the handler like any other exception.
 

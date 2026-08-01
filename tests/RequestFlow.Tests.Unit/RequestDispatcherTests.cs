@@ -104,6 +104,32 @@ public sealed class RequestDispatcherTests
     }
 
     [Fact]
+    public async Task Given_Handler_That_Returns_A_Null_Task_When_Sending_Request_Then_Throws_Naming_The_Request()
+    {
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
+            .Returns(default(Task<string>)!);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => _sut.SendAsync(new Ping("bob")));
+
+        exception.Message.ShouldContain(nameof(Ping));
+        exception.Message.ShouldContain("null task");
+    }
+
+    [Fact]
+    public async Task Given_Void_Handler_That_Returns_A_Null_Task_When_Sending_Request_Then_Throws_Naming_The_Request()
+    {
+        _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
+            .Returns(default(Task)!);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => _sut.SendAsync(new Log("hi")));
+
+        exception.Message.ShouldContain(nameof(Log));
+        exception.Message.ShouldContain("null task");
+    }
+
+    [Fact]
     public async Task Given_Faulted_Handler_Task_When_Sending_Request_Then_Handler_Exception_Propagates()
     {
         var failure = new InvalidOperationException("boom");

@@ -1,16 +1,17 @@
 # RequestFlow
 
-A small, fast request/handler library for .NET. You define a request and its handler, register them with one call, and dispatch through a single interface. Handler lookup is validated at startup and served from a frozen map, so nothing on the dispatch path uses reflection.
-
-Composable stages for cross-cutting concerns (validation, logging, authorization) are the next planned piece: a request will flow through its stages, then into the handler, and the response back out. They are not in the current preview.
+A small, fast request/handler library for .NET. You define a request and its handler, register them with one call, and dispatch through a single interface. All the wiring happens at runtime, once at startup, with no compiler plugin and no build-time code generation: if a project can reference a NuGet package, it can run RequestFlow.
 
 The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, install `RequestFlow.Cqrs` instead; it already contains the core package.
 
+[![NuGet](https://img.shields.io/nuget/vpre/RequestFlow?label=nuget)](https://www.nuget.org/packages/RequestFlow)
+[![Downloads](https://img.shields.io/nuget/dt/RequestFlow?label=downloads)](https://www.nuget.org/packages/RequestFlow)
+[![CI](https://github.com/illia1f/RequestFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/illia1f/RequestFlow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/illia1f/RequestFlow/blob/main/LICENSE)
 ![Status](https://img.shields.io/badge/status-preview-orange)
 ![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net462%20%7C%20net8.0%20%7C%20net10.0-512BD4)
 
-> **Status:** preview on NuGet. The request/handler core, startup validation, and the CQRS package are live; stages are still in development. Install with the `--prerelease` flag:
+> **Status:** [preview on NuGet](https://www.nuget.org/packages/RequestFlow). Install with the `--prerelease` flag:
 >
 > ```
 > dotnet add package RequestFlow --prerelease
@@ -18,20 +19,36 @@ The core library stays unopinionated about how you name your requests. If you wa
 
 ## Why
 
-[MediatR](https://github.com/LuckyPennySoftware/MediatR) went commercial in 2025, and it had been the default for this kind of work for years. The free options that remain fall into two camps. Some are general-purpose mediators that treat every message the same, with no distinction between a command and a query. Others are older and narrower, like Microsoft's [CQRS.Mediatr.Lite](https://github.com/microsoft/CQRS.Mediatr.Lite), which last shipped in 2021 and solved one team's problem before going quiet.
+[MediatR](https://github.com/LuckyPennySoftware/MediatR) went commercial in 2025, and the search for a replacement now turns up a crowded field of free mediators. Many of the fastest are built on source generators: compiler plugins that write the dispatch code during your build. That buys speed and compile-time checks. It also ties the library to your toolchain: a recent compiler, `PackageReference`, analyzers left on, and generated code in every build.
 
-None of them pair low-allocation dispatch with a command/query split the type system enforces. RequestFlow aims at that gap:
+RequestFlow trades those requirements away and keeps everything at runtime.
 
-1. No reflection on the hot path; handler lookup is cached.
-2. CQRS as an opt-in package, not a convention.
-3. Stage pipeline composed once, no LINQ in dispatch (planned, not in the current preview).
+- Errors surface at startup, not in production. Discovery, validation, and the dispatch plan all finish before the first request, and a broken configuration fails the boot with one exception listing every problem. After that, dispatch is one dictionary lookup with no reflection, LINQ, or locking.
+- No build step. Nothing runs inside your compiler, and there is no generated code to step through when something misbehaves. One package behaves the same from .NET 10 down to .NET Framework 4.6.2.
+- MIT, permanently. This library exists because a license changed underneath its users once. It takes no dependency whose license could do the same.
+- Migration is mostly renames. Requests and handlers keep their shape coming from MediatR; the mapping table below covers a typical codebase.
+
+Fast is a claim to prove, not to assert. A BenchmarkDotNet suite against the other mediators, raw artifacts included, is on the [roadmap](ROADMAP.md) before v1. Until it lands, this README quotes no numbers.
+
+## Coming from MediatR
+
+| MediatR                                              | RequestFlow                                           |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| `IRequest<TResponse>`, `IRequest`                    | same names, `RequestFlow` namespace                   |
+| `IRequestHandler<TRequest, TResponse>` with `Handle` | same interface, method is `HandleAsync`               |
+| `IMediator.Send(...)`                                | `IRequestDispatcher.SendAsync(...)`                   |
+| void requests through `Unit`                         | void handlers return plain `Task`, no `Unit` anywhere |
+| `IPipelineBehavior<,>`                               | `IRequestStage<,>`                                    |
+| `services.AddMediatR(...)`                           | `services.AddRequestFlow(...)`                        |
+
+What doesn't move yet: notifications (`INotification` / `Publish`) and streaming. Both are on the [roadmap](ROADMAP.md) for after v1.0. Notifications return as events, an in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`); streaming arrives through `IAsyncEnumerable<T>`. Neither is built today, so if your codebase leans on either, hold the migration until they land.
 
 ## Packages
 
-- **`RequestFlow.Abstractions`** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestDispatcher`, `NoResult`. Depends on nothing. `IRequestStage` joins this package when stages ship.
-- **`RequestFlow`** is the runtime: dispatcher, `AddRequestFlow` with assembly scanning, startup validation. Depends on Abstractions and `Microsoft.Extensions.DependencyInjection.Abstractions`.
-- **`RequestFlow.Cqrs.Abstractions`** holds the CQRS contracts: `ICommand`, `IQuery`, their handler interfaces, `ICommandDispatcher`, `IQueryDispatcher`. Depends on `RequestFlow.Abstractions` only.
-- **`RequestFlow.Cqrs`** is the CQRS runtime: typed dispatcher implementations, registered with `AddRequestFlow(...).AddCqrs()`. Depends on the contracts package and the core runtime.
+- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestDispatcher`, `IRequestStage`, `NoResult`. Depends on nothing.
+- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** is the runtime: dispatcher, `AddRequestFlow` with assembly scanning, startup validation. Depends on Abstractions and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+- **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds the CQRS contracts: `ICommand`, `IQuery`, their handler interfaces, `ICommandDispatcher`, `IQueryDispatcher`. Depends on `RequestFlow.Abstractions` only.
+- **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** is the CQRS runtime: typed dispatcher implementations, registered with `AddRequestFlow(...).AddCqrs()`. Depends on the contracts package and the core runtime.
 
 Contracts live in their own packages so your domain layer, and any future add-on package, can reference the interfaces without taking a dependency on a runtime. Install a runtime package at the composition root and the matching contracts arrive transitively. Core types share the `RequestFlow` namespace; the CQRS types live in `RequestFlow.Cqrs`.
 
@@ -39,6 +56,7 @@ Contracts live in their own packages so your domain layer, and any future add-on
 
 - [Getting started](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md): install, first request and handler, dispatching
 - [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
+- [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, which requests a stage reaches, filters
 - [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
 - [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
 

@@ -15,6 +15,10 @@ public sealed class RequestFlowOptions
 
     internal List<GenericHandlerDeclaration> Declarations { get; } = [];
 
+    internal List<StageDeclaration> StageDeclarations { get; } = [];
+
+    internal bool UnusedStagesDisallowed { get; private set; }
+
     /// <exception cref="ArgumentNullException"/>
     internal RequestFlowOptions Apply(Action<RequestFlowOptions> configure)
     {
@@ -114,7 +118,52 @@ public sealed class RequestFlowOptions
         }
 
         Declarations.Add(new GenericHandlerDeclaration(handlerType, closingTypes));
-        
+
+        return this;
+    }
+
+    /// <summary>
+    /// Registers <paramref name="stageType"/> to run around the handler of every request it
+    /// applies to. Pass an open generic definition such as <c>typeof(LoggingStage&lt;,&gt;)</c>
+    /// to let the stage's own generic constraints decide which requests it reaches, or a
+    /// closed stage class to target a single request contract. A closed stage is not
+    /// restricted to the one request type it names: <c>TRequest</c> is contravariant, so a
+    /// stage declared for a base request also wraps every request that derives from it.
+    /// <paramref name="configure"/> narrows that set further. One stage type belongs to a chain
+    /// once, so a second call naming the same type is a duplicate whatever it filters on.
+    /// Registration order is execution order, outermost first. A null argument and a repeated
+    /// <c>WhereHandlerImplements</c> call throw here; an invalid stage surfaces as a
+    /// <see cref="RequestFlowValidationException"/> problem when the dispatch map is built.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="InvalidOperationException"/>
+    public RequestFlowOptions AddStage(Type stageType, Action<StageApplicability>? configure = null)
+    {
+        if (stageType is null)
+            throw new ArgumentNullException(nameof(stageType));
+
+        var applicability = new StageApplicability();
+        configure?.Invoke(applicability);
+
+        StageDeclarations.Add(new StageDeclaration(stageType, applicability.HandlerFilter));
+
+        return this;
+    }
+
+    /// <summary>
+    /// Registers <typeparamref name="TStage"/> under the same rules as <see cref="AddStage(Type, Action{StageApplicability})"/>.
+    /// </summary>
+    public RequestFlowOptions AddStage<TStage>(Action<StageApplicability>? configure = null)
+        where TStage : class
+        => AddStage(typeof(TStage), configure);
+
+    /// <summary>
+    /// Reports a stage that reaches no registered request as a validation problem instead of
+    /// leaving it a silent no-op. Applies to all registered stages once any call opts in.
+    /// </summary>
+    public RequestFlowOptions DisallowUnusedStages()
+    {
+        UnusedStagesDisallowed = true;
         return this;
     }
 }

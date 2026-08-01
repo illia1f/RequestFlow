@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 #if NET8_0_OR_GREATER
 using System.Collections.Frozen;
 #endif
@@ -18,6 +19,7 @@ internal sealed class DispatchMap(Dictionary<Type, RequestPlanBase> plans)
     private readonly Dictionary<Type, RequestPlanBase> _plans = plans;
 #endif
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGet(Type requestType, out RequestPlanBase? plan)
         => _plans.TryGetValue(requestType, out plan);
 }
