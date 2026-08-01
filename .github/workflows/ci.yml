@@ -34,9 +34,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           # global.json pins the SDK to 10.0.100. 8.0.x is here for the net8.0 test runtime.
           dotnet-version: |
@@ -44,7 +44,7 @@ jobs:
             10.0.x
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.*.props', 'global.json') }}
@@ -69,14 +69,14 @@ jobs:
 
       - name: Upload test results
         if: failure() || github.event_name == 'push'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: tests/*/TestResults/**
 
       - name: Upload packages
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages
           path: artifacts/packages/*

@@ -25,9 +25,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           # global.json pins the SDK to 10.0.100. 8.0.x is here for the net8.0 test runtime.
           dotnet-version: |
@@ -35,7 +35,7 @@ jobs:
             10.0.x
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/Directory.*.props', 'global.json') }}
@@ -77,7 +77,7 @@ jobs:
         run: Get-ChildItem artifacts/packages | Select-Object Name, Length
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-packages
           # The .snupkg symbol packages ride along so the publish job can push both.
@@ -87,7 +87,7 @@ jobs:
 
       - name: Upload release notes
         if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: artifacts/release-notes.md
@@ -105,12 +105,12 @@ jobs:
       # Trusted Publishing: NuGet/login exchanges the GitHub OIDC token for a short-lived API key.
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-packages
           path: artifacts/packages
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
 
@@ -141,12 +141,12 @@ jobs:
       # Creating the Release is the only thing here that writes to the repository.
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-packages
           path: artifacts/packages
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-notes
           path: artifacts
@@ -154,7 +154,7 @@ jobs:
       - name: Create GitHub Release
         # Pinned to a commit, not a tag: this is the one third-party action here, and it
         # runs with contents: write. A moved tag would be a silent code swap.
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           body_path: artifacts/release-notes.md
           # Any tag with a suffix (v1.0.0-preview.2) is a prerelease, which also keeps it
