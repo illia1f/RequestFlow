@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
@@ -131,20 +132,121 @@ public sealed class StageLifetimeTests
     }
 
     [Fact]
-    public void Given_Consumer_Registered_Stage_When_Adding_Request_Flow_Then_The_Consumer_Registration_Is_Kept()
+    public void Given_Stage_With_No_Declared_Lifetime_When_Adding_Request_Flow_Then_The_Closed_Stage_Is_Transient()
+    {
+        ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>)));
+
+        LifetimeOf(services).ShouldBe(ServiceLifetime.Transient);
+    }
+
+    [Fact]
+    public void Given_Stage_Declared_Singleton_When_Adding_Request_Flow_Then_The_Closed_Stage_Is_Singleton()
+    {
+        ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsSingleton()));
+
+        LifetimeOf(services).ShouldBe(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void Given_Stage_Declared_Scoped_When_Adding_Request_Flow_Then_The_Closed_Stage_Is_Scoped()
+    {
+        ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsScoped()));
+
+        LifetimeOf(services).ShouldBe(ServiceLifetime.Scoped);
+    }
+
+    [Fact]
+    public void Given_Two_Stages_With_Different_Lifetimes_When_Adding_Request_Flow_Then_Each_Keeps_Its_Own()
+    {
+        ServiceCollection services = Collect(o => o
+            .AddStage(typeof(ProbeStage<,>), s => s.AsSingleton())
+            .AddStage(typeof(MarkerStage<,>), s => s.AsScoped()));
+
+        LifetimeOf(services).ShouldBe(ServiceLifetime.Singleton);
+        LifetimeOf(services, typeof(MarkerStage<Probe, string>)).ShouldBe(ServiceLifetime.Scoped);
+    }
+
+    [Fact]
+    public async Task Given_Singleton_Stage_When_Sending_From_Two_Scopes_Then_One_Instance_Runs_Both()
+    {
+        ServiceProvider provider = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsSingleton()))
+            .BuildServiceProvider();
+
+        await SendTwiceInSeparateScopesAsync(provider);
+
+        StageInstances[0].ShouldBeSameAs(StageInstances[1]);
+    }
+
+    [Fact]
+    public async Task Given_Scoped_Stage_When_Sending_Twice_In_One_Scope_Then_One_Instance_Runs_Both()
+    {
+        ServiceProvider provider = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsScoped()))
+            .BuildServiceProvider();
+
+        await SendTwiceInOneScopeAsync(provider);
+
+        StageInstances[0].ShouldBeSameAs(StageInstances[1]);
+    }
+
+    [Fact]
+    public async Task Given_Scoped_Stage_When_Sending_From_Two_Scopes_Then_Each_Scope_Gets_Its_Own_Instance()
+    {
+        ServiceProvider provider = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsScoped()))
+            .BuildServiceProvider();
+
+        await SendTwiceInSeparateScopesAsync(provider);
+
+        StageInstances[0].ShouldNotBeSameAs(StageInstances[1]);
+    }
+
+    // Stages register the way handlers do, so the declaration's descriptor comes last and wins,
+    // and the one registered first is left behind for ValidateOnBuild to walk.
+    [Fact]
+    public void Given_Consumer_Registered_Stage_Before_Adding_Request_Flow_When_Adding_Request_Flow_Then_The_Declaration_Wins()
     {
         var services = new ServiceCollection();
-        services.AddScoped<ScopeMarker>();
-        services.AddSingleton<MarkerStage<Probe, string>>();
+        services.AddSingleton<ProbeStage<Probe, string>>();
 
-        services.AddRequestFlow(o => o
-            .RegisterHandlersFromAssemblyContaining<StageLifetimeTests>()
-            .AddStage(typeof(MarkerStage<,>)));
+        AddFlow(services, o => o.AddStage(typeof(ProbeStage<,>), s => s.AsScoped()));
 
-        List<ServiceDescriptor> descriptors =
-            [.. services.Where(d => d.ServiceType == typeof(MarkerStage<Probe, string>))];
+        List<ServiceDescriptor> descriptors = DescriptorsFor(services);
+        descriptors.Count.ShouldBe(2);
+        descriptors[1].Lifetime.ShouldBe(ServiceLifetime.Scoped);
+    }
+
+    [Fact]
+    public async Task Given_Stage_Registered_After_Adding_Request_Flow_When_Sending_Then_That_Registration_Wins()
+    {
+        ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>)));
+        services.AddSingleton<ProbeStage<Probe, string>>();
+
+        await SendTwiceInSeparateScopesAsync(services.BuildServiceProvider());
+
+        StageInstances[0].ShouldBeSameAs(StageInstances[1]);
+    }
+
+    // One descriptor is the point: ValidateOnBuild walks every one of them, and the descriptor
+    // AddStage leaves behind names a constructor the container may not be able to satisfy.
+    [Fact]
+    public void Given_Hand_Built_Stage_Replacing_The_Declaration_Then_Only_That_Descriptor_Remains()
+    {
+        ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>)));
+
+        services.Replace(ServiceDescriptor.Singleton(new ProbeStage<Probe, string>()));
+
+        List<ServiceDescriptor> descriptors = DescriptorsFor(services);
         descriptors.Count.ShouldBe(1);
-        descriptors[0].Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        descriptors[0].ImplementationInstance.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Given_Stage_Declared_In_An_Earlier_Call_When_Adding_Request_Flow_Again_Then_It_Is_Registered_Once()
+    {
+        ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsSingleton()));
+
+        AddFlow(services,_ => { });
+
+        DescriptorsFor(services).Count.ShouldBe(1);
     }
 
     #region Initialization
@@ -173,15 +275,30 @@ public sealed class StageLifetimeTests
     #region Helpers
 
     private static ServiceProvider Build()
+        => Collect(o => o.AddStage(typeof(MarkerStage<,>))).BuildServiceProvider();
+
+    private static ServiceCollection Collect(Action<RequestFlowOptions> configure)
     {
         var services = new ServiceCollection();
         services.AddScoped<ScopeMarker>();
-        services.AddRequestFlow(o => o
-            .RegisterHandlersFromAssemblyContaining<StageLifetimeTests>()
-            .AddStage(typeof(MarkerStage<,>)));
+        AddFlow(services, configure);
 
-        return services.BuildServiceProvider();
+        return services;
     }
+
+    private static void AddFlow(ServiceCollection services, Action<RequestFlowOptions> configure)
+        => services.AddRequestFlow(o =>
+        {
+            o.RegisterHandlersFromAssemblyContaining<StageLifetimeTests>();
+            configure(o);
+        });
+
+    private static List<ServiceDescriptor> DescriptorsFor(
+        IServiceCollection services, Type? stageType = null)
+        => [.. services.Where(d => d.ServiceType == (stageType ?? typeof(ProbeStage<Probe, string>)))];
+
+    private static ServiceLifetime LifetimeOf(IServiceCollection services, Type? stageType = null)
+        => DescriptorsFor(services, stageType).Single().Lifetime;
 
     private static async Task SendAsync(ServiceProvider provider)
     {
@@ -269,6 +386,19 @@ public sealed class StageLifetimeTests
             TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
             StageMarkers.Add(marker);
+            StageInstances.Add(this);
+
+            return next.InvokeAsync();
+        }
+    }
+
+    // No constructor dependencies, so it registers cleanly under any lifetime.
+    public sealed class ProbeStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        public Task<TResponse> HandleAsync(
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+        {
             StageInstances.Add(this);
 
             return next.InvokeAsync();

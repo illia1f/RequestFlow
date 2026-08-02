@@ -6,30 +6,44 @@ What RequestFlow registers, with which lifetime, and what you can change.
 
 | Service                                                                        | Lifetime                                                   | Configurable                   |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------ |
-| Handlers (`IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`) | Transient                                                  | Yes, per `AddRequestFlow` call |
+| Handlers (`IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
+| Stages (`IRequestStage<TRequest, TResponse>`, `IRequestStage<TRequest>`)       | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage` call |
 | `IRequestDispatcher`                                                           | Scoped                                                     | Yes, `WithTransientDispatcher` |
 | Dispatch map (internal handler lookup)                                         | Singleton, built the first time the dispatcher is resolved | No                             |
 
 ## Configuring handler lifetime
 
-Call `WithHandlerLifetime` inside the configure delegate; it chains with the registration methods:
+Handlers are transient by default: each dispatch gets a fresh instance, so a handler can hold mutable state without leaking it into the next dispatch. Call `WithScopedHandlers` when handlers share per-request dependencies such as a `DbContext`; it chains with the registration methods:
 
 ```csharp
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Program>()
-    .WithHandlerLifetime(ServiceLifetime.Scoped));
+    .WithScopedHandlers());
 ```
 
-`ServiceLifetime.Transient` is the default: each dispatch gets a fresh handler instance, so a handler can hold mutable state without leaking it into the next dispatch. Use `Scoped` when handlers share per-request dependencies such as a `DbContext`. Use `Singleton` only for stateless handlers whose dependencies are all singletons.
+Those two are the whole set. There is no singleton option, because a singleton handler pins every dependency it injects for the life of the process, and the dependency it usually injects is a `DbContext`. To register one anyway, add it yourself after the last `AddRequestFlow` call:
+
+```csharp
+services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<Program>());
+services.AddSingleton<IRequestHandler<Ping, string>, PingHandler>();
+```
+
+Order matters there, and one rule covers handlers and stages alike: register your own after the last `AddRequestFlow` call. RequestFlow appends its descriptors whatever the collection already holds, and the container resolves the last descriptor registered for a service type, so yours has to come second.
+
+- "Last call" is literal. A registration made between two calls usually does win, since a call registers only what it newly discovers and skips a handler or closed stage type an earlier call already registered. It loses when the later call scans a new assembly and is the first to close an already declared stage over one of the new request types. Going after the last call saves you from telling those apart.
+- A descriptor yours overrules stays in the collection and never resolves, but `ValidateOnBuild` still walks it and checks the constructor it names.
+- Supplying an instance you built yourself calls for `services.Replace`, which drops the leftover descriptor along the way. [stages.md](stages.md#replacing-a-stage-registration) has the example.
+
+The captive dependency rules below are yours to keep from that point on.
 
 ## Lifetime is per registration call
 
-`AddRequestFlow` can be called multiple times; calls are additive. Each call's `HandlerLifetime` applies to the handlers that call discovers:
+`AddRequestFlow` can be called multiple times; calls are additive. Each call decides the lifetime of the handlers that call discovers:
 
 ```csharp
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Orders.Module>()
-    .WithHandlerLifetime(ServiceLifetime.Scoped));
+    .WithScopedHandlers());
 
 // Handlers stay transient by default.
 services.AddRequestFlow(o => o
@@ -37,6 +51,29 @@ services.AddRequestFlow(o => o
 ```
 
 An assembly already registered by an earlier call is skipped, so its handlers keep the lifetime of the call that first registered it. The same rule applies to `RegisterGenericHandler`: registering a generic handler for the same closing type again does nothing, and the first registration's lifetime wins.
+
+`WithScopedHandlers` is the opposite of the dispatcher's rule below, where the first call fixes the lifetime for everyone. Handlers belong to the call that found them; the dispatcher is one service shared by all of them.
+
+## Stage lifetime is per stage
+
+Handlers are homogeneous, so one lifetime per registration call fits them. Stages are not: a logging stage wants singleton and a unit-of-work stage wants scoped in the same chain. One global setting would drag both to whichever is stricter, so the lifetime sits on the declaration:
+
+```csharp
+services.AddRequestFlow(o => o
+    .RegisterHandlersFromAssemblyContaining<Program>()
+    .AddStage(typeof(LoggingStage<,>), s => s.AsSingleton())
+    .AddStage(typeof(UnitOfWorkStage<,>), s => s.AsScoped()));
+```
+
+Stages get the singleton option handlers do not, because a stage is usually the cross-cutting kind of class that holds no dependency worth pinning. The rest of the container's rules still apply:
+
+- A singleton stage is shared by every dispatch in the process, so it has to be thread safe, and anything it injects lives as long as it does.
+- A scoped stage resolved from the root provider is the quiet case. With scope validation on, the resolution throws at dispatch; with it off, the root provider builds the stage and caches it there, so one instance serves every dispatch until the process exits. `WithTransientDispatcher` plus a dispatcher injected into a singleton is how a chain arrives there, and a unit-of-work stage shared across every request corrupts data rather than failing.
+- A transient stage that owns an `IDisposable` is tracked by the scope that resolved it, which is the root scope for a root-resolved dispatcher.
+
+Catching the first at startup takes both container flags. `ValidateOnBuild` walks every descriptor and builds its constructor graph, and every closed stage type is a registered service, so stages are in that walk. The lifetime comparison behind "Cannot consume scoped service" is `ValidateScopes`. Turn on the pair, which is what ASP.NET Core turns on in Development: under a bare `BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true })` a singleton stage holding a scoped `DbContext` starts up clean.
+
+`AddStage` registers each closed stage type the way the scan registers handlers, so the ordering rule above applies unchanged: the declaration's descriptor comes last, its lifetime is the one that applies, and a descriptor the declaration got to overrule is left behind unresolved. To supply your own, call `services.Replace` afterwards. It drops one descriptor for the type and appends yours, where a plain `AddSingleton` leaves the old one for `ValidateOnBuild` to check. One is all it drops, so if the type also has a descriptor of your own from before `AddRequestFlow`, use `services.RemoveAll<TStage>()` and then register. [stages.md](stages.md) has the example.
 
 ## Why the dispatcher is scoped
 
@@ -70,7 +107,7 @@ services.AddRequestFlow(o => o
 Dispatch behavior does not change: a transient dispatcher still resolves handlers from the provider it was created from. Two things do change:
 
 - Each injection point gets its own dispatcher instance instead of sharing one per scope. Creating a dispatcher is cheap, so this costs nothing in practice.
-- A singleton can now inject `IRequestDispatcher` directly, because scope validation allows transient services at the root. That dispatcher resolves handlers from the root provider, so a scoped handler now fails at dispatch time instead of at startup. Prefer the `IServiceScopeFactory` pattern above: it keeps the failure at startup and gives each unit of work its own scope.
+- A singleton can now inject `IRequestDispatcher` directly, because scope validation allows transient services at the root. That dispatcher resolves handlers from the root provider, which moves a scoped handler's problem past startup and, with scope validation off, out of sight: the root provider builds the handler, caches it, and hands the same instance to every dispatch for the life of the process. With scope validation on the dispatch throws "Cannot resolve scoped service" instead. Prefer the `IServiceScopeFactory` pattern above: it keeps the failure at startup and gives each unit of work its own scope.
 
 There is a quieter cost to root-resolved dispatch: the container tracks every transient `IDisposable` it creates in the scope that resolved it, and the root scope only ends at application shutdown. A transient handler that is (or owns) an `IDisposable`, dispatched through a root-resolved dispatcher, is therefore kept alive by the root provider on every send; memory grows for the life of the process. Inside a request scope or an explicit `IServiceScopeFactory` scope the same handler is disposed at scope end. This is standard Microsoft DI behavior, not something RequestFlow can override, and one more reason to prefer the scope-per-unit-of-work pattern.
 
@@ -80,8 +117,10 @@ The first `AddRequestFlow` call fixes the dispatcher lifetime; later calls canno
 
 The container does not stop a longer-lived handler from holding a shorter-lived dependency. The dependency silently lives as long as the handler does (a "captive dependency"). Safe pairings:
 
-- Transient or scoped handlers can depend on services of any lifetime.
-- Singleton handlers should depend on singletons only. A singleton handler holding a scoped `DbContext` keeps that one `DbContext` alive for the entire process.
+- Transient or scoped handlers can depend on services of any lifetime. That is why those are the two lifetimes RequestFlow registers.
+- A hand-registered singleton handler should depend on singletons only. One holding a scoped `DbContext` keeps that `DbContext` alive for the entire process.
+
+`ValidateOnBuild` and `ValidateScopes` together report the second case at startup; neither alone does.
 
 ## Validation and build timing
 

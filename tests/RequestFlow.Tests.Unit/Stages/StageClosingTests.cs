@@ -123,20 +123,6 @@ public sealed class StageClosingTests
         services.Count(d => d.ServiceType == typeof(LoggingStage<Ping, string>)).ShouldBe(1);
     }
 
-    [Fact]
-    public void Given_User_Registered_Closed_Stage_When_Adding_Request_Flow_Then_The_User_Lifetime_Wins()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton<LoggingStage<Ping, string>>();
-
-        services.AddRequestFlow(o => o
-            .RegisterHandlersFromAssemblyContaining<StageClosingTests>()
-            .AddStage(typeof(LoggingStage<,>)));
-
-        ServiceDescriptor descriptor = services.Single(d => d.ServiceType == typeof(LoggingStage<Ping, string>));
-        descriptor.Lifetime.ShouldBe(ServiceLifetime.Singleton);
-    }
-
     #region Initialization
 
     private readonly HandlerRegistration _pingHandler =

@@ -133,7 +133,59 @@ The setting is sticky, like `AllowUnhandledRequests`: once any call opts in, eve
 
 ## Lifetime
 
-RequestFlow registers each closed stage type transient and resolves the instances on every dispatch, so a stage can hold per-dispatch state. To pick a different lifetime, register the closed stage type yourself before calling `AddRequestFlow`; a stage type already in the collection is left alone. [lifetimes.md](lifetimes.md) covers the wider lifetime picture.
+Each stage declares its own lifetime, because a chain is rarely homogeneous. A logging stage holds nothing and can be a singleton; a unit-of-work stage in the same chain has to be scoped:
+
+```csharp
+services.AddRequestFlow(o => o
+    .RegisterHandlersFromAssemblyContaining<Program>()
+    .AddStage(typeof(LoggingStage<,>), s => s.AsSingleton())
+    .AddStage(typeof(UnitOfWorkStage<,>), s => s.AsScoped()));
+```
+
+Say nothing and the stage is transient, which means a fresh instance per dispatch and a stage free to hold per-dispatch state. A stage takes one lifetime, so `AsSingleton().AsScoped()` throws; naming the same one twice is fine. An open generic stage passes its lifetime to every closed type it produces.
+
+The two lifetime methods sit on the same delegate as `WhereHandlerImplements`, and chain in either order:
+
+```csharp
+.AddStage(typeof(TransactionStage<,>), s => s
+    .WhereHandlerImplements<IWriteHandler>()
+    .AsScoped())
+```
+
+Singleton is worth a moment's thought. The instance outlives every scope, so the stage must be thread safe, and anything it injects is pinned for the life of the process. A singleton stage holding a scoped `DbContext` is a captive dependency.
+
+Every closed stage type is a registered service, so the container can catch that at startup. Whether it does depends on the options:
+
+- `ValidateOnBuild` and `ValidateScopes` both on: the captive dependency is reported. ASP.NET Core turns this pair on in Development.
+- `ValidateOnBuild` alone: it builds the constructor graph without comparing lifetimes, and says nothing.
+
+Scoped stages have the mirror-image problem, quieter still. A root-resolved dispatcher resolves the stage from the root provider, so with scope validation off one instance sits there for the life of the process. [lifetimes.md](lifetimes.md) covers both.
+
+### Replacing a stage registration
+
+`AddStage` appends a descriptor for each closed stage type whatever the collection already holds, and the container takes the last descriptor registered for a type. That gives three rules:
+
+- The declared lifetime is the one that applies.
+- The declaration wins over anything registered before it.
+- Anything registered after it wins instead.
+
+Register your own stage after the *last* `AddRequestFlow` call, not the first. Closing runs again on every call, so a stage declared in the first call gains descriptors for the request types the second call scans, and those land after anything registered between the two.
+
+To register a stage on terms the declaration cannot express, a factory or an instance you built yourself, replace it after that call:
+
+```csharp
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+services.AddRequestFlow(o => o
+    .RegisterHandlersFromAssemblyContaining<Program>()
+    .AddStage(typeof(LoggingStage<,>)));
+
+services.Replace(ServiceDescriptor.Singleton(new LoggingStage<Ping, string>(sink)));
+```
+
+`Replace`, not `AddSingleton`. Both resolve to your instance, since the container takes the last descriptor. The difference shows up under `ServiceProviderOptions.ValidateOnBuild`, which walks every descriptor including the one `AddStage` left behind. That one names the stage's constructor, so if the container cannot supply `sink`, and not having to supply it is why you built the stage by hand, startup fails over a stage that never runs. `Replace` drops that descriptor and leaves nothing to fail on.
+
+`Replace` drops exactly one descriptor. Register the same stage type yourself before `AddRequestFlow` as well and one survives, so `ValidateOnBuild` still walks it. To clear every descriptor for the type, call `services.RemoveAll<LoggingStage<Ping, string>>()` and then `AddSingleton`.
 
 ## Validation
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
@@ -38,6 +39,57 @@ public sealed class AddStageTests
 
         _sut.StageDeclarations[0].StageType.ShouldBe(typeof(PingAuditStage));
         _sut.StageDeclarations[0].HandlerFilter.ShouldBe(typeof(IAuditable));
+    }
+
+    [Fact]
+    public void Given_No_Declared_Lifetime_When_Adding_Stage_Then_Declaration_Is_Transient()
+    {
+        _sut.AddStage(typeof(LoggingStage<,>));
+
+        _sut.StageDeclarations[0].Lifetime.ShouldBe(ServiceLifetime.Transient);
+    }
+
+    [Fact]
+    public void Given_Singleton_Declared_When_Adding_Stage_Then_Lifetime_Is_Recorded()
+    {
+        _sut.AddStage(typeof(LoggingStage<,>), s => s.AsSingleton());
+
+        _sut.StageDeclarations[0].Lifetime.ShouldBe(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void Given_Scoped_Declared_When_Adding_Stage_By_Type_Argument_Then_Lifetime_Is_Recorded()
+    {
+        _sut.AddStage<PingAuditStage>(s => s.AsScoped());
+
+        _sut.StageDeclarations[0].Lifetime.ShouldBe(ServiceLifetime.Scoped);
+    }
+
+    [Fact]
+    public void Given_Conflicting_Lifetimes_When_Adding_Stage_Then_Throws_Invalid_Operation_Exception()
+    {
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() =>
+            _sut.AddStage(typeof(LoggingStage<,>), s => s.AsSingleton().AsScoped()));
+
+        exception.Message.ShouldContain("Singleton");
+        exception.Message.ShouldContain("one lifetime");
+    }
+
+    [Fact]
+    public void Given_The_Same_Lifetime_Twice_When_Adding_Stage_Then_The_Declaration_Keeps_It()
+    {
+        _sut.AddStage(typeof(LoggingStage<,>), s => s.AsScoped().AsScoped());
+
+        _sut.StageDeclarations[0].Lifetime.ShouldBe(ServiceLifetime.Scoped);
+    }
+
+    [Fact]
+    public void Given_Filter_And_Lifetime_When_Adding_Stage_Then_Both_Are_Recorded()
+    {
+        _sut.AddStage(typeof(LoggingStage<,>), s => s.WhereHandlerImplements<IAuditable>().AsScoped());
+
+        _sut.StageDeclarations[0].HandlerFilter.ShouldBe(typeof(IAuditable));
+        _sut.StageDeclarations[0].Lifetime.ShouldBe(ServiceLifetime.Scoped);
     }
 
     [Fact]

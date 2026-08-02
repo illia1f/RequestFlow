@@ -10,17 +10,19 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 ### Added
 
-- Dedicated exceptions for the three broken-contract failures that used to throw a plain `InvalidOperationException`: `HandlerNullTaskException` and `StageNullTaskException` for a null task returned from `HandleAsync`, and `OverlappingNextCallException` for a stage that calls `next` while its earlier call is still running. Each carries the type at fault in a property (`RequestType` or `StageType`) instead of only naming it in the message. The two null-task types share an abstract `NullTaskException` base, so one catch clause covers both, and all three still derive from `InvalidOperationException`.
+- `HandlerNullTaskException` and `StageNullTaskException` for a null task out of `HandleAsync`, and `OverlappingNextCallException` for a stage that calls `next` while its earlier call is still running. Each carries the type at fault (`RequestType` or `StageType`). The two null-task types share a `NullTaskException` base, and all three derive from `InvalidOperationException`, which these cases used to throw plain.
 
 ### Changed
 
-- A stage receives `next` as `IContinuation<TResponse>` (or `IContinuation` on the void form) instead of the `StageDelegate` delegate types, which are gone. Stage bodies call `await next.InvokeAsync()` where they called `await next()`. Nothing else about a stage changes. An interface also leaves room to add arguments to a future `InvokeAsync` overload, which a delegate signature cannot take without breaking every stage.
-- A stage now resolves from the container when its level first runs rather than up front, and so does the handler. A stage that short-circuits builds neither the stages below it nor the handler behind them, which is the point for a cache stage sitting in front of a repository. A repeated `next` call still walks the instances the dispatch already resolved, the handler included.
-- For a request with stages, a container failure building a stage or the handler now surfaces from inside the chain, out of the `next.InvokeAsync()` call that reached that level, where the stages wrapped around it can catch it. A retry stage with a broad `catch` will retry a missing registration. Turn on `ServiceProviderOptions.ValidateOnBuild` to keep registration mistakes at startup.
+- A stage receives `next` as `IContinuation<TResponse>`, or `IContinuation` on the void form. The `StageDelegate` types are gone: call `await next.InvokeAsync()` where you called `await next()`.
+- A stage and the handler resolve from the container when their level first runs, not up front. A stage that short-circuits builds nothing below it, and a repeated `next` call reuses what the dispatch already resolved. A container failure now surfaces out of the `next.InvokeAsync()` call at that level, where the stages around it can catch it. Turn on `ServiceProviderOptions.ValidateOnBuild` to keep registration mistakes at startup.
+- Handlers register transient or scoped, nothing else. `WithHandlerLifetime(ServiceLifetime)` is gone, `WithScopedHandlers()` replaces it, and `HandlerLifetime` and `DispatcherLifetime` on `RequestFlowOptions` are internal now. Registering a singleton handler by hand still works, in the order [lifetimes.md](docs/lifetimes.md) shows.
+- Each stage declares its own lifetime through `AsSingleton()` and `AsScoped()` on the `AddStage` delegate, transient when neither is called. Naming two different lifetimes throws. The delegate parameter is now `StageOptions` instead of `StageApplicability`; `WhereHandlerImplements` is unchanged.
+- `AddStage` appends its own descriptor even when the service collection already holds the closed stage type, so the declared lifetime always applies. One ordering rule now covers stages and handlers alike: register your own after the last `AddRequestFlow` call, where the container takes the last descriptor for a service type. [stages.md](docs/stages.md) covers the `Replace` and `ValidateOnBuild` corners.
 
 ### Performance
 
-- A dispatch through a chain of N stages allocates N objects instead of 2N+1: the per-level delegate and the per-dispatch stage array are both gone, and a stage that invokes `next` more than once no longer allocates on the repeat. Measured on net10.0 with a synchronous handler, a three-stage chain costs 192 bytes per dispatch against 416 before, and each further stage adds 56 bytes rather than 112.
+- A dispatch through N stages allocates N objects instead of 2N+1, and a repeated `next` call allocates nothing. On net10.0 with a synchronous handler, a three-stage chain costs 192 bytes per dispatch against 416 before, and each further stage adds 56 bytes rather than 112.
 
 ## [1.0.0-preview.3] - 2026-08-02
 

@@ -140,6 +140,23 @@ public sealed class AddRequestFlowValidationTests
     }
 
     [Fact]
+    public async Task Given_Handler_Registered_After_Adding_Request_Flow_When_Sending_Request_Then_That_Registration_Wins()
+    {
+        var handler = Substitute.For<IRequestHandler<AddRequestFlowTests.Echo, string>>();
+        handler.HandleAsync(Arg.Any<AddRequestFlowTests.Echo>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult("HI"));
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>());
+        services.AddSingleton(handler);
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        string result = await provider.GetRequiredService<IRequestDispatcher>()
+            .SendAsync(new AddRequestFlowTests.Echo("hi"));
+
+        result.ShouldBe("HI");
+    }
+
+    [Fact]
     public void Given_Unhandled_Requests_Allowed_When_Resolving_Dispatcher_Then_Missing_Handler_Is_Not_Reported()
     {
         RequestFlowValidationException exception = ScanFixtureAssembly(allowUnhandledRequests: true);
@@ -169,17 +186,47 @@ public sealed class AddRequestFlowValidationTests
     }
 
     [Fact]
-    public void Given_Scoped_Handler_Lifetime_When_Registering_Request_Flow_Then_Handlers_Are_Registered_Scoped()
+    public void Given_Scoped_Handlers_When_Registering_Request_Flow_Then_Handlers_Are_Registered_Scoped()
     {
         var services = new ServiceCollection();
 
         services.AddRequestFlow(o => o
             .RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>()
-            .WithHandlerLifetime(ServiceLifetime.Scoped));
+            .WithScopedHandlers());
 
         ServiceDescriptor descriptor = services
             .Single(d => d.ServiceType == typeof(IRequestHandler<AddRequestFlowTests.Echo, string>));
         descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped);
+    }
+
+    [Fact]
+    public void Given_Default_Options_When_Registering_Request_Flow_Then_Handlers_Are_Registered_Transient()
+    {
+        var services = new ServiceCollection();
+
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>());
+
+        ServiceDescriptor descriptor = services
+            .Single(d => d.ServiceType == typeof(IRequestHandler<AddRequestFlowTests.Echo, string>));
+        descriptor.Lifetime.ShouldBe(ServiceLifetime.Transient);
+    }
+
+    [Fact]
+    public void Given_Scoped_Handlers_In_First_Call_When_Second_Call_Omits_It_Then_Its_Handlers_Are_Transient()
+    {
+        var services = new ServiceCollection();
+
+        services.AddRequestFlow(o => o
+            .RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>()
+            .WithScopedHandlers());
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssembly(typeof(Lonely).Assembly));
+
+        ServiceDescriptor firstCall = services
+            .Single(d => d.ServiceType == typeof(IRequestHandler<AddRequestFlowTests.Echo, string>));
+        ServiceDescriptor secondCall = services
+            .Single(d => d.ServiceType == typeof(IRequestHandler<Rooted, int>));
+        firstCall.Lifetime.ShouldBe(ServiceLifetime.Scoped);
+        secondCall.Lifetime.ShouldBe(ServiceLifetime.Transient);
     }
 
     [Fact]

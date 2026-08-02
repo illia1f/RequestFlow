@@ -19,6 +19,7 @@ internal sealed class RequestFlowRegistry
     private readonly HashSet<Assembly> _assemblies = [];
     private readonly HashSet<GenericHandlerClosing> _closings = [];
     private readonly List<StageDeclaration> _stageDeclarations = [];
+    private readonly HashSet<Type> _registeredClosedStageTypes = [];
 
     /// <summary>
     /// True once any <c>AddRequestFlow</c> call opted out of the missing-handler check.
@@ -65,6 +66,13 @@ internal sealed class RequestFlowRegistry
     /// </summary>
     public void AddStageDeclarations(IReadOnlyList<StageDeclaration> declarations)
         => _stageDeclarations.AddRange(declarations);
+
+    /// <summary>
+    /// Records <paramref name="closedStageType"/> unless an earlier call already did, and returns
+    /// whether this call recorded it, so each closed stage gets one descriptor.
+    /// </summary>
+    public bool TryAddClosedStageType(Type closedStageType)
+        => _registeredClosedStageTypes.Add(closedStageType);
 
     /// <summary>
     /// Adds the assemblies not registered by an earlier call and returns the newly added ones.

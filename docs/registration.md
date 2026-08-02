@@ -9,7 +9,7 @@ Every `AddRequestFlow` option: what each one registers and when to reach for it.
 ```csharp
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Program>()
-    .WithHandlerLifetime(ServiceLifetime.Scoped));
+    .WithScopedHandlers());
 ```
 
 | Option                                        | What it does                                                                  |
@@ -17,10 +17,10 @@ services.AddRequestFlow(o => o
 | `RegisterHandlersFromAssemblyContaining<T>()` | Scans the assembly containing `T`                                              |
 | `RegisterHandlersFromAssembly(assembly)`      | Scans the given assembly                                                        |
 | `RegisterGenericHandler(handlerType, ...)`    | Closes an open generic handler over the declared types                          |
-| `AddStage(stageType, configure?)`             | Wraps applicable handlers in a stage (see [stages.md](stages.md))               |
+| `AddStage(stageType, configure?)`             | Wraps applicable handlers in a stage; `configure` narrows its reach and sets its lifetime (see [stages.md](stages.md)) |
 | `DisallowUnusedStages()`                      | Fails startup validation when a stage reaches no request (see [stages.md](stages.md)) |
 | `AllowUnhandledRequests()`                    | Skips the missing-handler check at startup validation                           |
-| `WithHandlerLifetime(lifetime)`               | Lifetime for this call's handlers, transient by default (see [lifetimes.md](lifetimes.md)) |
+| `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |
 | `WithTransientDispatcher()`                   | Registers the dispatcher transient instead of scoped (see [lifetimes.md](lifetimes.md))    |
 
 ## What the scan picks up
@@ -38,7 +38,7 @@ Abstract classes, interfaces, and open generic definitions are skipped. Open gen
 ```csharp
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Orders.Module>()
-    .WithHandlerLifetime(ServiceLifetime.Scoped));
+    .WithScopedHandlers());
 
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Reporting.Module>());

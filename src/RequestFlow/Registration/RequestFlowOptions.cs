@@ -19,6 +19,10 @@ public sealed class RequestFlowOptions
 
     internal bool UnusedStagesDisallowed { get; private set; }
 
+    internal ServiceLifetime HandlerLifetime { get; private set; } = ServiceLifetime.Transient;
+
+    internal ServiceLifetime DispatcherLifetime { get; private set; } = ServiceLifetime.Scoped;
+
     /// <exception cref="ArgumentNullException"/>
     internal RequestFlowOptions Apply(Action<RequestFlowOptions> configure)
     {
@@ -31,21 +35,14 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Lifetime for discovered handlers. Transient by default.
+    /// Registers this call's handlers with a scoped lifetime instead of the default transient.
+    /// Applies only to the handlers this call discovers; a later call decides for its own.
+    /// Transient and scoped are the whole set: a singleton handler pins every dependency it
+    /// injects for the life of the process.
     /// </summary>
-    public ServiceLifetime HandlerLifetime { get; private set; } = ServiceLifetime.Transient;
-
-    /// <summary>
-    /// Lifetime for <c>IRequestDispatcher</c>. Scoped by default.
-    /// </summary>
-    public ServiceLifetime DispatcherLifetime { get; private set; } = ServiceLifetime.Scoped;
-
-    /// <summary>
-    /// Registers this call's handlers with <paramref name="lifetime"/>.
-    /// </summary>
-    public RequestFlowOptions WithHandlerLifetime(ServiceLifetime lifetime)
+    public RequestFlowOptions WithScopedHandlers()
     {
-        HandlerLifetime = lifetime;
+        HandlerLifetime = ServiceLifetime.Scoped;
         return this;
     }
 
@@ -132,29 +129,30 @@ public sealed class RequestFlowOptions
     /// target one request contract. A closed stage is not restricted to the request type it
     /// names: <c>TRequest</c> is contravariant, so it also wraps every request deriving from
     /// that one, and <paramref name="configure"/> narrows the set further. A stage type belongs
-    /// to a chain once, so a second call naming it is a duplicate whatever it filters on. An
-    /// invalid stage surfaces as a <see cref="RequestFlowValidationException"/> problem when
-    /// the dispatch map is built.
+    /// to a chain once, so a second call naming it is a duplicate whatever it filters on. Each
+    /// stage carries its own lifetime, transient unless <paramref name="configure"/> says
+    /// otherwise. An invalid stage surfaces as a <see cref="RequestFlowValidationException"/>
+    /// problem when the dispatch map is built.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="InvalidOperationException"/>
-    public RequestFlowOptions AddStage(Type stageType, Action<StageApplicability>? configure = null)
+    public RequestFlowOptions AddStage(Type stageType, Action<StageOptions>? configure = null)
     {
         if (stageType is null)
             throw new ArgumentNullException(nameof(stageType));
 
-        var applicability = new StageApplicability();
-        configure?.Invoke(applicability);
+        var stage = new StageOptions();
+        configure?.Invoke(stage);
 
-        StageDeclarations.Add(new StageDeclaration(stageType, applicability.HandlerFilter));
+        StageDeclarations.Add(new StageDeclaration(stageType, stage.HandlerFilter, stage.Lifetime));
 
         return this;
     }
 
     /// <summary>
-    /// Registers <typeparamref name="TStage"/> under the same rules as <see cref="AddStage(Type, Action{StageApplicability})"/>.
+    /// Registers <typeparamref name="TStage"/> under the same rules as <see cref="AddStage(Type, Action{StageOptions})"/>.
     /// </summary>
-    public RequestFlowOptions AddStage<TStage>(Action<StageApplicability>? configure = null)
+    public RequestFlowOptions AddStage<TStage>(Action<StageOptions>? configure = null)
         where TStage : class
         => AddStage(typeof(TStage), configure);
 

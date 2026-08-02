@@ -53,7 +53,7 @@ public static class ServiceCollectionExtensions
         registry.Add(handlers, scan.RequestTypes, problems);
 
         RegisterHandlers(services, handlers, options.HandlerLifetime);
-        RegisterStages(services, registry.StageDeclarations, registry.Handlers, registry.ClosingCache);
+        RegisterStages(services, registry);
 
         services.TryAddSingleton(_ => registry.BuildDispatchMap());
         services.TryAdd(new ServiceDescriptor(
@@ -109,34 +109,24 @@ public static class ServiceCollectionExtensions
         }
     }
 
-    // Walks the whole accumulated cross product on every call rather than a delta, so a stage
-    // declared by an earlier call reaches requests scanned by a later one; the closing cache
-    // makes the repeated pairs cheap. Skipping a type already present leaves a stage the
-    // consumer registered on its own lifetime; a keyed descriptor is a different service.
-    private static void RegisterStages(
-        IServiceCollection services,
-        IReadOnlyList<StageDeclaration> declarations,
-        IReadOnlyList<HandlerRegistration> handlers,
-        StageClosingCache closings)
+    // Walks every declaration against every handler on each call, not just the new ones, so a
+    // stage declared earlier still reaches requests scanned later. The registry remembers which
+    // closed types it registered, so a later call does not register one twice. Stages register the
+    // way handlers do: the container takes the last descriptor, so a registration made after
+    // AddRequestFlow wins and one made before it does not.
+    private static void RegisterStages(IServiceCollection services, RequestFlowRegistry registry)
     {
-        HashSet<Type> registered = [];
-        foreach (var descriptor in services)
+        foreach (var declaration in registry.StageDeclarations)
         {
-            if (!descriptor.IsKeyedService)
-                registered.Add(descriptor.ServiceType);
-        }
-
-        foreach (var declaration in declarations)
-        {
-            foreach (var handler in handlers)
+            foreach (var handler in registry.Handlers)
             {
-                if (!closings.TryClose(declaration, handler, out Type closedStageType))
+                if (!registry.ClosingCache.TryClose(declaration, handler, out Type closedStageType))
                     continue;
 
-                if (!registered.Add(closedStageType))
+                if (!registry.TryAddClosedStageType(closedStageType))
                     continue;
 
-                services.Add(new ServiceDescriptor(closedStageType, closedStageType, ServiceLifetime.Transient));
+                services.Add(new ServiceDescriptor(closedStageType, closedStageType, declaration.Lifetime));
             }
         }
     }
