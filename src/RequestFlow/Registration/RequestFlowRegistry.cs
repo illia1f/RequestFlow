@@ -187,9 +187,8 @@ internal sealed class RequestFlowRegistry
         return new StagePlanSet(chainsByRequest, appliedStageTypes);
     }
 
-    // Only a void request can take stages of either contract shape, so it is the only chain
-    // that has to record which shape each level runs under. A stage that implements both is
-    // run as the two-parameter form, the shape that carries the response type.
+    // Only a void request can take stages of either contract shape, so only its chain records
+    // which shape each level runs under. A stage implementing both runs as the two-parameter form.
     private static bool[] TypedShapesFor(HandlerRegistration handler, Type[] stageTypes)
     {
         if (!handler.IsVoid || stageTypes.Length == 0)

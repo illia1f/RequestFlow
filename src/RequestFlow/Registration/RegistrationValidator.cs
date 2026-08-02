@@ -353,8 +353,7 @@ internal static class RegistrationValidator
 
     // The first declaration seen for a stage class under one handler, with the closed type it
     // produced, so the collision message can say whether the pair met on one closed type or on
-    // two closings of the class. Spelled out because net462 has no ValueTuple and the library
-    // takes no dependency to get one.
+    // two closings of the class. Spelled out because net462 has no ValueTuple.
     private readonly struct StageOwner(StageDeclaration declaration, Type closedStageType)
     {
         public StageDeclaration Declaration { get; } = declaration;

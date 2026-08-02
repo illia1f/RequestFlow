@@ -93,6 +93,101 @@ public sealed class StageExecutorTests
     }
 
     [Fact]
+    public async Task Given_Stage_That_Substitutes_A_Token_When_Calling_Next_Then_Handler_Receives_The_Substituted_Token()
+    {
+        using var entry = new CancellationTokenSource();
+        using var substituted = new CancellationTokenSource();
+        object[] stages = [new SubstitutingStage(substituted.Token)];
+        var sut = PingExecutorWithToken(entry.Token, stages);
+
+        await sut.RunAsync();
+
+        await _pingHandler.Received(1).HandleAsync(Arg.Any<Ping>(), substituted.Token);
+        await _pingHandler.DidNotReceive().HandleAsync(Arg.Any<Ping>(), entry.Token);
+    }
+
+    // The substitution has to survive a stage that calls next without naming a token, or the
+    // level below a timeout stage would quietly put the handler back on the entry token.
+    [Fact]
+    public async Task Given_Outer_Stage_Substituted_A_Token_When_Inner_Stage_Omits_One_Then_Inner_Levels_Keep_The_Substituted_Token()
+    {
+        using var entry = new CancellationTokenSource();
+        using var substituted = new CancellationTokenSource();
+        var inner = new TokenCapturingStage();
+        object[] stages = [new SubstitutingStage(substituted.Token), inner];
+        var sut = PingExecutorWithToken(entry.Token, stages);
+
+        await sut.RunAsync();
+
+        inner.CapturedToken.ShouldBe(substituted.Token);
+        await _pingHandler.Received(1).HandleAsync(Arg.Any<Ping>(), substituted.Token);
+    }
+
+    // None is the sentinel for an omitted token, so a stage handing next a token that happens to
+    // be empty inherits instead of putting the levels below it on None.
+    [Fact]
+    public async Task Given_Stage_That_Passes_None_When_Calling_Next_Then_Inner_Levels_Keep_The_Token_It_Received()
+    {
+        using var entry = new CancellationTokenSource();
+        var inner = new TokenCapturingStage();
+        object[] stages = [new SubstitutingStage(CancellationToken.None), inner];
+        var sut = PingExecutorWithToken(entry.Token, stages);
+
+        await sut.RunAsync();
+
+        inner.CapturedToken.ShouldBe(entry.Token);
+        await _pingHandler.Received(1).HandleAsync(Arg.Any<Ping>(), entry.Token);
+        await _pingHandler.DidNotReceive().HandleAsync(Arg.Any<Ping>(), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Given_Stage_That_Calls_Next_Twice_With_Different_Tokens_When_Running_Executor_Then_Each_Pass_Uses_Its_Own_Token()
+    {
+        using var first = new CancellationTokenSource();
+        using var second = new CancellationTokenSource();
+        var inner = new TokenRecordingStage();
+        object[] stages = [new TwoTokenStage(first.Token, second.Token), inner];
+        var sut = PingExecutor(stages);
+
+        await sut.RunAsync();
+
+        inner.CapturedTokens.ShouldBe([first.Token, second.Token]);
+    }
+
+    // Retry around timeout is the pair the guard used to make impossible: a timeout stage that
+    // cancels its call and awaits it out leaves a completed task behind, so re-entry is admitted.
+    [Fact]
+    public async Task Given_Timeout_Stage_That_Cancels_And_Awaits_Its_Call_When_An_Outer_Stage_Retries_It_Then_The_Chain_Runs_Again()
+    {
+        int handlerCalls = 0;
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
+            .Returns(call => ++handlerCalls == 1
+                ? WaitForCancellationAsync(call.Arg<CancellationToken>())
+                : Task.FromResult("second"));
+        var timeout = new CancelAndAwaitStage();
+        object[] stages = [new RetryOnceStage([]), timeout];
+        var sut = PingExecutor(stages);
+
+        string result = await sut.RunAsync();
+
+        result.ShouldBe("second");
+        timeout.Attempts.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Given_Void_Form_Stage_That_Substitutes_A_Token_When_Running_Void_Executor_Then_Handler_Receives_The_Substituted_Token()
+    {
+        var logHandler = Substitute.For<IRequestHandler<Log>>();
+        using var substituted = new CancellationTokenSource();
+        object[] stages = [new SubstitutingVoidStage(substituted.Token)];
+        var sut = LogExecutor(logHandler, stages);
+
+        await sut.RunAsync();
+
+        await logHandler.Received(1).HandleAsync(Arg.Any<Log>(), substituted.Token);
+    }
+
+    [Fact]
     public async Task Given_Void_Handler_And_One_Stage_When_Running_Executor_Then_Handler_Runs_And_Chain_Completes()
     {
         var logHandler = Substitute.For<IRequestHandler<Log>>();
@@ -199,9 +294,8 @@ public sealed class StageExecutorTests
         log.ShouldBe(["outer:enter"]);
     }
 
-    // A level keeps its guard state for the whole dispatch, so re-entry does not clear it. A
-    // stage that walked away from a call still in flight overlaps with itself when an outer
-    // retry sends it back down.
+    // A level keeps its guard state for the whole dispatch, so a stage that walked away from a
+    // call still in flight overlaps with itself when an outer retry sends it back down.
     [Fact]
     public async Task Given_Stage_That_Abandoned_A_Pending_Next_Call_When_An_Outer_Stage_Retries_It_Then_Throws()
     {
@@ -475,9 +569,8 @@ public sealed class StageExecutorTests
         await result;
     }
 
-    // A one-stage chain is the boundary case: the outermost stage's next reaches the handler
-    // with no level in between, so it exercises the executor's own guard state rather than a
-    // continuation's.
+    // The boundary case: with no level in between, the outermost stage's next exercises the
+    // executor's own guard state rather than a continuation's.
     [Fact]
     public async Task Given_One_Stage_When_Running_Executor_Then_Stage_Wraps_The_Handler()
     {
@@ -583,9 +676,8 @@ public sealed class StageExecutorTests
 
     #region Helpers
 
-    // A chain resolves each stage from DI by its registered type, so a test chain gives every
-    // level its own stage type, the same way validation forces a real chain to. The handler goes
-    // in the same provider, because the bottom level resolves it there too.
+    // A chain resolves each stage from DI by its registered type, so every level needs a stage
+    // type of its own; the handler goes in the same provider the bottom level resolves from.
     private static ServiceProvider ChainProvider<THandler>(THandler handler, object[] stages)
         where THandler : class
     {
@@ -631,6 +723,9 @@ public sealed class StageExecutorTests
         IRequestHandler<Ping, string> handler, params object[] stages)
         => new(StageTypes(stages), ChainProvider(handler, stages), new Ping("hi"), CancellationToken.None);
 
+    private TypedStageExecutor<Ping, string> PingExecutorWithToken(CancellationToken cancellationToken, object[] stages)
+        => new(StageTypes(stages), ChainProvider(_pingHandler, stages), new Ping("hi"), cancellationToken);
+
     private static VoidStageExecutor<Log> LogExecutor(IRequestHandler<Log> handler, params object[] stages)
         => new(
             StageTypes(stages),
@@ -655,8 +750,7 @@ public sealed class StageExecutorTests
 
     public sealed record Silent : IRequest;
 
-    // Other tests scan this assembly and demand a handler per request type, so each
-    // fixture record needs a concrete handler even though these tests only use the mocks.
+    // The assembly scan demands one handler per request type, even for requests only mocked here.
     public sealed class PingHandler : IRequestHandler<Ping, string>
     {
         public Task<string> HandleAsync(Ping request, CancellationToken cancellationToken)
@@ -814,9 +908,9 @@ public sealed class StageExecutorTests
         }
     }
 
-    // Releases both callers into next at the same instant. The gate keeps the handler's task
-    // incomplete until both calls have been attempted, so an overlapping call can never look
-    // like a legal sequential re-run: a second success means the guard let both through.
+    // Releases both callers into next at the same instant. The gate holds the handler's task
+    // incomplete until both calls are attempted, so a second success means the guard let both
+    // through rather than a legal sequential re-run.
     private sealed class SimultaneousNextStage(TaskCompletionSource<string> gate, Action onGuardThrow)
         : IRequestStage<Ping, string>
     {
@@ -944,6 +1038,77 @@ public sealed class StageExecutorTests
         {
             CapturedToken = cancellationToken;
             return next.InvokeAsync();
+        }
+    }
+
+    // The shape a timeout stage takes: it puts its own token on the rest of the chain instead of
+    // the one it was handed.
+    private sealed class SubstitutingStage(CancellationToken substitute) : IRequestStage<Ping, string>
+    {
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync(substitute);
+    }
+
+    private sealed class SubstitutingVoidStage(CancellationToken substitute) : IRequestStage<Log>
+    {
+        public Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
+            => next.InvokeAsync(substitute);
+    }
+
+    private sealed class TokenRecordingStage : IRequestStage<Ping, string>
+    {
+        public List<CancellationToken> CapturedTokens { get; } = [];
+
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            CapturedTokens.Add(cancellationToken);
+            return next.InvokeAsync();
+        }
+    }
+
+    private sealed class TwoTokenStage(CancellationToken first, CancellationToken second) : IRequestStage<Ping, string>
+    {
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            await next.InvokeAsync(first);
+
+            return await next.InvokeAsync(second);
+        }
+    }
+
+    // The timeout shape written to compose: it cancels the call it started and awaits it out, so
+    // the level is free when an outer retry re-enters. Cancelling at once keeps the test fast.
+    private sealed class CancelAndAwaitStage : IRequestStage<Ping, string>
+    {
+        public int Attempts { get; private set; }
+
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            Attempts++;
+            if (Attempts > 1)
+                return await next.InvokeAsync();
+
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            Task<string> call = next.InvokeAsync(linked.Token);
+            linked.Cancel();
+            try
+            {
+                return await call;
+            }
+            catch (OperationCanceledException)
+            {
+                throw new TimeoutException("gave up");
+            }
+        }
+    }
+
+    // Stands in for a handler that honours its token: it finishes only once cancelled.
+    private static async Task<string> WaitForCancellationAsync(CancellationToken cancellationToken)
+    {
+        var cancelled = new TaskCompletionSource<string>();
+        using (cancellationToken.Register(() => cancelled.TrySetCanceled(cancellationToken)))
+        {
+            return await cancelled.Task;
         }
     }
 

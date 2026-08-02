@@ -15,15 +15,16 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 ### Changed
 
 - A stage receives `next` as `IContinuation<TResponse>`, or `IContinuation` on the void form. The `StageDelegate` types are gone: call `await next.InvokeAsync()` where you called `await next()`.
+- `next.InvokeAsync` takes an optional `CancellationToken`. Omit it and the call continues under the token the stage received, which is the previous behaviour. Pass one and it replaces the token for every level below the stage, the handler included, which is what a timeout stage needs to stop the work rather than only stop waiting for it. [stages.md](docs/stages.md) has the linked-token timeout stage, and a retry stage around it composes.
 - A stage and the handler resolve from the container when their level first runs, not up front. A stage that short-circuits builds nothing below it, and a repeated `next` call reuses what the dispatch already resolved. A container failure now surfaces out of the `next.InvokeAsync()` call at that level, where the stages around it can catch it. Turn on `ServiceProviderOptions.ValidateOnBuild` to keep registration mistakes at startup.
 - Handlers register transient or scoped, nothing else. `WithHandlerLifetime(ServiceLifetime)` is gone, `WithScopedHandlers()` replaces it, and `HandlerLifetime` and `DispatcherLifetime` on `RequestFlowOptions` are internal now. Registering a singleton handler by hand still works, in the order [lifetimes.md](docs/lifetimes.md) shows.
 - Each stage declares its own lifetime through `AsSingleton()` and `AsScoped()` on the `AddStage` delegate, transient when neither is called. Naming two different lifetimes throws. The delegate parameter is now `StageOptions` instead of `StageApplicability`; `WhereHandlerImplements` is unchanged.
 - `AddStage` appends its own descriptor even when the service collection already holds the closed stage type, so the declared lifetime always applies. One ordering rule now covers stages and handlers alike: register your own after the last `AddRequestFlow` call, where the container takes the last descriptor for a service type. [stages.md](docs/stages.md) covers the `Replace` and `ValidateOnBuild` corners.
-- The embedded package icon is a near-square crop of the logo. nuget.org draws it into a fixed 32x32 `object-fit: contain` box, where the old 1.7:1 image filled 19 pixels of the 32 available.
+- The embedded package icon is a near-square crop of the logo. nuget.org draws it into a fixed 32x32 `object-fit: contain` box, where the old wide image left most of the height empty.
 
 ### Performance
 
-- A dispatch through N stages allocates N objects instead of 2N+1, and a repeated `next` call allocates nothing. On net10.0 with a synchronous handler, a three-stage chain costs 192 bytes per dispatch against 416 before, and each further stage adds 56 bytes rather than 112.
+- A dispatch through N stages allocates N objects instead of 2N+1, and a repeated `next` call allocates nothing.
 
 ## [1.0.0-preview.3] - 2026-08-02
 

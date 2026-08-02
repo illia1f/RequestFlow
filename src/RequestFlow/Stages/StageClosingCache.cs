@@ -22,9 +22,7 @@ internal sealed class StageClosingCache
     {
         var key = new ClosingKey(declaration, handler);
 
-        // Locked because every provider built from the collection freezes once, and two
-        // providers can freeze at the same time. Registration and the freeze are the only
-        // callers, so the lock never sits on the dispatch path.
+        // Locked because two providers built from the same collection can freeze at once.
         lock (_closings)
         {
             if (!_closings.TryGetValue(key, out Type? closed))
@@ -38,9 +36,7 @@ internal sealed class StageClosingCache
         }
     }
 
-    // Declarations and handlers accumulate once in the registry and every caller hands the
-    // same instances back, so reference identity is the key. Spelled out because net462 has
-    // no ValueTuple and the library takes no dependency to get one.
+    // Every caller hands back the same declaration and handler instances the registry holds, so reference identity is the key.
     private readonly struct ClosingKey(StageDeclaration declaration, HandlerRegistration handler)
         : IEquatable<ClosingKey>
     {

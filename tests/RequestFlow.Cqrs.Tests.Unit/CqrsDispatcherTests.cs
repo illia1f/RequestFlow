@@ -109,8 +109,7 @@ public sealed class CqrsDispatcherTests
 
     public sealed record FindName(string Id) : IQuery<string>;
 
-    // AddRequestFlow scans this assembly and demands a handler per request type, so each
-    // fixture record needs a concrete handler even though the tests only use the mocks.
+    // The assembly scan demands one handler per request type, even for requests only mocked here.
     public sealed class RenameHandler : ICommandHandler<Rename, string>
     {
         public Task<string> HandleAsync(Rename request, CancellationToken cancellationToken)

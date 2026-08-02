@@ -236,8 +236,7 @@ public sealed class AddStageTests
 
     public sealed record Wipe : IRequest;
 
-    // Other tests scan this assembly and demand a handler per request type, so Ping needs
-    // a concrete handler even though these tests never dispatch it.
+    // The assembly scan demands one handler per request type, even for Ping, never dispatched here.
     public sealed class PingHandler : IRequestHandler<Ping, string>
     {
         public Task<string> HandleAsync(Ping request, CancellationToken cancellationToken)

@@ -9,7 +9,8 @@ namespace RequestFlow;
 public sealed class OverlappingNextCallException(Type stageType)
     : InvalidOperationException(
         $"Stage '{stageType.FullName}' called next while the task from its earlier call was still running. " +
-        "Await that task before calling next again: each call runs the rest of the chain, so overlapping calls would run it twice at once.")
+        "Await that task before calling next again: each call runs the rest of the chain, so overlapping calls would run it twice at once. " +
+        "A stage that stops waiting on a call, such as a timeout, has to cancel it through the token it passed to next and await it out before returning.")
 {
     /// <summary>
     /// The stage type that called next twice over.

@@ -29,6 +29,42 @@ A stage has three ways to use `next`:
 - Return without invoking it to short-circuit. The handler, and every stage inside this one, never runs. Nothing inside is built either: each level resolves from the container the first time it runs, and that includes the handler, so a cache stage that answers from memory never pays for the repository behind it.
 - Invoke it again after its task completes to run the rest of the chain again, the shape of a retry stage. A repeated call walks the same stage instances resolved for the dispatch, and reaches the same handler instance, so state a stage kept from the first pass is still there. Invoking `next` while an earlier call is still running throws `OverlappingNextCallException`.
 
+## Cancellation
+
+`next.InvokeAsync()` continues under the token the stage was handed, so by default the token given to `SendAsync` reaches every stage and the handler. Pass a token to put the rest of the chain on a different one, which is what a timeout needs:
+
+```csharp
+public sealed class TimeoutStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private static readonly TimeSpan Limit = TimeSpan.FromSeconds(5);
+
+    public async Task<TResponse> HandleAsync(
+        TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        linked.CancelAfter(Limit);
+
+        try
+        {
+            return await next.InvokeAsync(linked.Token);
+        }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"{typeof(TRequest).Name} took longer than {Limit}.");
+        }
+    }
+}
+```
+
+The substituted token holds for every level below the stage, the handler included, and for inner stages that call `next` without naming a token of their own. Levels above the stage keep the token they had.
+
+`CancellationToken.None` is not a substitution: passing it, `default` and an empty variable included, reads as omitting the token, so the rest of the chain continues under the one the stage received. To put the levels below on no cancellation at all, pass the token of a source nobody cancels.
+
+Awaiting the cancelled call is the part to get right. A timeout that starts the chain and walks away from it leaves the handler running with its connection open, and leaves that level occupied, so a retry stage around it throws `OverlappingNextCallException` on the second attempt. Cancel the call, wait for it to end, and then throw. Written that way, retry around timeout composes.
+
+A handler that never looks at its token cannot be stopped by any of this. Cancellation is cooperative here as it is everywhere else in .NET.
+
 ## Registering
 
 `AddStage` chains on the same configure delegate as the scanning options. Registration order is execution order, outermost first:

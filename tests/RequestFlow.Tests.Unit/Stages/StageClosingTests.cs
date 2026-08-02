@@ -150,8 +150,7 @@ public sealed class StageClosingTests
 
     public sealed record Log : IRequest;
 
-    // Every request type in this assembly needs exactly one handler: other test classes scan
-    // it and build a provider, which is where the missing-handler check runs.
+    // The assembly scan demands one handler per request type, and other test classes run it.
     public sealed class PingHandler : IRequestHandler<Ping, string>
     {
         public Task<string> HandleAsync(Ping request, CancellationToken cancellationToken)

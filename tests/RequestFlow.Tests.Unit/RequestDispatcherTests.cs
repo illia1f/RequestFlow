@@ -236,8 +236,7 @@ public sealed class RequestDispatcherTests
     // compiles through covariance and must fail with the dedicated mismatch exception.
     public sealed record Fetch : IRequest<DerivedResult>;
 
-    // AddRequestFlow scans this assembly and demands a handler per request type, so each
-    // fixture record needs a concrete handler even though the tests only use the mocks.
+    // The assembly scan demands one handler per request type, even for requests only mocked here.
     public sealed class PingHandler : IRequestHandler<Ping, string>
     {
         public Task<string> HandleAsync(Ping request, CancellationToken cancellationToken)

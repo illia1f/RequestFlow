@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace RequestFlow;
@@ -17,7 +18,12 @@ public interface IContinuation<TResponse>
     /// <summary>
     /// Runs the rest of the chain.
     /// </summary>
-    Task<TResponse> InvokeAsync();
+    /// <param name="cancellationToken">
+    /// The token every level below this stage runs under, the handler included. Omit it, or
+    /// pass <see cref="CancellationToken.None"/>, to continue under the token this stage
+    /// received.
+    /// </param>
+    Task<TResponse> InvokeAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -28,5 +34,10 @@ public interface IContinuation
     /// <summary>
     /// Runs the rest of the chain.
     /// </summary>
-    Task InvokeAsync();
+    /// <param name="cancellationToken">
+    /// The token every level below this stage runs under, the handler included. Omit it, or
+    /// pass <see cref="CancellationToken.None"/>, to continue under the token this stage
+    /// received.
+    /// </param>
+    Task InvokeAsync(CancellationToken cancellationToken = default);
 }

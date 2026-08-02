@@ -6,15 +6,14 @@ namespace RequestFlow;
 
 /// <summary>
 /// Decides whether one stage declaration applies to one handler registration and, when it
-/// does, produces the closed stage type. This is the single source of applicability:
-/// registration emits closed service descriptors and the freeze orders each request's stages
-/// from the same answers, cached per pair in <see cref="StageClosingCache"/>, so a provider
-/// built after the last <c>AddRequestFlow</c> call never sees the two disagree.
+/// does, produces the closed stage type. The single source of applicability: registration and
+/// the freeze both read their answers from here, cached per pair in
+/// <see cref="StageClosingCache"/>, so the two can never disagree.
 /// </summary>
 internal static class StageClosing
 {
     /// <summary>
-    /// Applicability without the explanation.
+    /// Applicability only, without the reason.
     /// </summary>
     public static bool TryClose(StageDeclaration declaration, HandlerRegistration handler, out Type closedStageType)
         => TryClose(declaration, handler, out closedStageType, out _);
@@ -80,8 +79,7 @@ internal static class StageClosing
     }
 
     // Honors the in TRequest variance, so a closed stage written against a base request type
-    // also applies to requests that inherit the contract. The void form is only ever offered
-    // to a void handler, since that is the only place its response type can line up.
+    // also applies to requests that inherit the contract.
     private static bool SatisfiesContract(Type candidate, HandlerRegistration handler)
     {
         Type contract = typeof(IRequestStage<,>).MakeGenericType(handler.RequestType, handler.ResponseType);

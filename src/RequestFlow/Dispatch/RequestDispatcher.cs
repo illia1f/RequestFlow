@@ -19,11 +19,13 @@ internal sealed class RequestDispatcher(DispatchMap map, IServiceProvider servic
             throw new ArgumentNullException(nameof(request));
 
         Type requestType = request.GetType();
-        if (!_map.TryGet(requestType, out RequestPlanBase? plan) || plan is null)
+
+        // The map never stores a null plan, so a hit always carries one.
+        if (!_map.TryGet(requestType, out RequestPlanBase? plan))
             throw new HandlerNotFoundException(requestType);
 
         if (plan is not RequestPlan<TResponse> typedPlan)
-            throw new ResponseTypeMismatchException(requestType, expected: plan.ResponseType, actual: typeof(TResponse));
+            throw new ResponseTypeMismatchException(requestType, expected: plan!.ResponseType, actual: typeof(TResponse));
 
         return typedPlan.ExecuteAsync(request, _services, cancellationToken);
     }

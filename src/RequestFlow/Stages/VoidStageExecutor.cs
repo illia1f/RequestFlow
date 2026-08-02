@@ -31,8 +31,7 @@ internal sealed class VoidStageExecutor<TRequest>(
         if (typedShapes[index])
             return ((IRequestStage<TRequest, NoResult>)stage).HandleAsync(request, next, cancellationToken);
 
-        // Task<NoResult> converts to the void shape's Task return, so one level object serves
-        // both forms. Both reach the same level and share its guard state.
+        // The void shape's Task converts to Task<NoResult>, so both forms reach the same level object and share its guard state.
         return NoResultBridge.CompleteOrNull(
             ((IRequestStage<TRequest>)stage).HandleAsync(request, (IContinuation)next, cancellationToken));
     }

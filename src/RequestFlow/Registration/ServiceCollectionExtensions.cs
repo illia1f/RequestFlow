@@ -110,10 +110,8 @@ public static class ServiceCollectionExtensions
     }
 
     // Walks every declaration against every handler on each call, not just the new ones, so a
-    // stage declared earlier still reaches requests scanned later. The registry remembers which
-    // closed types it registered, so a later call does not register one twice. Stages register the
-    // way handlers do: the container takes the last descriptor, so a registration made after
-    // AddRequestFlow wins and one made before it does not.
+    // stage declared earlier still reaches requests scanned later. Stages register the way
+    // handlers do, with Add, so a registration made after AddRequestFlow wins.
     private static void RegisterStages(IServiceCollection services, RequestFlowRegistry registry)
     {
         foreach (var declaration in registry.StageDeclarations)
