@@ -8,6 +8,8 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 ## [Unreleased]
 
+## [1.0.0-preview.4] - 2026-08-03
+
 ### Added
 
 - `HandlerNullTaskException` and `StageNullTaskException` for a null task out of `HandleAsync`, and `OverlappingNextCallException` for a stage that calls `next` while its earlier call is still running. Each carries the type at fault (`RequestType` or `StageType`). The two null-task types share a `NullTaskException` base, and all three derive from `InvalidOperationException`, which these cases used to throw plain.
@@ -50,7 +52,8 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
-[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.3...HEAD
+[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.4...HEAD
+[1.0.0-preview.4]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.3...v1.0.0-preview.4
 [1.0.0-preview.3]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.2...v1.0.0-preview.3
 [1.0.0-preview.2]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.1...v1.0.0-preview.2
 [1.0.0-preview.1]: https://github.com/illia1f/RequestFlow/releases/tag/v1.0.0-preview.1
