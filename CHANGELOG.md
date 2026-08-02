@@ -19,6 +19,7 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 - Handlers register transient or scoped, nothing else. `WithHandlerLifetime(ServiceLifetime)` is gone, `WithScopedHandlers()` replaces it, and `HandlerLifetime` and `DispatcherLifetime` on `RequestFlowOptions` are internal now. Registering a singleton handler by hand still works, in the order [lifetimes.md](docs/lifetimes.md) shows.
 - Each stage declares its own lifetime through `AsSingleton()` and `AsScoped()` on the `AddStage` delegate, transient when neither is called. Naming two different lifetimes throws. The delegate parameter is now `StageOptions` instead of `StageApplicability`; `WhereHandlerImplements` is unchanged.
 - `AddStage` appends its own descriptor even when the service collection already holds the closed stage type, so the declared lifetime always applies. One ordering rule now covers stages and handlers alike: register your own after the last `AddRequestFlow` call, where the container takes the last descriptor for a service type. [stages.md](docs/stages.md) covers the `Replace` and `ValidateOnBuild` corners.
+- The embedded package icon is a near-square crop of the logo. nuget.org draws it into a fixed 32x32 `object-fit: contain` box, where the old 1.7:1 image filled 19 pixels of the 32 available.
 
 ### Performance
 

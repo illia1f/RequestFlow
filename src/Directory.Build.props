@@ -37,7 +37,7 @@
 
   <ItemGroup>
     <None Include="$(RepoRoot)README.md" Pack="true" PackagePath="\" />
-    <None Include="$(RepoRoot)assets\RequestFlowIcon-128x75.png" Pack="true" PackagePath="icon.png" />
+    <None Include="$(RepoRoot)assets\RequestFlowIcon-256x256.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 
 </Project>
