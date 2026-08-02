@@ -109,11 +109,11 @@ public sealed class RequestDispatcherTests
         _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
             .Returns(default(Task<string>)!);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
+        var exception = await Should.ThrowAsync<HandlerNullTaskException>(
             () => _sut.SendAsync(new Ping("bob")));
 
-        exception.Message.ShouldContain(nameof(Ping));
-        exception.Message.ShouldContain("null task");
+        exception.RequestType.ShouldBe(typeof(Ping));
+        exception.ShouldBeAssignableTo<NullTaskException>();
     }
 
     [Fact]
@@ -122,11 +122,11 @@ public sealed class RequestDispatcherTests
         _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
             .Returns(default(Task)!);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(
+        var exception = await Should.ThrowAsync<HandlerNullTaskException>(
             () => _sut.SendAsync(new Log("hi")));
 
-        exception.Message.ShouldContain(nameof(Log));
-        exception.Message.ShouldContain("null task");
+        exception.RequestType.ShouldBe(typeof(Log));
+        exception.ShouldBeAssignableTo<NullTaskException>();
     }
 
     [Fact]

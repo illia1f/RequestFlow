@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using RequestFlow;
 using RequestFlow.Cqrs;
 
-// Microsoft's own convention for registration extensions: AddCqrs is visible in Program.cs without an extra using.
+// Same namespace convention as AddRequestFlow: AddCqrs needs no extra using.
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>

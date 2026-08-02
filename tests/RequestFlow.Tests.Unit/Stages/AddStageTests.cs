@@ -207,29 +207,29 @@ public sealed class AddStageTests
     private sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
-        public Task<TResponse> HandleAsync(TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
-            => next();
+        public Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class PingAuditStage : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
-            => next();
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     // One type parameter that the contract never uses as its request, so validation rejects
     // it even though it implements IRequestStage.
     private sealed class OneParameterStage<TRequest> : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
-            => next();
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class ResponseBoundStage<TRequest> : IRequestStage<TRequest, string>
         where TRequest : IRequest<string>
     {
-        public Task<string> HandleAsync(TRequest request, StageDelegate<string> next, CancellationToken cancellationToken)
-            => next();
+        public Task<string> HandleAsync(TRequest request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     // Implements the contract, but with the parameters transposed, so closing it over a
@@ -237,21 +237,21 @@ public sealed class AddStageTests
     private sealed class SwappedStage<TResponse, TRequest> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
-        public Task<TResponse> HandleAsync(TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
-            => next();
+        public Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class VoidOnlyStage<TRequest> : IRequestStage<TRequest>
         where TRequest : IRequest
     {
-        public Task HandleAsync(TRequest request, StageDelegate next, CancellationToken cancellationToken)
-            => next();
+        public Task HandleAsync(TRequest request, IContinuation next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class WipeAuditStage : IRequestStage<Wipe>
     {
-        public Task HandleAsync(Wipe request, StageDelegate next, CancellationToken cancellationToken)
-            => next();
+        public Task HandleAsync(Wipe request, IContinuation next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class NotAStage
@@ -259,7 +259,7 @@ public sealed class AddStageTests
 
     private abstract class AbstractStage : IRequestStage<Ping, string>
     {
-        public abstract Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken);
+        public abstract Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken);
     }
 
     #endregion

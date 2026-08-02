@@ -124,17 +124,18 @@ public sealed class RequestFlowOptions
 
     /// <summary>
     /// Registers <paramref name="stageType"/> to run around the handler of every request it
-    /// applies to. Pass an open generic definition such as <c>typeof(LoggingStage&lt;,&gt;)</c>
-    /// to let the stage's own generic constraints decide which requests it reaches, or a
-    /// closed stage class to target a single request contract. A closed stage is not
-    /// restricted to the one request type it names: <c>TRequest</c> is contravariant, so a
-    /// stage declared for a base request also wraps every request that derives from it.
-    /// <paramref name="configure"/> narrows that set further. One stage type belongs to a chain
-    /// once, so a second call naming the same type is a duplicate whatever it filters on.
-    /// Registration order is execution order, outermost first. A null argument and a repeated
-    /// <c>WhereHandlerImplements</c> call throw here; an invalid stage surfaces as a
-    /// <see cref="RequestFlowValidationException"/> problem when the dispatch map is built.
+    /// applies to. Registration order is execution order, outermost first.
     /// </summary>
+    /// <remarks>
+    /// Pass an open generic definition such as <c>typeof(LoggingStage&lt;,&gt;)</c> to let the
+    /// stage's own constraints decide which requests it reaches, or a closed stage class to
+    /// target one request contract. A closed stage is not restricted to the request type it
+    /// names: <c>TRequest</c> is contravariant, so it also wraps every request deriving from
+    /// that one, and <paramref name="configure"/> narrows the set further. A stage type belongs
+    /// to a chain once, so a second call naming it is a duplicate whatever it filters on. An
+    /// invalid stage surfaces as a <see cref="RequestFlowValidationException"/> problem when
+    /// the dispatch map is built.
+    /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="InvalidOperationException"/>
     public RequestFlowOptions AddStage(Type stageType, Action<StageApplicability>? configure = null)

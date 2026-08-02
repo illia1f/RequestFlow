@@ -4,7 +4,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RequestFlow;
 
-// Microsoft's own convention for IServiceCollection extensions: AddRequestFlow is visible in Program.cs without an extra using.
+// Microsoft's convention for IServiceCollection extensions: AddRequestFlow needs no extra using.
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
@@ -111,9 +111,8 @@ public static class ServiceCollectionExtensions
 
     // Walks the whole accumulated cross product on every call rather than a delta, so a stage
     // declared by an earlier call reaches requests scanned by a later one; the closing cache
-    // makes the repeated pairs cheap. Skipping a type that is already present leaves a stage
-    // the consumer registered themselves on its own lifetime; a keyed descriptor is a
-    // different service, so it does not count as present.
+    // makes the repeated pairs cheap. Skipping a type already present leaves a stage the
+    // consumer registered on its own lifetime; a keyed descriptor is a different service.
     private static void RegisterStages(
         IServiceCollection services,
         IReadOnlyList<StageDeclaration> declarations,
