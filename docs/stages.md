@@ -4,7 +4,7 @@ A stage wraps the handler of every request it applies to: code before and after 
 
 ## Writing a stage
 
-Implement `IRequestStage<TRequest, TResponse>`. The `next` delegate runs the rest of the chain, ending at the handler:
+Implement `IRequestStage<TRequest, TResponse>`. Invoking `next` runs the rest of the chain, ending at the handler:
 
 ```csharp
 using RequestFlow;
@@ -13,10 +13,10 @@ public sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, 
     where TRequest : IRequest<TResponse>
 {
     public async Task<TResponse> HandleAsync(
-        TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+        TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
     {
         Console.WriteLine($"Handling {typeof(TRequest).Name}");
-        TResponse response = await next();
+        TResponse response = await next.InvokeAsync();
         Console.WriteLine($"Handled {typeof(TRequest).Name}");
         return response;
     }
@@ -25,9 +25,9 @@ public sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, 
 
 A stage has three ways to use `next`:
 
-- Await it once and return its result: the normal pass-through.
-- Return without calling it to short-circuit. The handler, and every stage inside this one, never runs.
-- Call it again after its task completes to run the rest of the chain again, the shape of a retry stage. A repeated call walks the same stage instances resolved for the dispatch, so state a stage kept from the first pass is still there. Calling `next` while an earlier call is still running throws `InvalidOperationException`.
+- Await `next.InvokeAsync()` once and return its result: the normal pass-through.
+- Return without invoking it to short-circuit. The handler, and every stage inside this one, never runs. Nothing inside is built either: each level resolves from the container the first time it runs, and that includes the handler, so a cache stage that answers from memory never pays for the repository behind it.
+- Invoke it again after its task completes to run the rest of the chain again, the shape of a retry stage. A repeated call walks the same stage instances resolved for the dispatch, and reaches the same handler instance, so state a stage kept from the first pass is still there. Invoking `next` while an earlier call is still running throws `OverlappingNextCallException`.
 
 ## Registering
 
@@ -56,9 +56,9 @@ public sealed class AuditStage<TRequest, TResponse> : IRequestStage<TRequest, TR
     where TRequest : IRequest<TResponse>, IAudited
 {
     public async Task<TResponse> HandleAsync(
-        TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+        TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
     {
-        TResponse response = await next();
+        TResponse response = await next.InvokeAsync();
         // write the audit record
         return response;
     }
@@ -76,11 +76,11 @@ public sealed class ErrorTranslationStage<TRequest> : IRequestStage<TRequest, Re
     where TRequest : IRequest<Result>
 {
     public async Task<Result> HandleAsync(
-        TRequest request, StageDelegate<Result> next, CancellationToken cancellationToken)
+        TRequest request, IContinuation<Result> next, CancellationToken cancellationToken)
     {
         try
         {
-            return await next();
+            return await next.InvokeAsync();
         }
         catch (DomainException e)
         {
@@ -106,13 +106,13 @@ The filter looks at the handler class, not the request, so a module can mark its
 
 ## Void requests
 
-A stage for void requests implements `IRequestStage<TRequest>`, takes the parameterless `StageDelegate`, and returns plain `Task`:
+A stage for void requests implements `IRequestStage<TRequest>`, takes the void form `IContinuation`, and returns plain `Task`:
 
 ```csharp
 public sealed class CacheClearGuard : IRequestStage<ClearCache>
 {
-    public Task HandleAsync(ClearCache request, StageDelegate next, CancellationToken cancellationToken)
-        => next();
+    public Task HandleAsync(ClearCache request, IContinuation next, CancellationToken cancellationToken)
+        => next.InvokeAsync();
 }
 ```
 

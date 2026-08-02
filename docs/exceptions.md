@@ -9,12 +9,14 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 | `RequestFlowValidationException` | Startup validation       | Any registration problem; one throw lists all of them          |
 | `HandlerNotFoundException`       | `SendAsync`              | The dispatched request type has no registered handler          |
 | `ResponseTypeMismatchException`  | `SendAsync`              | The call site's response type differs from the registered one  |
-| `InvalidOperationException`      | `SendAsync`              | A handler or stage returned a null task, or a stage overlapped two `next` calls |
+| `HandlerNullTaskException`       | `SendAsync`              | A handler returned a null task from `HandleAsync`              |
+| `StageNullTaskException`         | `SendAsync`              | A stage returned a null task from `HandleAsync`                |
+| `OverlappingNextCallException`   | `SendAsync`              | A stage called `next` while its earlier call was still running |
 | `InvalidOperationException`      | `WhereHandlerImplements` | A second handler filter added to one stage                     |
 | `ArgumentNullException`          | All public entry points  | A required argument is null                                    |
 | `ArgumentException`              | `RegisterGenericHandler` | `closingTypes` contains a null element                         |
 
-The three RequestFlow types are sealed, live in the `RequestFlow` namespace in the `RequestFlow.Abstractions` package, and derive from `InvalidOperationException`. All of them signal programmer errors: fix the registration or the call site instead of catching them.
+The RequestFlow types live in the `RequestFlow` namespace in the `RequestFlow.Abstractions` package and derive from `InvalidOperationException`. All are sealed except `NullTaskException`, the abstract base the two null-task types share. All of them signal programmer errors: fix the registration or the call site instead of catching them.
 
 ## RequestFlowValidationException
 
@@ -127,18 +129,38 @@ public sealed class SyncInventory : IRequest, IRequest<SyncReport> { }
 
 With a handler registered as `IRequestHandler<SyncInventory, SyncReport>`, the natural call `SendAsync(new SyncInventory())` cannot infer `TResponse` from two candidate interfaces. It silently binds the void `SendAsync(IRequest)` overload, asks for `NoResult`, and throws. The fix belongs in the model, not the call site: give each request type exactly one `IRequest<TResponse>` interface, and split it in two if both shapes are needed.
 
-## InvalidOperationException
+## HandlerNullTaskException
 
-Plain `InvalidOperationException` signals a broken handler or stage contract. Three cases surface at dispatch, one at registration:
+Thrown by `SendAsync` when a handler returns a null task from `HandleAsync`. The `RequestType` property holds the request whose handler returned it.
 
-| Message starts with                                        | Thrown from                | Fix                                                                      |
-| ----------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------- |
-| `The handler for '...' returned a null task from HandleAsync.` | `SendAsync`             | Return a task from every path; use `Task.CompletedTask` or `Task.FromResult` for synchronous results |
-| `Stage '...' returned a null task from HandleAsync...`      | `SendAsync`                 | Return the task from `next`, or a completed task when short-circuiting      |
-| `Stage '...' called next while the task from its earlier call was still running.` | `SendAsync` | Await each `next` call before calling it again; each call runs the rest of the chain |
-| `This stage already filters on '...'`                       | `AddStage` configure delegate | One `WhereHandlerImplements` per stage; give the target handlers one shared contract |
+Return a task from every path: `Task.FromResult(value)` for a synchronous result, `Task.CompletedTask` for the void form. The usual source is a test double left without a configured return value.
 
-The null-task checks exist so the failure names the handler or stage at fault instead of surfacing as a `NullReferenceException` at the await. The overlap check stops a stage from running the rest of the chain twice at the same time; a sequential second call, the retry shape, is allowed (see [stages.md](stages.md)).
+## StageNullTaskException
+
+Thrown by `SendAsync` when a stage returns a null task from `HandleAsync`. The `StageType` property holds the stage class at fault.
+
+Return the task from `next.InvokeAsync()`, or a completed task when short-circuiting.
+
+Both null-task types derive from `NullTaskException`, so one catch clause covers a handler and a stage:
+
+```csharp
+catch (NullTaskException e)
+{
+    // e is a HandlerNullTaskException or a StageNullTaskException
+}
+```
+
+The base class is abstract with no public constructor, so those two are the only cases it ever holds. Both checks exist so the failure names the handler or stage at fault instead of surfacing as a `NullReferenceException` at the await.
+
+## OverlappingNextCallException
+
+Thrown by `SendAsync` when a stage invokes `next` while the task from its earlier call is still running. The `StageType` property holds the stage class at fault.
+
+Await each call before making the next one. The check stops a stage from running the rest of the chain twice at the same time; a sequential second call, the retry shape, is allowed (see [stages.md](stages.md)).
+
+## Plain InvalidOperationException
+
+One case is left with no type of its own. Adding a second `WhereHandlerImplements` to one stage throws from the `AddStage` configure delegate, with a message starting `This stage already filters on '...'`. A stage takes one handler filter, so give the target handlers one shared contract instead.
 
 ## Argument validation
 
@@ -161,3 +183,5 @@ Handler and stage exceptions propagate as thrown. The dispatcher and the stage c
 Cancellation follows the same rule. The token passes to `HandleAsync` untouched, and an `OperationCanceledException` surfaces from the handler like any other exception.
 
 Container failures keep the container's own exception types. The dispatcher resolves the handler from the service provider on every dispatch, so a handler with a missing constructor dependency, or a scoped handler resolved from the root provider, throws the container's `InvalidOperationException` at dispatch time. See [lifetimes.md](lifetimes.md) for the lifetime rules that prevent these.
+
+On a request with stages, that failure lands inside the chain. Each level resolves when it first runs, so the container's exception comes out of the `next.InvokeAsync()` call that reached the broken level, and the stages wrapped around it can catch it like any other exception. A retry stage with a broad `catch` will retry a missing registration until it runs out of attempts. Catch the exceptions you mean to handle, and turn on `ServiceProviderOptions.ValidateOnBuild` so a registration mistake fails at startup instead.

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace RequestFlow;
 
 /// <summary>
-/// Rejects a null task returned by a handler with an <see cref="InvalidOperationException"/>
+/// Rejects a null task returned by a handler with a <see cref="HandlerNullTaskException"/>
 /// that names the request type.
 /// </summary>
 internal static class NullTaskGuard
@@ -14,7 +14,7 @@ internal static class NullTaskGuard
     public static Task<TResponse> ThrowIfNull<TResponse>(Task<TResponse> task, Type requestType)
     {
         if (task is null)
-            throw new InvalidOperationException(HandlerMessage(requestType));
+            throw new HandlerNullTaskException(requestType);
 
         return task;
     }
@@ -23,14 +23,8 @@ internal static class NullTaskGuard
     public static Task ThrowIfNull(Task task, Type requestType)
     {
         if (task is null)
-            throw new InvalidOperationException(HandlerMessage(requestType));
+            throw new HandlerNullTaskException(requestType);
 
         return task;
     }
-
-    /// <summary>
-    /// The error message for a handler that returned a null task, shared by every dispatch path.
-    /// </summary>
-    public static string HandlerMessage(Type requestType)
-        => $"The handler for '{requestType.FullName}' returned a null task from HandleAsync.";
 }

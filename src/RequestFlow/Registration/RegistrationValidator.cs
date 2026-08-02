@@ -168,7 +168,7 @@ internal static class RegistrationValidator
     // MakeGenericType substitutes positionally and StageClosing closes a one-parameter
     // definition over the request alone, so the interface's request argument has to be the
     // stage's own parameter for the closed type to name the dispatched request. A stage that
-    // breaks this closes into a type no request can match, or drags along a parameter its contract never uses.
+    // breaks this closes into a type no request can match.
     private static bool ClosesOverItsOwnParameters(Type stageType)
     {
         Type[] parameters = stageType.GetGenericArguments();

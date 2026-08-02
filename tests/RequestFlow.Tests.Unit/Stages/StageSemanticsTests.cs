@@ -125,6 +125,18 @@ public sealed class StageSemanticsTests
         await task;
     }
 
+    // Which shape a void request's stage runs under is settled once, when the dispatch map
+    // freezes, so a stage that implements both has to land on the same one every dispatch.
+    [Fact]
+    public async Task Given_Stage_Implementing_Both_Contract_Shapes_When_Sending_Void_Request_Then_The_Typed_Shape_Runs()
+    {
+        IRequestDispatcher dispatcher = Build(o => o.AddStage(typeof(BothShapesStage)));
+
+        await dispatcher.SendAsync(new Wipe());
+
+        Trace.ShouldBe(["BothShapes:typed"]);
+    }
+
     #region Initialization
 
     // The container instantiates stages, so the trace and counters have to be static; the
@@ -222,9 +234,9 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
-            await next();
+            await next.InvokeAsync();
             throw new TimeoutException("after next");
         }
     }
@@ -233,7 +245,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
             => throw new InvalidTimeZoneException("from stage");
     }
 
@@ -241,28 +253,28 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
-            => next();
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     public sealed class SecondPassThroughStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
-            => next();
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     public sealed class TokenForwardingStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
                 Trace.Add("Token:cancelled");
 
-            return next();
+            return next.InvokeAsync();
         }
     }
 
@@ -271,11 +283,11 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
             await Task.Yield();
             Trace.Add("Await:enter");
-            TResponse response = await next();
+            TResponse response = await next.InvokeAsync();
             Trace.Add("Await:exit");
             return response;
         }
@@ -285,10 +297,10 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
             Trace.Add("Tracing:enter");
-            TResponse response = await next();
+            TResponse response = await next.InvokeAsync();
             Trace.Add("Tracing:exit");
             return response;
         }
@@ -298,10 +310,27 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
-            await next();
-            return await next();
+            await next.InvokeAsync();
+            return await next.InvokeAsync();
+        }
+    }
+
+    // Implements the two-parameter and the void contract at once, which only a void request can
+    // offer both of. Each records which one ran.
+    public sealed class BothShapesStage : IRequestStage<Wipe, NoResult>, IRequestStage<Wipe>
+    {
+        public Task<NoResult> HandleAsync(Wipe request, IContinuation<NoResult> next, CancellationToken cancellationToken)
+        {
+            Trace.Add("BothShapes:typed");
+            return next.InvokeAsync();
+        }
+
+        public Task HandleAsync(Wipe request, IContinuation next, CancellationToken cancellationToken)
+        {
+            Trace.Add("BothShapes:void");
+            return next.InvokeAsync();
         }
     }
 
@@ -309,15 +338,15 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
             try
             {
-                return await next();
+                return await next.InvokeAsync();
             }
             catch (InvalidOperationException)
             {
-                return await next();
+                return await next.InvokeAsync();
             }
         }
     }
@@ -328,10 +357,10 @@ public sealed class StageSemanticsTests
         public static int Entries;
 
         public Task<TResponse> HandleAsync(
-            TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
         {
             Entries++;
-            return next();
+            return next.InvokeAsync();
         }
     }
 

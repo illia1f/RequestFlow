@@ -6,23 +6,17 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// Closed plan for one void request wrapped in stages. The ordered stage types are fixed when
-/// the dispatch map freezes; the instances resolve from the supplied provider on each call, so
-/// DI lifetimes hold.
+/// Closed plan for one void request wrapped in stages. The ordered stage types and the
+/// contract shape each one runs under are fixed when the dispatch map freezes; each stage
+/// instance and the handler resolve from the supplied provider when their level first runs, so
+/// DI lifetimes hold and a level the chain never reaches is never built.
 /// </summary>
-internal sealed class StagedVoidRequestPlan<TRequest>(Type[] stageTypes) : RequestPlan<NoResult>
+internal sealed class StagedVoidRequestPlan<TRequest>(Type[] stageTypes, bool[] typedShapes) : RequestPlan<NoResult>
     where TRequest : IRequest<NoResult>
 {
     /// <inheritdoc />
     public override Task<NoResult> ExecuteAsync(
         IRequest<NoResult> request, IServiceProvider services, CancellationToken cancellationToken)
-    {
-        var stages = new object[stageTypes.Length];
-        for (int i = 0; i < stages.Length; i++)
-            stages[i] = services.GetRequiredService(stageTypes[i]);
-
-        var handler = services.GetRequiredService<IRequestHandler<TRequest>>();
-
-        return new VoidStageExecutor<TRequest>(stages, handler, (TRequest)request, cancellationToken).RunAsync();
-    }
+        => new VoidStageExecutor<TRequest>(
+            stageTypes, typedShapes, services, (TRequest)request, cancellationToken).RunAsync();
 }

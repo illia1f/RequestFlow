@@ -1,38 +1,48 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
 
 /// <summary>
 /// Stage chain that terminates at the standalone <see cref="IRequestHandler{TRequest}"/>.
-/// Its stages come in both contract shapes, so the array is untyped and each level picks.
+/// Its stages come in both contract shapes, so which shape each level runs is settled when the
+/// dispatch map freezes and read from <paramref name="typedShapes"/> here.
 /// </summary>
 internal sealed class VoidStageExecutor<TRequest>(
-    object[] stages,
-    IRequestHandler<TRequest> handler,
+    Type[] stageTypes,
+    bool[] typedShapes,
+    IServiceProvider services,
     TRequest request,
     CancellationToken cancellationToken)
-    : StageExecutor<TRequest, NoResult>(stages.Length, request, cancellationToken)
+    : StageExecutor<TRequest, NoResult>(stageTypes.Length, request, cancellationToken)
     where TRequest : IRequest<NoResult>
 {
+    private IRequestHandler<TRequest>? _handler;
+
+    /// <inheritdoc />
+    protected override object ResolveStage(int index) => services.GetRequiredService(stageTypes[index]);
+
     /// <inheritdoc />
     protected override Task<NoResult> InvokeStageAsync(
-        int index, TRequest request, StageDelegate<NoResult> next, CancellationToken cancellationToken)
+        int index, object stage, IContinuation<NoResult> next, TRequest request, CancellationToken cancellationToken)
     {
-        object stage = stages[index];
-        if (stage is IRequestStage<TRequest, NoResult> typed)
-            return typed.HandleAsync(request, next, cancellationToken);
+        if (typedShapes[index])
+            return ((IRequestStage<TRequest, NoResult>)stage).HandleAsync(request, next, cancellationToken);
 
-        // The void shape wraps the same continuation, so both forms share its guard state.
+        // Task<NoResult> converts to the void shape's Task return, so one level object serves
+        // both forms. Both reach the same level and share its guard state.
         return NoResultBridge.CompleteOrNull(
-            ((IRequestStage<TRequest>)stage).HandleAsync(request, new StageDelegate(next.Invoke), cancellationToken));
+            ((IRequestStage<TRequest>)stage).HandleAsync(request, (IContinuation)next, cancellationToken));
     }
 
     /// <inheritdoc />
     protected override Task<NoResult> InvokeHandlerAsync(TRequest request, CancellationToken cancellationToken)
-        => NoResultBridge.CompleteOrNull(handler.HandleAsync(request, cancellationToken));
+        => NoResultBridge.CompleteOrNull(
+            (_handler ??= services.GetRequiredService<IRequestHandler<TRequest>>())
+                .HandleAsync(request, cancellationToken));
 
     /// <inheritdoc />
-    protected override Type StageTypeAt(int index) => stages[index].GetType();
+    protected override Type StageTypeAt(int index) => stageTypes[index];
 }

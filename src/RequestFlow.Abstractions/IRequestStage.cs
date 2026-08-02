@@ -4,23 +4,6 @@ using System.Threading.Tasks;
 namespace RequestFlow;
 
 /// <summary>
-/// Runs the rest of the stage chain, ending at the request's handler. Call it again after
-/// its task completes to run the rest of the chain again; calling it while an earlier call
-/// is still running throws <see cref="System.InvalidOperationException"/>.
-/// </summary>
-/// <remarks>
-/// A repeated call walks the same stage instances: the chain resolves them once per
-/// dispatch, not per call, so state a stage kept from the first pass is still there.
-/// </remarks>
-/// <typeparam name="TResponse">The response the chain produces.</typeparam>
-public delegate Task<TResponse> StageDelegate<TResponse>();
-
-/// <summary>
-/// The void form of <see cref="StageDelegate{TResponse}"/>, under the same rules.
-/// </summary>
-public delegate Task StageDelegate();
-
-/// <summary>
 /// Runs around the handler of every request this stage applies to. The implementing
 /// class's generic constraints decide which requests those are.
 /// </summary>
@@ -30,10 +13,10 @@ public interface IRequestStage<in TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     /// <summary>
-    /// Wraps the rest of the chain for <paramref name="request"/>. Call
+    /// Wraps the rest of the chain for <paramref name="request"/>. Invoke
     /// <paramref name="next"/> to continue, or skip it to short-circuit.
     /// </summary>
-    Task<TResponse> HandleAsync(TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken);
+    Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -45,8 +28,8 @@ public interface IRequestStage<in TRequest>
     where TRequest : IRequest<NoResult>
 {
     /// <summary>
-    /// Wraps the rest of the chain for <paramref name="request"/>. Call
+    /// Wraps the rest of the chain for <paramref name="request"/>. Invoke
     /// <paramref name="next"/> to continue, or skip it to short-circuit.
     /// </summary>
-    Task HandleAsync(TRequest request, StageDelegate next, CancellationToken cancellationToken);
+    Task HandleAsync(TRequest request, IContinuation next, CancellationToken cancellationToken);
 }

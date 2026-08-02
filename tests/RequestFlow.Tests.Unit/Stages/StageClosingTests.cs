@@ -187,21 +187,21 @@ public sealed class StageClosingTests
     private sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
-        public Task<TResponse> HandleAsync(TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
-            => next();
+        public Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class TaggedOnlyStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>, ITag
     {
-        public Task<TResponse> HandleAsync(TRequest request, StageDelegate<TResponse> next, CancellationToken cancellationToken)
-            => next();
+        public Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class PingAuditStage : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
-            => next();
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     #endregion

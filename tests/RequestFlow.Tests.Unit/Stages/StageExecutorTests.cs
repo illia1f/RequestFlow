@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
@@ -7,7 +8,7 @@ public sealed class StageExecutorTests
     [Fact]
     public async Task Given_No_Stages_When_Running_Executor_Then_Handler_Produces_Response()
     {
-        var sut = new TypedStageExecutor<Ping, string>([], _pingHandler, new Ping("hi"), CancellationToken.None);
+        var sut = PingExecutor();
 
         string result = await sut.RunAsync();
 
@@ -18,8 +19,8 @@ public sealed class StageExecutorTests
     public async Task Given_Two_Stages_When_Running_Executor_Then_First_Registered_Stage_Is_Outermost()
     {
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new RecordingStage("outer", log), new RecordingStage("inner", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new RecordingStage<Outer>("outer", log), new RecordingStage<Inner>("inner", log)];
+        var sut = PingExecutor(stages);
 
         await sut.RunAsync();
 
@@ -30,8 +31,8 @@ public sealed class StageExecutorTests
     public async Task Given_Stage_That_Awaits_Before_Calling_Next_When_Running_Executor_Then_Chain_Completes()
     {
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new AwaitBeforeNextStage("outer", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new AwaitBeforeNextStage<Outer>("outer", log)];
+        var sut = PingExecutor(stages);
 
         string result = await sut.RunAsync();
 
@@ -43,8 +44,8 @@ public sealed class StageExecutorTests
     public async Task Given_Two_Stages_That_Await_Before_Calling_Next_When_Running_Executor_Then_First_Registered_Stage_Is_Outermost()
     {
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new AwaitBeforeNextStage("outer", log), new AwaitBeforeNextStage("inner", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new AwaitBeforeNextStage<Outer>("outer", log), new AwaitBeforeNextStage<Inner>("inner", log)];
+        var sut = PingExecutor(stages);
 
         await sut.RunAsync();
 
@@ -54,8 +55,8 @@ public sealed class StageExecutorTests
     [Fact]
     public async Task Given_Stage_That_Skips_Next_When_Running_Executor_Then_Handler_Is_Not_Invoked()
     {
-        IRequestStage<Ping, string>[] stages = [new ShortCircuitStage("cached")];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new ShortCircuitStage("cached")];
+        var sut = PingExecutor(stages);
 
         string result = await sut.RunAsync();
 
@@ -68,8 +69,8 @@ public sealed class StageExecutorTests
     {
         _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<string>(new InvalidTimeZoneException("no such zone")));
-        IRequestStage<Ping, string>[] stages = [new RecordingStage("outer", [])];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new RecordingStage<Outer>("outer", [])];
+        var sut = PingExecutor(stages);
 
         var exception = await Should.ThrowAsync<InvalidTimeZoneException>(() => sut.RunAsync());
 
@@ -81,7 +82,9 @@ public sealed class StageExecutorTests
     {
         using var cts = new CancellationTokenSource();
         var stage = new TokenCapturingStage();
-        var sut = new TypedStageExecutor<Ping, string>([stage], _pingHandler, new Ping("hi"), cts.Token);
+        object[] stages = [stage];
+        var sut = new TypedStageExecutor<Ping, string>(
+            StageTypes(stages), ChainProvider(_pingHandler, stages), new Ping("hi"), cts.Token);
 
         await sut.RunAsync();
 
@@ -94,8 +97,8 @@ public sealed class StageExecutorTests
     {
         var logHandler = Substitute.For<IRequestHandler<Log>>();
         List<string> log = [];
-        IRequestStage<Log, NoResult>[] stages = [new RecordingVoidStage(log)];
-        var sut = new VoidStageExecutor<Log>(stages, logHandler, new Log("hi"), CancellationToken.None);
+        object[] stages = [new RecordingVoidStage(log)];
+        var sut = LogExecutor(logHandler, stages);
 
         NoResult result = await sut.RunAsync();
 
@@ -108,8 +111,8 @@ public sealed class StageExecutorTests
     public async Task Given_Stage_That_Calls_Next_Twice_When_Running_Executor_Then_Inner_Chain_Runs_Again()
     {
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new DoubleNextStage("outer", log), new RecordingStage("inner", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new DoubleNextStage("outer", log), new RecordingStage<Inner>("inner", log)];
+        var sut = PingExecutor(stages);
 
         await sut.RunAsync();
 
@@ -123,8 +126,8 @@ public sealed class StageExecutorTests
         _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
             .Returns(call => YieldThenReturnAsync(call.Arg<Ping>().Text + ":handled"));
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new DoubleNextStage("outer", log), new RecordingStage("inner", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new DoubleNextStage("outer", log), new RecordingStage<Inner>("inner", log)];
+        var sut = PingExecutor(stages);
 
         await sut.RunAsync();
 
@@ -140,8 +143,8 @@ public sealed class StageExecutorTests
                 ? Task.FromException<string>(new InvalidTimeZoneException("transient"))
                 : Task.FromResult("second"));
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new RetryOnceStage(log), new RecordingStage("inner", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new RetryOnceStage(log), new RecordingStage<Inner>("inner", log)];
+        var sut = PingExecutor(stages);
 
         string result = await sut.RunAsync();
 
@@ -153,8 +156,8 @@ public sealed class StageExecutorTests
     public async Task Given_Stage_That_Throws_Before_Returning_A_Task_When_Outer_Stage_Retries_Then_It_Runs_Again()
     {
         var flaky = new ThrowOnFirstAttemptStage();
-        IRequestStage<Ping, string>[] stages = [new RetryOnceStage([]), flaky];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new RetryOnceStage([]), flaky];
+        var sut = PingExecutor(stages);
 
         string result = await sut.RunAsync();
 
@@ -168,14 +171,50 @@ public sealed class StageExecutorTests
         var pending = new TaskCompletionSource<string>();
         _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
         List<string> log = [];
-        IRequestStage<Ping, string>[] stages = [new ConcurrentNextStage(), new RecordingStage("inner", log)];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new ConcurrentNextStage(), new RecordingStage<Inner>("inner", log)];
+        var sut = PingExecutor(stages);
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(() => sut.RunAsync());
+        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
 
-        exception.Message.ShouldContain(nameof(ConcurrentNextStage));
+        exception.StageType.ShouldBe(typeof(ConcurrentNextStage));
         exception.Message.ShouldContain("still running");
         log.ShouldBe(["inner:enter"]);
+    }
+
+    // The outermost level and the levels below it hold their guard state in different places, so
+    // an inner stage is a separate case from the outer one rather than a repeat of it.
+    [Fact]
+    public async Task Given_Inner_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Throws()
+    {
+        var pending = new TaskCompletionSource<string>();
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
+        List<string> log = [];
+        object[] stages = [new RecordingStage<Outer>("outer", log), new ConcurrentNextStage()];
+        var sut = PingExecutor(stages);
+
+        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+
+        exception.StageType.ShouldBe(typeof(ConcurrentNextStage));
+        exception.Message.ShouldContain("still running");
+        log.ShouldBe(["outer:enter"]);
+    }
+
+    // A level keeps its guard state for the whole dispatch, so re-entry does not clear it. A
+    // stage that walked away from a call still in flight overlaps with itself when an outer
+    // retry sends it back down.
+    [Fact]
+    public async Task Given_Stage_That_Abandoned_A_Pending_Next_Call_When_An_Outer_Stage_Retries_It_Then_Throws()
+    {
+        var pending = new TaskCompletionSource<string>();
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
+        var abandoning = new AbandonPendingNextStage();
+        object[] stages = [new RetryOnceStage([]), abandoning];
+        var sut = PingExecutor(stages);
+
+        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+
+        exception.StageType.ShouldBe(typeof(AbandonPendingNextStage));
+        abandoning.Attempts.ShouldBe(2);
     }
 
     [Fact]
@@ -197,13 +236,61 @@ public sealed class StageExecutorTests
                     return gate.Task;
                 });
             var stage = new SimultaneousNextStage(gate, () => Interlocked.Increment(ref guardThrows));
-            var sut = new TypedStageExecutor<Ping, string>([stage], handler, new Ping("hi"), CancellationToken.None);
+            var sut = PingExecutorFor(handler, stage);
 
             await sut.RunAsync();
         }
 
         handlerRuns.ShouldBe(attempts);
         guardThrows.ShouldBe(attempts);
+    }
+
+    [Fact]
+    public async Task Given_Inner_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Executor_Then_Exactly_One_Call_Proceeds()
+    {
+        const int attempts = 1000;
+        int handlerRuns = 0;
+        int guardThrows = 0;
+
+        for (int i = 0; i < attempts; i++)
+        {
+            var gate = new TaskCompletionSource<string>();
+            var handler = Substitute.For<IRequestHandler<Ping, string>>();
+            handler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    Interlocked.Increment(ref handlerRuns);
+                    return gate.Task;
+                });
+            IRequestStage<Ping, string>[] stages =
+            [
+                new RecordingStage<Outer>("outer", []),
+                new SimultaneousNextStage(gate, () => Interlocked.Increment(ref guardThrows)),
+            ];
+            var sut = PingExecutorFor(handler, stages);
+
+            await sut.RunAsync();
+        }
+
+        handlerRuns.ShouldBe(attempts);
+        guardThrows.ShouldBe(attempts);
+    }
+
+    // A void-form stage reaches the same guard state as a two-parameter one, so its second call
+    // has to be admitted once the first has completed.
+    [Fact]
+    public async Task Given_Void_Form_Stage_That_Calls_Next_Twice_When_Running_Void_Executor_Then_Inner_Chain_Runs_Again()
+    {
+        var handler = Substitute.For<IRequestHandler<Log>>();
+        handler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        List<string> log = [];
+        object[] stages = [new DoubleNextVoidStage(log), new RecordingVoidStage(log)];
+        var sut = LogExecutor(handler, stages);
+
+        await sut.RunAsync();
+
+        log.ShouldBe(["void:enter", "enter", "exit", "enter", "exit", "void:exit"]);
+        await handler.Received(2).HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -224,7 +311,38 @@ public sealed class StageExecutorTests
                     return gate.Task;
                 });
             object[] stages = [new SimultaneousNextVoidStage(gate, () => Interlocked.Increment(ref guardThrows))];
-            var sut = new VoidStageExecutor<Log>(stages, handler, new Log("hi"), CancellationToken.None);
+            var sut = LogExecutor(handler, stages);
+
+            await sut.RunAsync();
+        }
+
+        handlerRuns.ShouldBe(attempts);
+        guardThrows.ShouldBe(attempts);
+    }
+
+    [Fact]
+    public async Task Given_Inner_Void_Form_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Void_Executor_Then_Exactly_One_Call_Proceeds()
+    {
+        const int attempts = 1000;
+        int handlerRuns = 0;
+        int guardThrows = 0;
+
+        for (int i = 0; i < attempts; i++)
+        {
+            var gate = new TaskCompletionSource<NoResult>();
+            var handler = Substitute.For<IRequestHandler<Log>>();
+            handler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    Interlocked.Increment(ref handlerRuns);
+                    return gate.Task;
+                });
+            object[] stages =
+            [
+                new VoidFormStage([]),
+                new SimultaneousNextVoidStage(gate, () => Interlocked.Increment(ref guardThrows)),
+            ];
+            var sut = LogExecutor(handler, stages);
 
             await sut.RunAsync();
         }
@@ -236,32 +354,33 @@ public sealed class StageExecutorTests
     [Fact]
     public void Given_Stage_That_Returns_A_Null_Task_When_Running_Executor_Then_Throws_Naming_The_Stage()
     {
-        IRequestStage<Ping, string>[] stages = [new NullTaskStage()];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new NullTaskStage()];
+        var sut = PingExecutor(stages);
 
-        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() => sut.RunAsync());
+        StageNullTaskException exception = Should.Throw<StageNullTaskException>(() => sut.RunAsync());
 
-        exception.Message.ShouldContain(nameof(NullTaskStage));
-        exception.Message.ShouldContain("null task");
+        exception.StageType.ShouldBe(typeof(NullTaskStage));
+        exception.ShouldBeAssignableTo<NullTaskException>();
     }
 
     [Fact]
     public void Given_Handler_That_Returns_A_Null_Task_When_Running_Executor_Then_Throws_Naming_The_Request()
     {
-        var sut = new TypedStageExecutor<Nil, string>([], new NilHandler(), new Nil(), CancellationToken.None);
+        var sut = new TypedStageExecutor<Nil, string>(
+            [], ChainProvider<IRequestHandler<Nil, string>>(new NilHandler(), []), new Nil(), CancellationToken.None);
 
-        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() => sut.RunAsync());
+        HandlerNullTaskException exception = Should.Throw<HandlerNullTaskException>(() => sut.RunAsync());
 
-        exception.Message.ShouldContain(nameof(Nil));
-        exception.Message.ShouldContain("null task");
+        exception.RequestType.ShouldBe(typeof(Nil));
+        exception.ShouldBeAssignableTo<NullTaskException>();
     }
 
     [Fact]
     public async Task Given_Stage_That_Returned_A_Null_Task_When_Outer_Stage_Retries_Then_It_Runs_Again()
     {
         var flaky = new NullTaskOnFirstAttemptStage();
-        IRequestStage<Ping, string>[] stages = [new RetryOnceStage([]), flaky];
-        var sut = new TypedStageExecutor<Ping, string>(stages, _pingHandler, new Ping("hi"), CancellationToken.None);
+        object[] stages = [new RetryOnceStage([]), flaky];
+        var sut = PingExecutor(stages);
 
         string result = await sut.RunAsync();
 
@@ -275,7 +394,7 @@ public sealed class StageExecutorTests
         var logHandler = Substitute.For<IRequestHandler<Log>>();
         List<string> log = [];
         object[] stages = [new VoidFormStage(log)];
-        var sut = new VoidStageExecutor<Log>(stages, logHandler, new Log("hi"), CancellationToken.None);
+        var sut = LogExecutor(logHandler, stages);
 
         NoResult result = await sut.RunAsync();
 
@@ -290,7 +409,7 @@ public sealed class StageExecutorTests
         var logHandler = Substitute.For<IRequestHandler<Log>>();
         List<string> log = [];
         object[] stages = [new AwaitBeforeNextVoidStage(log)];
-        var sut = new VoidStageExecutor<Log>(stages, logHandler, new Log("hi"), CancellationToken.None);
+        var sut = LogExecutor(logHandler, stages);
 
         NoResult result = await sut.RunAsync();
 
@@ -300,12 +419,12 @@ public sealed class StageExecutorTests
     }
 
     [Fact]
-    public async Task Given_Both_Stage_Forms_When_Running_Void_Executor_Then_Array_Order_Is_Execution_Order()
+    public async Task Given_Both_Stage_Forms_When_Running_Void_Executor_Then_Registration_Order_Is_Execution_Order()
     {
         var logHandler = Substitute.For<IRequestHandler<Log>>();
         List<string> log = [];
         object[] stages = [new RecordingVoidStage(log), new VoidFormStage(log)];
-        var sut = new VoidStageExecutor<Log>(stages, logHandler, new Log("hi"), CancellationToken.None);
+        var sut = LogExecutor(logHandler, stages);
 
         await sut.RunAsync();
 
@@ -317,7 +436,7 @@ public sealed class StageExecutorTests
     {
         var logHandler = Substitute.For<IRequestHandler<Log>>();
         object[] stages = [new ShortCircuitVoidStage()];
-        var sut = new VoidStageExecutor<Log>(stages, logHandler, new Log("hi"), CancellationToken.None);
+        var sut = LogExecutor(logHandler, stages);
 
         await sut.RunAsync();
 
@@ -329,23 +448,22 @@ public sealed class StageExecutorTests
     {
         var logHandler = Substitute.For<IRequestHandler<Log>>();
         object[] stages = [new NullTaskVoidStage()];
-        var sut = new VoidStageExecutor<Log>(stages, logHandler, new Log("hi"), CancellationToken.None);
+        var sut = LogExecutor(logHandler, stages);
 
-        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() => sut.RunAsync());
+        StageNullTaskException exception = Should.Throw<StageNullTaskException>(() => sut.RunAsync());
 
-        exception.Message.ShouldContain(nameof(NullTaskVoidStage));
-        exception.Message.ShouldContain("null task");
+        exception.StageType.ShouldBe(typeof(NullTaskVoidStage));
     }
 
     [Fact]
     public void Given_Void_Handler_That_Returns_A_Null_Task_When_Running_Void_Executor_Then_Throws_Naming_The_Request()
     {
-        var sut = new VoidStageExecutor<Silent>([], new SilentHandler(), new Silent(), CancellationToken.None);
+        var sut = new VoidStageExecutor<Silent>(
+            [], [], ChainProvider<IRequestHandler<Silent>>(new SilentHandler(), []), new Silent(), CancellationToken.None);
 
-        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() => sut.RunAsync());
+        HandlerNullTaskException exception = Should.Throw<HandlerNullTaskException>(() => sut.RunAsync());
 
-        exception.Message.ShouldContain(nameof(Silent));
-        exception.Message.ShouldContain("null task");
+        exception.RequestType.ShouldBe(typeof(Silent));
     }
 
     [Fact]
@@ -355,6 +473,99 @@ public sealed class StageExecutorTests
 
         result.ShouldBeSameAs(NoResult.Task);
         await result;
+    }
+
+    // A one-stage chain is the boundary case: the outermost stage's next reaches the handler
+    // with no level in between, so it exercises the executor's own guard state rather than a
+    // continuation's.
+    [Fact]
+    public async Task Given_One_Stage_When_Running_Executor_Then_Stage_Wraps_The_Handler()
+    {
+        List<string> log = [];
+        var sut = PingExecutor(new RecordingStage<Outer>("only", log));
+
+        string result = await sut.RunAsync();
+
+        result.ShouldBe("hi:handled");
+        log.ShouldBe(["only:enter", "only:exit"]);
+    }
+
+    [Fact]
+    public async Task Given_One_Stage_That_Calls_Next_Twice_When_Running_Executor_Then_Handler_Runs_Again()
+    {
+        List<string> log = [];
+        var sut = PingExecutor(new DoubleNextStage("only", log));
+
+        await sut.RunAsync();
+
+        log.ShouldBe(["only:enter", "only:exit"]);
+        await _pingHandler.Received(2).HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Given_One_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Throws()
+    {
+        var pending = new TaskCompletionSource<string>();
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
+        var sut = PingExecutor(new ConcurrentNextStage());
+
+        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+
+        exception.StageType.ShouldBe(typeof(ConcurrentNextStage));
+        exception.Message.ShouldContain("still running");
+    }
+
+    [Fact]
+    public void Given_One_Stage_That_Returns_A_Null_Task_When_Running_Executor_Then_Throws_Naming_The_Stage()
+    {
+        var sut = PingExecutor(new NullTaskStage());
+
+        StageNullTaskException exception = Should.Throw<StageNullTaskException>(() => sut.RunAsync());
+
+        exception.StageType.ShouldBe(typeof(NullTaskStage));
+    }
+
+    [Fact]
+    public void Given_One_Stage_And_Handler_That_Returns_A_Null_Task_When_Running_Executor_Then_Throws_Naming_The_Request()
+    {
+        object[] stages = [new NilPassThroughStage()];
+        var sut = new TypedStageExecutor<Nil, string>(
+            StageTypes(stages),
+            ChainProvider<IRequestHandler<Nil, string>>(new NilHandler(), stages),
+            new Nil(),
+            CancellationToken.None);
+
+        HandlerNullTaskException exception = Should.Throw<HandlerNullTaskException>(() => sut.RunAsync());
+
+        exception.RequestType.ShouldBe(typeof(Nil));
+    }
+
+    [Fact]
+    public async Task Given_One_Typed_Form_Stage_When_Running_Void_Executor_Then_It_Wraps_The_Handler()
+    {
+        var logHandler = Substitute.For<IRequestHandler<Log>>();
+        List<string> log = [];
+        var sut = LogExecutor(logHandler, new RecordingVoidStage(log));
+
+        NoResult result = await sut.RunAsync();
+
+        result.ShouldBe(NoResult.Value);
+        log.ShouldBe(["enter", "exit"]);
+        await logHandler.Received(1).HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Given_One_Void_Form_Stage_That_Calls_Next_Twice_When_Running_Void_Executor_Then_Handler_Runs_Again()
+    {
+        var handler = Substitute.For<IRequestHandler<Log>>();
+        handler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        List<string> log = [];
+        var sut = LogExecutor(handler, new DoubleNextVoidStage(log));
+
+        await sut.RunAsync();
+
+        log.ShouldBe(["void:enter", "void:exit"]);
+        await handler.Received(2).HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>());
     }
 
     #region Initialization
@@ -371,6 +582,69 @@ public sealed class StageExecutorTests
     #endregion
 
     #region Helpers
+
+    // A chain resolves each stage from DI by its registered type, so a test chain gives every
+    // level its own stage type, the same way validation forces a real chain to. The handler goes
+    // in the same provider, because the bottom level resolves it there too.
+    private static ServiceProvider ChainProvider<THandler>(THandler handler, object[] stages)
+        where THandler : class
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(handler);
+        foreach (object stage in stages)
+        {
+            services.AddSingleton(stage.GetType(), stage);
+        }
+
+        return services.BuildServiceProvider();
+    }
+
+    private static Type[] StageTypes(object[] stages)
+    {
+        Type[] types = new Type[stages.Length];
+        for (int i = 0; i < stages.Length; i++)
+        {
+            types[i] = stages[i].GetType();
+        }
+
+        return types;
+    }
+
+    // The freeze settles which contract shape each void level runs under; these tests stand in
+    // for it by reading the shape off the instances they were handed.
+    private static bool[] TypedShapes<TRequest>(object[] stages)
+        where TRequest : IRequest<NoResult>
+    {
+        bool[] shapes = new bool[stages.Length];
+        for (int i = 0; i < stages.Length; i++)
+        {
+            shapes[i] = stages[i] is IRequestStage<TRequest, NoResult>;
+        }
+
+        return shapes;
+    }
+
+    private TypedStageExecutor<Ping, string> PingExecutor(params object[] stages)
+        => PingExecutorFor(_pingHandler, stages);
+
+    private static TypedStageExecutor<Ping, string> PingExecutorFor(
+        IRequestHandler<Ping, string> handler, params object[] stages)
+        => new(StageTypes(stages), ChainProvider(handler, stages), new Ping("hi"), CancellationToken.None);
+
+    private static VoidStageExecutor<Log> LogExecutor(IRequestHandler<Log> handler, params object[] stages)
+        => new(
+            StageTypes(stages),
+            TypedShapes<Log>(stages),
+            ChainProvider(handler, stages),
+            new Log("hi"),
+            CancellationToken.None);
+
+    // Position markers, so two levels of the same stage class are two registrable types.
+    private sealed class Outer
+    { }
+
+    private sealed class Inner
+    { }
 
     // Public so NSubstitute can proxy handler interfaces closed over these types.
     public sealed record Ping(string Text) : IRequest<string>;
@@ -410,12 +684,12 @@ public sealed class StageExecutorTests
             => null!;
     }
 
-    private sealed class RecordingStage(string name, List<string> log) : IRequestStage<Ping, string>
+    private sealed class RecordingStage<TPosition>(string name, List<string> log) : IRequestStage<Ping, string>
     {
-        public async Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             log.Add($"{name}:enter");
-            string response = await next();
+            string response = await next.InvokeAsync();
             log.Add($"{name}:exit");
             return response;
         }
@@ -423,10 +697,10 @@ public sealed class StageExecutorTests
 
     private sealed class RecordingVoidStage(List<string> log) : IRequestStage<Log, NoResult>
     {
-        public async Task<NoResult> HandleAsync(Log request, StageDelegate<NoResult> next, CancellationToken cancellationToken)
+        public async Task<NoResult> HandleAsync(Log request, IContinuation<NoResult> next, CancellationToken cancellationToken)
         {
             log.Add("enter");
-            NoResult response = await next();
+            NoResult response = await next.InvokeAsync();
             log.Add("exit");
             return response;
         }
@@ -434,36 +708,62 @@ public sealed class StageExecutorTests
 
     private sealed class ShortCircuitStage(string response) : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
             => Task.FromResult(response);
     }
 
     private sealed class DoubleNextStage(string name, List<string> log) : IRequestStage<Ping, string>
     {
-        public async Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             log.Add($"{name}:enter");
-            await next();
-            string response = await next();
+            await next.InvokeAsync();
+            string response = await next.InvokeAsync();
             log.Add($"{name}:exit");
             return response;
         }
     }
 
+    private sealed class DoubleNextVoidStage(List<string> log) : IRequestStage<Log>
+    {
+        public async Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
+        {
+            log.Add("void:enter");
+            await next.InvokeAsync();
+            await next.InvokeAsync();
+            log.Add("void:exit");
+        }
+    }
+
     private sealed class RetryOnceStage(List<string> log) : IRequestStage<Ping, string>
     {
-        public async Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             log.Add("retry:attempt");
             try
             {
-                return await next();
+                return await next.InvokeAsync();
             }
             catch (Exception)
             {
                 log.Add("retry:attempt");
-                return await next();
+                return await next.InvokeAsync();
             }
+        }
+    }
+
+    // The timeout shape: it starts the rest of the chain, gives up on it, and leaves that call in
+    // flight rather than awaiting it out.
+    private sealed class AbandonPendingNextStage : IRequestStage<Ping, string>
+    {
+        public int Attempts { get; private set; }
+
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            Attempts++;
+            _ = next.InvokeAsync();
+
+            return Task.FromException<string>(new TimeoutException("gave up"));
         }
     }
 
@@ -471,21 +771,21 @@ public sealed class StageExecutorTests
     {
         public int Attempts { get; private set; }
 
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             Attempts++;
-            return Attempts == 1 ? throw new InvalidOperationException("sync boom") : next();
+            return Attempts == 1 ? throw new InvalidOperationException("sync boom") : next.InvokeAsync();
         }
     }
 
     // Suspends on work of its own before delegating, the shape of a validation or caching stage.
-    private sealed class AwaitBeforeNextStage(string name, List<string> log) : IRequestStage<Ping, string>
+    private sealed class AwaitBeforeNextStage<TPosition>(string name, List<string> log) : IRequestStage<Ping, string>
     {
-        public async Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             await Task.Yield();
             log.Add($"{name}:enter");
-            string response = await next();
+            string response = await next.InvokeAsync();
             log.Add($"{name}:exit");
             return response;
         }
@@ -493,11 +793,11 @@ public sealed class StageExecutorTests
 
     private sealed class AwaitBeforeNextVoidStage(List<string> log) : IRequestStage<Log>
     {
-        public async Task HandleAsync(Log request, StageDelegate next, CancellationToken cancellationToken)
+        public async Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
         {
             await Task.Yield();
             log.Add("void:enter");
-            await next();
+            await next.InvokeAsync();
             log.Add("void:exit");
         }
     }
@@ -505,10 +805,10 @@ public sealed class StageExecutorTests
     // Starts a second walk of the chain while the first is still suspended on the handler.
     private sealed class ConcurrentNextStage : IRequestStage<Ping, string>
     {
-        public async Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
-            Task<string> first = next();
-            Task<string> second = next();
+            Task<string> first = next.InvokeAsync();
+            Task<string> second = next.InvokeAsync();
 
             return await first.ConfigureAwait(false) + await second.ConfigureAwait(false);
         }
@@ -520,7 +820,7 @@ public sealed class StageExecutorTests
     private sealed class SimultaneousNextStage(TaskCompletionSource<string> gate, Action onGuardThrow)
         : IRequestStage<Ping, string>
     {
-        public async Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             using var barrier = new Barrier(2);
             Task<string>?[] calls = new Task<string>?[2];
@@ -530,9 +830,9 @@ public sealed class StageExecutorTests
                 barrier.SignalAndWait();
                 try
                 {
-                    calls[slot] = next();
+                    calls[slot] = next.InvokeAsync();
                 }
-                catch (InvalidOperationException)
+                catch (OverlappingNextCallException)
                 {
                     onGuardThrow();
                 }
@@ -555,7 +855,7 @@ public sealed class StageExecutorTests
     private sealed class SimultaneousNextVoidStage(TaskCompletionSource<NoResult> gate, Action onGuardThrow)
         : IRequestStage<Log>
     {
-        public async Task HandleAsync(Log request, StageDelegate next, CancellationToken cancellationToken)
+        public async Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
         {
             using var barrier = new Barrier(2);
             Task?[] calls = new Task?[2];
@@ -565,9 +865,9 @@ public sealed class StageExecutorTests
                 barrier.SignalAndWait();
                 try
                 {
-                    calls[slot] = next();
+                    calls[slot] = next.InvokeAsync();
                 }
-                catch (InvalidOperationException)
+                catch (OverlappingNextCallException)
                 {
                     onGuardThrow();
                 }
@@ -586,40 +886,47 @@ public sealed class StageExecutorTests
 
     private sealed class NullTaskStage : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
             => null!;
+    }
+
+    // Delegates straight to next, so the null task the handler returns is the one reported.
+    private sealed class NilPassThroughStage : IRequestStage<Nil, string>
+    {
+        public Task<string> HandleAsync(Nil request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class NullTaskOnFirstAttemptStage : IRequestStage<Ping, string>
     {
         public int Attempts { get; private set; }
 
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             Attempts++;
-            return Attempts == 1 ? null! : next();
+            return Attempts == 1 ? null! : next.InvokeAsync();
         }
     }
 
     private sealed class VoidFormStage(List<string> log) : IRequestStage<Log>
     {
-        public async Task HandleAsync(Log request, StageDelegate next, CancellationToken cancellationToken)
+        public async Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
         {
             log.Add("void:enter");
-            await next();
+            await next.InvokeAsync();
             log.Add("void:exit");
         }
     }
 
     private sealed class ShortCircuitVoidStage : IRequestStage<Log>
     {
-        public Task HandleAsync(Log request, StageDelegate next, CancellationToken cancellationToken)
+        public Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 
     private sealed class NullTaskVoidStage : IRequestStage<Log>
     {
-        public Task HandleAsync(Log request, StageDelegate next, CancellationToken cancellationToken)
+        public Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
             => null!;
     }
 
@@ -633,10 +940,10 @@ public sealed class StageExecutorTests
     {
         public CancellationToken CapturedToken { get; private set; }
 
-        public Task<string> HandleAsync(Ping request, StageDelegate<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             CapturedToken = cancellationToken;
-            return next();
+            return next.InvokeAsync();
         }
     }
 

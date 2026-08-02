@@ -147,7 +147,7 @@ internal sealed class RequestFlowRegistry
         Dictionary<Type, RequestPlanBase> plans = [];
         foreach (var handler in _handlers)
         {
-            plans[handler.RequestType] = CreatePlan(handler, stagePlans.StageTypesByRequest[handler.RequestType]);
+            plans[handler.RequestType] = CreatePlan(handler, stagePlans.ChainsByRequest[handler.RequestType]);
         }
 
         return new DispatchMap(plans);
@@ -156,7 +156,7 @@ internal sealed class RequestFlowRegistry
     // Ordering and chain shape are decided at freeze, never per AddRequestFlow call.
     private StagePlanSet BuildStagePlans()
     {
-        Dictionary<Type, Type[]> stageTypesByRequest = [];
+        Dictionary<Type, StageChain> chainsByRequest = [];
         HashSet<Type> appliedStageTypes = [];
         List<Type> ordered = [];
 
@@ -172,15 +172,32 @@ internal sealed class RequestFlowRegistry
                 appliedStageTypes.Add(declaration.StageType);
             }
 
-            stageTypesByRequest[handler.RequestType] = ordered.ToArray();
+            Type[] stageTypes = ordered.ToArray();
+            chainsByRequest[handler.RequestType] = new StageChain(stageTypes, TypedShapesFor(handler, stageTypes));
         }
 
-        return new StagePlanSet(stageTypesByRequest, appliedStageTypes);
+        return new StagePlanSet(chainsByRequest, appliedStageTypes);
     }
 
-    private static RequestPlanBase CreatePlan(HandlerRegistration handler, Type[] stageTypes)
+    // Only a void request can take stages of either contract shape, so it is the only chain
+    // that has to record which shape each level runs under. A stage that implements both is
+    // run as the two-parameter form, the shape that carries the response type.
+    private static bool[] TypedShapesFor(HandlerRegistration handler, Type[] stageTypes)
     {
-        if (stageTypes.Length == 0)
+        if (!handler.IsVoid || stageTypes.Length == 0)
+            return [];
+
+        Type typedContract = typeof(IRequestStage<,>).MakeGenericType(handler.RequestType, typeof(NoResult));
+        bool[] typedShapes = new bool[stageTypes.Length];
+        for (int i = 0; i < stageTypes.Length; i++)
+            typedShapes[i] = typedContract.IsAssignableFrom(stageTypes[i]);
+
+        return typedShapes;
+    }
+
+    private static RequestPlanBase CreatePlan(HandlerRegistration handler, StageChain chain)
+    {
+        if (chain.StageTypes.Length == 0)
         {
             Type planType = handler.IsVoid
                 ? typeof(VoidRequestPlan<>).MakeGenericType(handler.RequestType)
@@ -188,23 +205,41 @@ internal sealed class RequestFlowRegistry
             return (RequestPlanBase)Activator.CreateInstance(planType)!;
         }
 
-        Type stagedPlanType = handler.IsVoid
-            ? typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType)
-            : typeof(StagedRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
-
         // Wrapped in an object array on purpose: Type[] converts to object[], so handing
         // stageTypes straight through would be read as one constructor argument per stage type.
-        return (RequestPlanBase)Activator.CreateInstance(stagedPlanType, [(object)stageTypes])!;
+        if (handler.IsVoid)
+        {
+            Type voidPlanType = typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType);
+            return (RequestPlanBase)Activator.CreateInstance(
+                voidPlanType, [chain.StageTypes, chain.TypedShapes])!;
+        }
+
+        Type stagedPlanType = typeof(StagedRequestPlan<,>)
+            .MakeGenericType(handler.RequestType, handler.ResponseType);
+
+        return (RequestPlanBase)Activator.CreateInstance(stagedPlanType, [(object)chain.StageTypes])!;
     }
 }
 
 /// <summary>
-/// The ordered stage types for each request type, plus the stage types that reached at least
-/// one request.
+/// The stage chain for each request type, plus the stage types that reached at least one
+/// request.
 /// </summary>
-internal sealed class StagePlanSet(Dictionary<Type, Type[]> stageTypesByRequest, HashSet<Type> appliedStageTypes)
+internal sealed class StagePlanSet(Dictionary<Type, StageChain> chainsByRequest, HashSet<Type> appliedStageTypes)
 {
-    public Dictionary<Type, Type[]> StageTypesByRequest { get; } = stageTypesByRequest;
+    public Dictionary<Type, StageChain> ChainsByRequest { get; } = chainsByRequest;
 
     public ISet<Type> AppliedStageTypes { get; } = appliedStageTypes;
+}
+
+/// <summary>
+/// One request's stages in execution order. <see cref="TypedShapes"/> records, per position,
+/// whether the stage runs as <see cref="IRequestStage{TRequest, TResponse}"/>; it is empty for
+/// a request whose stages can only take that one shape.
+/// </summary>
+internal sealed class StageChain(Type[] stageTypes, bool[] typedShapes)
+{
+    public Type[] StageTypes { get; } = stageTypes;
+
+    public bool[] TypedShapes { get; } = typedShapes;
 }
