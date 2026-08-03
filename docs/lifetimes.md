@@ -13,7 +13,7 @@ What RequestFlow registers, with which lifetime, and what you can change.
 
 ## Configuring handler lifetime
 
-Handlers are transient by default: each dispatch gets a fresh instance, so a handler can hold mutable state without leaking it into the next dispatch. Call `WithScopedHandlers` when handlers share per-request dependencies such as a `DbContext`; it chains with the registration methods:
+Handlers are transient by default: every call into the handler gets a fresh instance, so a handler can hold mutable state without leaking it into the next dispatch. The bottom of a stage chain resolves on each entry, so a retry stage that runs the chain twice reaches a second instance rather than the one that failed. Call `WithScopedHandlers` when handlers share per-request dependencies such as a `DbContext`; it chains with the registration methods:
 
 ```csharp
 services.AddRequestFlow(o => o
@@ -69,7 +69,9 @@ Stages get the singleton option handlers do not, because a stage is usually the 
 
 - A singleton stage is shared by every dispatch in the process, so it has to be thread safe, and anything it injects lives as long as it does.
 - A scoped stage resolved from the root provider is the quiet case. With scope validation on, the resolution throws at dispatch; with it off, the root provider builds the stage and caches it there, so one instance serves every dispatch until the process exits. `WithTransientDispatcher` plus a dispatcher injected into a singleton is how a chain arrives there, and a unit-of-work stage shared across every request corrupts data rather than failing.
+- A stage above that overlaps its `next` calls runs the levels below it side by side, so within one dispatch a scoped or singleton stage under it is entered twice at once and has to be thread safe on that path too. Only transient stays clear of it, because every call resolves an instance of its own. [stages.md](stages.md) has the shape.
 - A transient stage that owns an `IDisposable` is tracked by the scope that resolved it, which is the root scope for a root-resolved dispatcher.
+- Repeated `next` calls multiply that. A level is resolved once per entry, so a retry stage that makes three attempts leaves three instances behind, and a hedging stage leaves one per branch. Inside a request scope they are disposed when the request ends. Under a root-resolved dispatcher they go on the root provider's disposal list instead, where nothing releases them until the process exits and the list grows with every dispatch.
 
 Catching the first at startup takes both container flags. `ValidateOnBuild` walks every descriptor and builds its constructor graph, and every closed stage type is a registered service, so stages are in that walk. The lifetime comparison behind "Cannot consume scoped service" is `ValidateScopes`. Turn on the pair, which is what ASP.NET Core turns on in Development: under a bare `BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true })` a singleton stage holding a scoped `DbContext` starts up clean.
 

@@ -23,11 +23,43 @@ public sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, 
 }
 ```
 
-A stage has three ways to use `next`:
+A stage has four ways to use `next`:
 
 - Await `next.InvokeAsync()` once and return its result: the normal pass-through.
-- Return without invoking it to short-circuit. The handler, and every stage inside this one, never runs. Nothing inside is built either: each level resolves from the container the first time it runs, and that includes the handler, so a cache stage that answers from memory never pays for the repository behind it.
-- Invoke it again after its task completes to run the rest of the chain again, the shape of a retry stage. A repeated call walks the same stage instances resolved for the dispatch, and reaches the same handler instance, so state a stage kept from the first pass is still there. Invoking `next` while an earlier call is still running throws `OverlappingNextCallException`.
+- Return without invoking it to short-circuit. The handler, and every stage inside this one, never runs. Nothing inside is built either: a level resolves from the container only when it runs, and that includes the handler, so a cache stage that answers from memory never pays for the repository behind it.
+- Await it, then invoke it again to run the rest of the chain a second time, the shape of a retry stage. Each call resolves the levels below it again, so the lifetime a stage was registered with decides what the second call gets. A transient stage is built fresh for the retry, which gives it a clean slate; a scoped one is the same instance for the whole scope.
+- Invoke it again without awaiting the first call to run the rest of the chain twice at once, the shape of a hedging or shadow-comparison stage. Each call enters the levels below on its own and keeps the token it was handed, so the library holds no state the two walks can collide over. What they do share is whatever the container hands to both of them: a transient stage below is resolved again per call, so each walk gets an instance of its own, while a scoped or singleton one is a single instance running inside two walks at once and has to be thread safe. The handler and any scoped service either walk reaches are on the same rule.
+
+A stage that fans out owns every call it has started. A stage that awaits each call to completion before starting the next has nothing to do here. A stage holding two live calls has two ways to lose one, and both end the same way: the abandoned walk keeps going and its own failure surfaces later as an `UnobservedTaskException`.
+
+- The second `next.InvokeAsync` throws instead of handing back a task. Resolving the level below and checking what that level returned both happen before there is a task, so the call can fail outright while the first walk is already running.
+- The first walk faults. `await first` throws, and the code never reaches `await second`.
+
+Start the second call inside a `try`, then await both together rather than one after the other:
+
+```csharp
+Task<TResponse> first = next.InvokeAsync();
+
+Task<TResponse> second;
+try
+{
+    second = next.InvokeAsync();
+}
+catch
+{
+    // Nobody else will await the first walk.
+    await ObserveAsync(first);
+    throw;
+}
+
+TResponse[] responses = await Task.WhenAll(first, second);
+```
+
+`Task.WhenAll` reads the outcome of every task handed to it, so a fault on one walk leaves the other observed. `return await first + await second` does not: the awaits run in order, and the first one to throw skips the rest.
+
+`ObserveAsync` is yours to write: await the walk and swallow whatever it threw, since the failure being reported is the one from the second call.
+
+A hedging stage cannot use `WhenAll`, which waits for the slowest walk when the point is to return on the fastest. The walk whose result it discards needs the same treatment as the one above: await it, cancelled through the token it was given, and swallow what comes out.
 
 ## Cancellation
 
@@ -61,7 +93,7 @@ The substituted token holds for every level below the stage, the handler include
 
 `CancellationToken.None` is not a substitution: passing it, `default` and an empty variable included, reads as omitting the token, so the rest of the chain continues under the one the stage received. To put the levels below on no cancellation at all, pass the token of a source nobody cancels.
 
-Awaiting the cancelled call is the part to get right. A timeout that starts the chain and walks away from it leaves the handler running with its connection open, and leaves that level occupied, so a retry stage around it throws `OverlappingNextCallException` on the second attempt. Cancel the call, wait for it to end, and then throw. Written that way, retry around timeout composes.
+Awaiting the cancelled call is the part to get right. A timeout that starts the chain and walks away from it leaves the handler running with its connection open, and an outer retry then sets a second walk going beside the first rather than replacing it. Cancel the call, wait for it to end, and then throw. Written that way, retry around timeout composes.
 
 A handler that never looks at its token cannot be stopped by any of this. Cancellation is cooperative here as it is everywhere else in .NET.
 
@@ -178,7 +210,7 @@ services.AddRequestFlow(o => o
     .AddStage(typeof(UnitOfWorkStage<,>), s => s.AsScoped()));
 ```
 
-Say nothing and the stage is transient, which means a fresh instance per dispatch and a stage free to hold per-dispatch state. A stage takes one lifetime, so `AsSingleton().AsScoped()` throws; naming the same one twice is fine. An open generic stage passes its lifetime to every closed type it produces.
+Say nothing and the stage is transient, which means a fresh instance every time the chain enters its level. It is free to hold state for that one pass, but a repeated `next` call from the stage above builds a new instance, so nothing carries from one pass to the next. A stage takes one lifetime, so `AsSingleton().AsScoped()` throws; naming the same one twice is fine. An open generic stage passes its lifetime to every closed type it produces.
 
 The two lifetime methods sit on the same delegate as `WhereHandlerImplements`, and chain in either order:
 
@@ -196,6 +228,8 @@ Every closed stage type is a registered service, so the container can catch that
 - `ValidateOnBuild` alone: it builds the constructor graph without comparing lifetimes, and says nothing.
 
 Scoped stages have the mirror-image problem, quieter still. A root-resolved dispatcher resolves the stage from the root provider, so with scope validation off one instance sits there for the life of the process. [lifetimes.md](lifetimes.md) covers both.
+
+Thread safety is not only a question of separate dispatches. A stage above that overlaps its `next` calls runs the levels below it side by side, so inside one dispatch a scoped or singleton stage under it is entered twice at once. Transient is the lifetime that stays clear of it: every call resolves an instance of its own.
 
 ### Replacing a stage registration
 

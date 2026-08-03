@@ -16,8 +16,6 @@ internal sealed class TypedStageExecutor<TRequest, TResponse>(
     : StageExecutor<TRequest, TResponse>(stageTypes.Length, request, cancellationToken)
     where TRequest : IRequest<TResponse>
 {
-    private IRequestHandler<TRequest, TResponse>? _handler;
-
     /// <inheritdoc />
     protected override object ResolveStage(int index) => services.GetRequiredService(stageTypes[index]);
 
@@ -28,7 +26,7 @@ internal sealed class TypedStageExecutor<TRequest, TResponse>(
 
     /// <inheritdoc />
     protected override Task<TResponse> InvokeHandlerAsync(TRequest request, CancellationToken cancellationToken)
-        => (_handler ??= services.GetRequiredService<IRequestHandler<TRequest, TResponse>>())
+        => services.GetRequiredService<IRequestHandler<TRequest, TResponse>>()
             .HandleAsync(request, cancellationToken);
 
     /// <inheritdoc />

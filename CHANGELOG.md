@@ -8,6 +8,18 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 ## [Unreleased]
 
+### Changed
+
+- A level resolves its stage, and the bottom level resolves the handler, on every entry rather than once per dispatch. The lifetime a stage was registered with now decides what a repeated `next` call reaches: a transient stage is built again for the retry, a scoped one stays the same instance for the scope. A retry over a transient chain therefore gets a clean instance instead of the one the failed attempt left behind. The instances a repeated call leaves behind are the scope's to dispose, which matters most under a root-resolved dispatcher; [lifetimes.md](docs/lifetimes.md) has that case.
+
+### Removed
+
+- `OverlappingNextCallException`. Calling `next` while an earlier call is still running is no longer an error. Each call enters the levels below it on its own and keeps the token it was handed, so two calls from one stage run the rest of the chain side by side over no state of RequestFlow's that either can disturb. Fan-out shapes such as hedging and shadow comparison work now. What the guard used to rule out comes with it: a scoped or singleton stage under a stage that overlaps its calls is one instance inside two walks at once, so it has to be thread safe within a single dispatch and not only across dispatches. A transient stage is resolved per call and stays clear of it. A stage that starts a second call also owns the first one, and [stages.md](docs/stages.md) has the shape that keeps a failure on either call from abandoning a walk nobody awaits.
+
+### Performance
+
+- No atomic operations left on the `next` path. A single pass through N stages allocates what it did before, one object per level it enters; a repeated `next` call now allocates the levels it re-enters instead of reusing the first call's.
+
 ## [1.0.0-preview.4] - 2026-08-03
 
 ### Added

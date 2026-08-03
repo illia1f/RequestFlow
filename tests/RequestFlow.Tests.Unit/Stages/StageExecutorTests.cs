@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
@@ -106,8 +107,7 @@ public sealed class StageExecutorTests
         await _pingHandler.DidNotReceive().HandleAsync(Arg.Any<Ping>(), entry.Token);
     }
 
-    // The substitution has to survive a stage that calls next without naming a token, or the
-    // level below a timeout stage would quietly put the handler back on the entry token.
+    // Without inheritance, the level below a timeout stage would fall back to the entry token.
     [Fact]
     public async Task Given_Outer_Stage_Substituted_A_Token_When_Inner_Stage_Omits_One_Then_Inner_Levels_Keep_The_Substituted_Token()
     {
@@ -123,8 +123,7 @@ public sealed class StageExecutorTests
         await _pingHandler.Received(1).HandleAsync(Arg.Any<Ping>(), substituted.Token);
     }
 
-    // None is the sentinel for an omitted token, so a stage handing next a token that happens to
-    // be empty inherits instead of putting the levels below it on None.
+    // None is the sentinel for an omitted token, not a token to pass down.
     [Fact]
     public async Task Given_Stage_That_Passes_None_When_Calling_Next_Then_Inner_Levels_Keep_The_Token_It_Received()
     {
@@ -154,8 +153,6 @@ public sealed class StageExecutorTests
         inner.CapturedTokens.ShouldBe([first.Token, second.Token]);
     }
 
-    // Retry around timeout is the pair the guard used to make impossible: a timeout stage that
-    // cancels its call and awaits it out leaves a completed task behind, so re-entry is admitted.
     [Fact]
     public async Task Given_Timeout_Stage_That_Cancels_And_Awaits_Its_Call_When_An_Outer_Stage_Retries_It_Then_The_Chain_Runs_Again()
     {
@@ -261,43 +258,41 @@ public sealed class StageExecutorTests
     }
 
     [Fact]
-    public async Task Given_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Throws()
+    public async Task Given_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Both_Walks_Run_The_Inner_Chain()
     {
-        var pending = new TaskCompletionSource<string>();
-        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
-        List<string> log = [];
-        object[] stages = [new ConcurrentNextStage(), new RecordingStage<Inner>("inner", log)];
-        var sut = PingExecutor(stages);
+        var gate = new TaskCompletionSource<string>();
+        var handler = new GatedPingHandler<Outer>(gate.Task);
+        var inner = new ConcurrentRecordingStage();
+        object[] stages = [new OverlappingNextStage(gate), inner];
+        var sut = PingExecutorFor(handler, stages);
 
-        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+        await sut.RunAsync();
 
-        exception.StageType.ShouldBe(typeof(ConcurrentNextStage));
-        exception.Message.ShouldContain("still running");
-        log.ShouldBe(["inner:enter"]);
+        inner.Entries.ShouldBe(2);
+        inner.Exits.ShouldBe(2);
+        handler.Calls.ShouldBe(2);
     }
 
-    // The outermost level and the levels below it hold their guard state in different places, so
-    // an inner stage is a separate case from the outer one rather than a repeat of it.
+    // Inner levels build their continuations elsewhere than the outermost, so this is a separate case.
     [Fact]
-    public async Task Given_Inner_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Throws()
+    public async Task Given_Inner_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Both_Walks_Reach_The_Handler()
     {
-        var pending = new TaskCompletionSource<string>();
-        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
+        var gate = new TaskCompletionSource<string>();
+        var handler = new GatedPingHandler<Outer>(gate.Task);
         List<string> log = [];
-        object[] stages = [new RecordingStage<Outer>("outer", log), new ConcurrentNextStage()];
-        var sut = PingExecutor(stages);
+        object[] stages = [new RecordingStage<Outer>("outer", log), new OverlappingNextStage(gate)];
+        var sut = PingExecutorFor(handler, stages);
 
-        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+        await sut.RunAsync();
 
-        exception.StageType.ShouldBe(typeof(ConcurrentNextStage));
-        exception.Message.ShouldContain("still running");
-        log.ShouldBe(["outer:enter"]);
+        // The outer stage is walked once, so its plain list is safe to assert in order.
+        log.ShouldBe(["outer:enter", "outer:exit"]);
+        handler.Calls.ShouldBe(2);
     }
 
-    // A level keeps its guard state for the whole dispatch, so a stage that walked away from a
-    // call still in flight overlaps with itself when an outer retry sends it back down.
+    // This stage abandons every attempt, so its own timeout surfaces, not an error from the chain.
     [Fact]
-    public async Task Given_Stage_That_Abandoned_A_Pending_Next_Call_When_An_Outer_Stage_Retries_It_Then_Throws()
+    public async Task Given_Stage_That_Abandoned_A_Pending_Next_Call_When_An_Outer_Stage_Retries_It_Then_The_Retry_Runs()
     {
         var pending = new TaskCompletionSource<string>();
         _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
@@ -305,73 +300,94 @@ public sealed class StageExecutorTests
         object[] stages = [new RetryOnceStage([]), abandoning];
         var sut = PingExecutor(stages);
 
-        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+        TimeoutException exception = await Should.ThrowAsync<TimeoutException>(() => sut.RunAsync());
 
-        exception.StageType.ShouldBe(typeof(AbandonPendingNextStage));
+        exception.Message.ShouldBe("gave up");
         abandoning.Attempts.ShouldBe(2);
     }
 
     [Fact]
-    public async Task Given_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Executor_Then_Exactly_One_Call_Proceeds()
+    public async Task Given_Stage_That_Overlaps_Two_Next_Calls_With_Different_Tokens_When_Running_Executor_Then_Each_Walk_Keeps_Its_Own_Token()
     {
-        const int attempts = 1000;
-        int handlerRuns = 0;
-        int guardThrows = 0;
+        using var first = new CancellationTokenSource();
+        using var second = new CancellationTokenSource();
+        var gate = new TaskCompletionSource<string>();
+        var handler = new GatedPingHandler<Outer>(gate.Task);
+        object[] stages = [new OverlappingTwoTokenStage(gate, first.Token, second.Token), new YieldThenPassThroughStage()];
+        var sut = PingExecutorFor(handler, stages);
 
-        // The race window depends on timing, so the test forces many synchronized collisions.
-        for (int i = 0; i < attempts; i++)
-        {
-            var gate = new TaskCompletionSource<string>();
-            var handler = Substitute.For<IRequestHandler<Ping, string>>();
-            handler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
-                .Returns(_ =>
-                {
-                    Interlocked.Increment(ref handlerRuns);
-                    return gate.Task;
-                });
-            var stage = new SimultaneousNextStage(gate, () => Interlocked.Increment(ref guardThrows));
-            var sut = PingExecutorFor(handler, stage);
+        await sut.RunAsync();
 
-            await sut.RunAsync();
-        }
-
-        handlerRuns.ShouldBe(attempts);
-        guardThrows.ShouldBe(attempts);
+        // Arrival order is up to the scheduler, so only the set of tokens is asserted.
+        handler.Tokens.ShouldBe([first.Token, second.Token], ignoreOrder: true);
     }
 
     [Fact]
-    public async Task Given_Inner_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Executor_Then_Exactly_One_Call_Proceeds()
+    public async Task Given_Transient_Stage_When_An_Outer_Stage_Retries_Then_Each_Attempt_Resolves_Its_Own_Instance()
     {
-        const int attempts = 1000;
+        CountingConstructionStage.Constructions = 0;
+        int calls = 0;
+        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ++calls == 1
+                ? Task.FromException<string>(new InvalidTimeZoneException("transient"))
+                : Task.FromResult("second"));
+        Type[] stageTypes = [typeof(ParameterlessRetryStage), typeof(CountingConstructionStage)];
+        var sut = new TypedStageExecutor<Ping, string>(
+            stageTypes, TransientChainProvider(_pingHandler, stageTypes), new Ping("hi"), CancellationToken.None);
+
+        string result = await sut.RunAsync();
+
+        result.ShouldBe("second");
+        CountingConstructionStage.Constructions.ShouldBe(2);
+    }
+
+    // Repeated to catch per-level state creeping back: a rejected call throws inside Task.Run,
+    // failing the WhenAll rather than the count.
+    [Fact]
+    public async Task Given_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Executor_Then_Both_Calls_Proceed()
+    {
+        const int attempts = 100;
         int handlerRuns = 0;
-        int guardThrows = 0;
 
         for (int i = 0; i < attempts; i++)
         {
             var gate = new TaskCompletionSource<string>();
-            var handler = Substitute.For<IRequestHandler<Ping, string>>();
-            handler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
-                .Returns(_ =>
-                {
-                    Interlocked.Increment(ref handlerRuns);
-                    return gate.Task;
-                });
+            var handler = new GatedPingHandler<Outer>(gate.Task);
+            var sut = PingExecutorFor(handler, new SimultaneousNextStage(gate));
+
+            await sut.RunAsync();
+
+            handlerRuns += handler.Calls;
+        }
+
+        handlerRuns.ShouldBe(attempts * 2);
+    }
+
+    [Fact]
+    public async Task Given_Inner_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Executor_Then_Both_Calls_Proceed()
+    {
+        const int attempts = 100;
+        int handlerRuns = 0;
+
+        for (int i = 0; i < attempts; i++)
+        {
+            var gate = new TaskCompletionSource<string>();
+            var handler = new GatedPingHandler<Outer>(gate.Task);
             IRequestStage<Ping, string>[] stages =
             [
                 new RecordingStage<Outer>("outer", []),
-                new SimultaneousNextStage(gate, () => Interlocked.Increment(ref guardThrows)),
+                new SimultaneousNextStage(gate),
             ];
             var sut = PingExecutorFor(handler, stages);
 
             await sut.RunAsync();
+
+            handlerRuns += handler.Calls;
         }
 
-        handlerRuns.ShouldBe(attempts);
-        guardThrows.ShouldBe(attempts);
+        handlerRuns.ShouldBe(attempts * 2);
     }
 
-    // A void-form stage reaches the same guard state as a two-parameter one, so its second call
-    // has to be admitted once the first has completed.
     [Fact]
     public async Task Given_Void_Form_Stage_That_Calls_Next_Twice_When_Running_Void_Executor_Then_Inner_Chain_Runs_Again()
     {
@@ -388,61 +404,49 @@ public sealed class StageExecutorTests
     }
 
     [Fact]
-    public async Task Given_Void_Form_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Void_Executor_Then_Exactly_One_Call_Proceeds()
+    public async Task Given_Void_Form_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Void_Executor_Then_Both_Calls_Proceed()
     {
-        const int attempts = 1000;
+        const int attempts = 100;
         int handlerRuns = 0;
-        int guardThrows = 0;
 
         for (int i = 0; i < attempts; i++)
         {
             var gate = new TaskCompletionSource<NoResult>();
-            var handler = Substitute.For<IRequestHandler<Log>>();
-            handler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
-                .Returns(_ =>
-                {
-                    Interlocked.Increment(ref handlerRuns);
-                    return gate.Task;
-                });
-            object[] stages = [new SimultaneousNextVoidStage(gate, () => Interlocked.Increment(ref guardThrows))];
+            var handler = new GatedLogHandler<Outer>(gate.Task);
+            object[] stages = [new SimultaneousNextVoidStage(gate)];
             var sut = LogExecutor(handler, stages);
 
             await sut.RunAsync();
+
+            handlerRuns += handler.Calls;
         }
 
-        handlerRuns.ShouldBe(attempts);
-        guardThrows.ShouldBe(attempts);
+        handlerRuns.ShouldBe(attempts * 2);
     }
 
     [Fact]
-    public async Task Given_Inner_Void_Form_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Void_Executor_Then_Exactly_One_Call_Proceeds()
+    public async Task Given_Inner_Void_Form_Stage_That_Calls_Next_From_Two_Threads_At_Once_When_Running_Void_Executor_Then_Both_Calls_Proceed()
     {
-        const int attempts = 1000;
+        const int attempts = 100;
         int handlerRuns = 0;
-        int guardThrows = 0;
 
         for (int i = 0; i < attempts; i++)
         {
             var gate = new TaskCompletionSource<NoResult>();
-            var handler = Substitute.For<IRequestHandler<Log>>();
-            handler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
-                .Returns(_ =>
-                {
-                    Interlocked.Increment(ref handlerRuns);
-                    return gate.Task;
-                });
+            var handler = new GatedLogHandler<Outer>(gate.Task);
             object[] stages =
             [
                 new VoidFormStage([]),
-                new SimultaneousNextVoidStage(gate, () => Interlocked.Increment(ref guardThrows)),
+                new SimultaneousNextVoidStage(gate),
             ];
             var sut = LogExecutor(handler, stages);
 
             await sut.RunAsync();
+
+            handlerRuns += handler.Calls;
         }
 
-        handlerRuns.ShouldBe(attempts);
-        guardThrows.ShouldBe(attempts);
+        handlerRuns.ShouldBe(attempts * 2);
     }
 
     [Fact]
@@ -569,8 +573,6 @@ public sealed class StageExecutorTests
         await result;
     }
 
-    // The boundary case: with no level in between, the outermost stage's next exercises the
-    // executor's own guard state rather than a continuation's.
     [Fact]
     public async Task Given_One_Stage_When_Running_Executor_Then_Stage_Wraps_The_Handler()
     {
@@ -596,16 +598,15 @@ public sealed class StageExecutorTests
     }
 
     [Fact]
-    public async Task Given_One_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Throws()
+    public async Task Given_One_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_Executor_Then_Both_Walks_Reach_The_Handler()
     {
-        var pending = new TaskCompletionSource<string>();
-        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>()).Returns(pending.Task);
-        var sut = PingExecutor(new ConcurrentNextStage());
+        var gate = new TaskCompletionSource<string>();
+        var handler = new GatedPingHandler<Outer>(gate.Task);
+        var sut = PingExecutorFor(handler, new OverlappingNextStage(gate));
 
-        var exception = await Should.ThrowAsync<OverlappingNextCallException>(() => sut.RunAsync());
+        await sut.RunAsync();
 
-        exception.StageType.ShouldBe(typeof(ConcurrentNextStage));
-        exception.Message.ShouldContain("still running");
+        handler.Calls.ShouldBe(2);
     }
 
     [Fact]
@@ -676,8 +677,7 @@ public sealed class StageExecutorTests
 
     #region Helpers
 
-    // A chain resolves each stage from DI by its registered type, so every level needs a stage
-    // type of its own; the handler goes in the same provider the bottom level resolves from.
+    // Each level resolves its stage from DI by type, so every level needs a distinct stage type.
     private static ServiceProvider ChainProvider<THandler>(THandler handler, object[] stages)
         where THandler : class
     {
@@ -686,6 +686,19 @@ public sealed class StageExecutorTests
         foreach (object stage in stages)
         {
             services.AddSingleton(stage.GetType(), stage);
+        }
+
+        return services.BuildServiceProvider();
+    }
+
+    private static ServiceProvider TransientChainProvider<THandler>(THandler handler, Type[] stageTypes)
+        where THandler : class
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(handler);
+        foreach (Type stageType in stageTypes)
+        {
+            services.AddTransient(stageType);
         }
 
         return services.BuildServiceProvider();
@@ -702,8 +715,7 @@ public sealed class StageExecutorTests
         return types;
     }
 
-    // The freeze settles which contract shape each void level runs under; these tests stand in
-    // for it by reading the shape off the instances they were handed.
+    // Stands in for the freeze, which settles the contract shape of each void level.
     private static bool[] TypedShapes<TRequest>(object[] stages)
         where TRequest : IRequest<NoResult>
     {
@@ -763,15 +775,14 @@ public sealed class StageExecutorTests
             => Task.CompletedTask;
     }
 
-    // Breaks the handler contract on purpose, which is what the executor has to report.
+    // Breaks the handler contract on purpose.
     public sealed class NilHandler : IRequestHandler<Nil, string>
     {
         public Task<string> HandleAsync(Nil request, CancellationToken cancellationToken)
             => null!;
     }
 
-    // The void form of the same broken contract, kept on its own request so the assembly scan
-    // still finds exactly one handler per request.
+    // The void form of the same, on its own request so the scan still finds one handler per request.
     public sealed class SilentHandler : IRequestHandler<Silent>
     {
         public Task HandleAsync(Silent request, CancellationToken cancellationToken)
@@ -846,8 +857,7 @@ public sealed class StageExecutorTests
         }
     }
 
-    // The timeout shape: it starts the rest of the chain, gives up on it, and leaves that call in
-    // flight rather than awaiting it out.
+    // Starts the rest of the chain and gives up without awaiting it, leaving the call in flight.
     private sealed class AbandonPendingNextStage : IRequestStage<Ping, string>
     {
         public int Attempts { get; private set; }
@@ -872,7 +882,7 @@ public sealed class StageExecutorTests
         }
     }
 
-    // Suspends on work of its own before delegating, the shape of a validation or caching stage.
+    // Suspends on work of its own before delegating.
     private sealed class AwaitBeforeNextStage<TPosition>(string name, List<string> log) : IRequestStage<Ping, string>
     {
         public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
@@ -896,23 +906,109 @@ public sealed class StageExecutorTests
         }
     }
 
-    // Starts a second walk of the chain while the first is still suspended on the handler.
-    private sealed class ConcurrentNextStage : IRequestStage<Ping, string>
+    // Hand-written because NSubstitute promises nothing about concurrent calls to one substitute,
+    // and these tests run two walks inside the handler at once. The unused type parameter keeps it
+    // out of the assembly scan, which would otherwise find a second handler for Ping.
+    private sealed class GatedPingHandler<TMarker>(Task<string> gate) : IRequestHandler<Ping, string>
+    {
+        private readonly ConcurrentQueue<CancellationToken> _tokens = new();
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public IEnumerable<CancellationToken> Tokens => _tokens;
+
+        public Task<string> HandleAsync(Ping request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            _tokens.Enqueue(cancellationToken);
+
+            return gate;
+        }
+    }
+
+    // Generic for the same scan reason as GatedPingHandler.
+    private sealed class GatedLogHandler<TMarker>(Task gate) : IRequestHandler<Log>
+    {
+        private int _calls;
+
+        public int Calls => Volatile.Read(ref _calls);
+
+        public Task HandleAsync(Log request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+
+            return gate;
+        }
+    }
+
+    // Counts instead of logging, because two overlapping walks finish in scheduler order.
+    private sealed class ConcurrentRecordingStage : IRequestStage<Ping, string>
+    {
+        private int _entries;
+        private int _exits;
+
+        public int Entries => Volatile.Read(ref _entries);
+
+        public int Exits => Volatile.Read(ref _exits);
+
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _entries);
+            string response = await next.InvokeAsync();
+            Interlocked.Increment(ref _exits);
+
+            return response;
+        }
+    }
+
+    // Starts a second call while the first is suspended on the handler, then releases the gate.
+    private sealed class OverlappingNextStage(TaskCompletionSource<string> gate) : IRequestStage<Ping, string>
     {
         public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
             Task<string> first = next.InvokeAsync();
             Task<string> second = next.InvokeAsync();
 
-            return await first.ConfigureAwait(false) + await second.ConfigureAwait(false);
+            gate.TrySetResult("released");
+
+            // WhenAll, so a fault on either walk leaves neither task unobserved.
+            string[] responses = await Task.WhenAll(first, second).ConfigureAwait(false);
+
+            return responses[0] + responses[1];
         }
     }
 
-    // Releases both callers into next at the same instant. The gate holds the handler's task
-    // incomplete until both calls are attempted, so a second success means the guard let both
-    // through rather than a legal sequential re-run.
-    private sealed class SimultaneousNextStage(TaskCompletionSource<string> gate, Action onGuardThrow)
+    private sealed class OverlappingTwoTokenStage(
+        TaskCompletionSource<string> gate, CancellationToken first, CancellationToken second)
         : IRequestStage<Ping, string>
+    {
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            Task<string> firstCall = next.InvokeAsync(first);
+            Task<string> secondCall = next.InvokeAsync(second);
+
+            gate.TrySetResult("released");
+
+            string[] responses = await Task.WhenAll(firstCall, secondCall).ConfigureAwait(false);
+
+            return responses[0] + responses[1];
+        }
+    }
+
+    // Yields so both overlapping walks are inside this stage before either calls next.
+    private sealed class YieldThenPassThroughStage : IRequestStage<Ping, string>
+    {
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+
+            return await next.InvokeAsync();
+        }
+    }
+
+    // Releases both callers into next at once, so one level is entered twice simultaneously.
+    private sealed class SimultaneousNextStage(TaskCompletionSource<string> gate) : IRequestStage<Ping, string>
     {
         public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
         {
@@ -922,14 +1018,7 @@ public sealed class StageExecutorTests
             Task Caller(int slot) => Task.Run(() =>
             {
                 barrier.SignalAndWait();
-                try
-                {
-                    calls[slot] = next.InvokeAsync();
-                }
-                catch (OverlappingNextCallException)
-                {
-                    onGuardThrow();
-                }
+                calls[slot] = next.InvokeAsync();
             });
 
             await Task.WhenAll(Caller(0), Caller(1));
@@ -946,8 +1035,7 @@ public sealed class StageExecutorTests
         }
     }
 
-    private sealed class SimultaneousNextVoidStage(TaskCompletionSource<NoResult> gate, Action onGuardThrow)
-        : IRequestStage<Log>
+    private sealed class SimultaneousNextVoidStage(TaskCompletionSource<NoResult> gate) : IRequestStage<Log>
     {
         public async Task HandleAsync(Log request, IContinuation next, CancellationToken cancellationToken)
         {
@@ -957,14 +1045,7 @@ public sealed class StageExecutorTests
             Task Caller(int slot) => Task.Run(() =>
             {
                 barrier.SignalAndWait();
-                try
-                {
-                    calls[slot] = next.InvokeAsync();
-                }
-                catch (OverlappingNextCallException)
-                {
-                    onGuardThrow();
-                }
+                calls[slot] = next.InvokeAsync();
             });
 
             await Task.WhenAll(Caller(0), Caller(1));
@@ -976,6 +1057,32 @@ public sealed class StageExecutorTests
                     await call;
             }
         }
+    }
+
+    // No constructor dependencies, so the container can build it per entry.
+    private sealed class ParameterlessRetryStage : IRequestStage<Ping, string>
+    {
+        public async Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await next.InvokeAsync();
+            }
+            catch (Exception)
+            {
+                return await next.InvokeAsync();
+            }
+        }
+    }
+
+    private sealed class CountingConstructionStage : IRequestStage<Ping, string>
+    {
+        public static int Constructions;
+
+        public CountingConstructionStage() => Interlocked.Increment(ref Constructions);
+
+        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     private sealed class NullTaskStage : IRequestStage<Ping, string>
@@ -1041,8 +1148,6 @@ public sealed class StageExecutorTests
         }
     }
 
-    // The shape a timeout stage takes: it puts its own token on the rest of the chain instead of
-    // the one it was handed.
     private sealed class SubstitutingStage(CancellationToken substitute) : IRequestStage<Ping, string>
     {
         public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
@@ -1076,8 +1181,8 @@ public sealed class StageExecutorTests
         }
     }
 
-    // The timeout shape written to compose: it cancels the call it started and awaits it out, so
-    // the level is free when an outer retry re-enters. Cancelling at once keeps the test fast.
+    // Cancels the call it started and awaits it out before giving up. Cancelling at once keeps
+    // the test fast.
     private sealed class CancelAndAwaitStage : IRequestStage<Ping, string>
     {
         public int Attempts { get; private set; }

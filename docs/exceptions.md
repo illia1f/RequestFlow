@@ -11,7 +11,6 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 | `ResponseTypeMismatchException`  | `SendAsync`              | The call site's response type differs from the registered one  |
 | `HandlerNullTaskException`       | `SendAsync`              | A handler returned a null task from `HandleAsync`              |
 | `StageNullTaskException`         | `SendAsync`              | A stage returned a null task from `HandleAsync`                |
-| `OverlappingNextCallException`   | `SendAsync`              | A stage called `next` while its earlier call was still running |
 | `InvalidOperationException`      | `WhereHandlerImplements` | A second handler filter added to one stage                     |
 | `ArgumentNullException`          | All public entry points  | A required argument is null                                    |
 | `ArgumentException`              | `RegisterGenericHandler` | `closingTypes` contains a null element                         |
@@ -152,14 +151,6 @@ catch (NullTaskException e)
 
 The base class is abstract with no public constructor, so those two are the only cases it ever holds. Both checks exist so the failure names the handler or stage at fault instead of surfacing as a `NullReferenceException` at the await.
 
-## OverlappingNextCallException
-
-Thrown by `SendAsync` when a stage invokes `next` while the task from its earlier call is still running. The `StageType` property holds the stage class at fault.
-
-Await each call before making the next one. The check stops a stage from running the rest of the chain twice at the same time; a sequential second call, the retry shape, is allowed (see [stages.md](stages.md)).
-
-A timeout stage hits this when it stops waiting and leaves its call running, because the level stays occupied and an outer retry re-entering it collides with that call. Cancel the call through the token passed to `next.InvokeAsync`, wait for it to end, and then throw.
-
 ## Plain InvalidOperationException
 
 One case is left with no type of its own. Adding a second `WhereHandlerImplements` to one stage throws from the `AddStage` configure delegate, with a message starting `This stage already filters on '...'`. A stage takes one handler filter, so give the target handlers one shared contract instead.
@@ -186,4 +177,4 @@ Cancellation follows the same rule. The token reaches `HandleAsync` as the calle
 
 Container failures keep the container's own exception types. The dispatcher resolves the handler from the service provider on every dispatch, so a handler with a missing constructor dependency throws the container's `InvalidOperationException` at dispatch time, and so does a scoped handler resolved from the root provider while scope validation is on. With scope validation off the second case throws nothing: the root provider builds the handler and reuses that instance for the life of the process. See [lifetimes.md](lifetimes.md) for the lifetime rules that prevent these.
 
-On a request with stages, that failure lands inside the chain. Each level resolves when it first runs, so the container's exception comes out of the `next.InvokeAsync()` call that reached the broken level, and the stages wrapped around it can catch it like any other exception. A retry stage with a broad `catch` will retry a missing registration until it runs out of attempts. Catch the exceptions you mean to handle, and turn on `ServiceProviderOptions.ValidateOnBuild` so a registration mistake fails at startup instead.
+On a request with stages, that failure lands inside the chain. A level resolves as it runs, so the container's exception comes out of the `next.InvokeAsync()` call that reached the broken level, and the stages wrapped around it can catch it like any other exception. A retry stage with a broad `catch` will retry a missing registration until it runs out of attempts. Catch the exceptions you mean to handle, and turn on `ServiceProviderOptions.ValidateOnBuild` so a registration mistake fails at startup instead.

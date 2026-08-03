@@ -60,13 +60,71 @@ public sealed class StageLifetimeTests
     }
 
     [Fact]
-    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Stage_Below_Is_Constructed_Once()
+    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Stage_Below_Is_Constructed_Once_Per_Call()
     {
         ServiceProvider provider = BuildTraceChain(typeof(DoubleNextStage));
 
         await SendTraceAsync(provider);
 
+        CountingStageConstructions.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Given_Scoped_Stage_Below_When_A_Stage_Calls_Next_Twice_Then_One_Instance_Serves_Both_Calls()
+    {
+        ServiceProvider provider = BuildScopedTraceChain(typeof(DoubleNextStage));
+
+        await SendTraceAsync(provider);
+
         CountingStageConstructions.ShouldBe(1);
+    }
+
+    // A scoped level is one instance for both overlapping walks, so its thread safety is the
+    // stage author's to keep.
+    [Fact]
+    public async Task Given_Scoped_Stage_Below_When_A_Stage_Overlaps_Two_Next_Calls_Then_One_Instance_Is_Inside_Both_Walks()
+    {
+        ServiceProvider provider = BuildOverlapChain(s => s.AsScoped());
+
+        await SendOverlapAsync(provider);
+
+        ConcurrentStageConstructions.ShouldBe(1);
+        ConcurrentStagePeak.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Given_Singleton_Stage_Below_When_A_Stage_Overlaps_Two_Next_Calls_Then_One_Instance_Is_Inside_Both_Walks()
+    {
+        ServiceProvider provider = BuildOverlapChain(s => s.AsSingleton());
+
+        await SendOverlapAsync(provider);
+
+        ConcurrentStageConstructions.ShouldBe(1);
+        ConcurrentStagePeak.ShouldBe(2);
+    }
+
+    // Transient is the lifetime that keeps overlapping walks apart.
+    [Fact]
+    public async Task Given_Transient_Stage_Below_When_A_Stage_Overlaps_Two_Next_Calls_Then_Each_Walk_Gets_Its_Own_Instance()
+    {
+        ServiceProvider provider = BuildOverlapChain();
+
+        await SendOverlapAsync(provider);
+
+        ConcurrentStageConstructions.ShouldBe(2);
+    }
+
+    // A level that fails to build throws out of next.InvokeAsync itself instead of handing back a
+    // faulted task, so a fan-out stage never receives a task for that call and has to settle the
+    // walk it already started. The stage returns "caught" only on the throwing path.
+    [Fact]
+    public async Task Given_Stage_Below_That_Fails_To_Build_On_The_Second_Entry_When_A_Stage_Overlaps_Two_Next_Calls_Then_The_Second_Call_Throws_Without_Producing_A_Task()
+    {
+        ServiceProvider provider = BuildStageChain(typeof(OverlapObservingStage), typeof(SecondEntryFailsStage));
+
+        string result = await SendOverlapForResultAsync(provider);
+
+        result.ShouldBe("caught:released");
     }
 
     [Fact]
@@ -80,13 +138,13 @@ public sealed class StageLifetimeTests
     }
 
     [Fact]
-    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Handler_Is_Constructed_Once()
+    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Handler_Is_Constructed_Once_Per_Call()
     {
         ServiceProvider provider = BuildTraceChain(typeof(DoubleNextStage));
 
         await SendTraceAsync(provider);
 
-        TraceHandlerConstructions.ShouldBe(1);
+        TraceHandlerConstructions.ShouldBe(2);
     }
 
     [Fact]
@@ -100,17 +158,17 @@ public sealed class StageLifetimeTests
     }
 
     [Fact]
-    public async Task Given_Void_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Handler_Is_Constructed_Once()
+    public async Task Given_Void_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Handler_Is_Constructed_Once_Per_Call()
     {
         ServiceProvider provider = BuildVoidTraceChain(typeof(DoubleNextVoidStage));
 
         await SendVoidTraceAsync(provider);
 
-        VoidTraceHandlerConstructions.ShouldBe(1);
+        VoidTraceHandlerConstructions.ShouldBe(2);
     }
 
     // Resolving a level lazily puts the container's failure inside the chain, where the stages
-    // above it can see it, instead of ahead of it where it escaped SendAsync untouched.
+    // above it can see it.
     [Fact]
     public async Task Given_Stage_That_Cannot_Be_Constructed_When_An_Outer_Stage_Wraps_It_Then_That_Stage_Observes_The_Failure()
     {
@@ -199,8 +257,7 @@ public sealed class StageLifetimeTests
         StageInstances[0].ShouldNotBeSameAs(StageInstances[1]);
     }
 
-    // Stages register the way handlers do, so the declaration's descriptor comes last and wins,
-    // and the one registered first is left behind for ValidateOnBuild to walk.
+    // Stages register the way handlers do, so the declaration's descriptor comes last and wins.
     [Fact]
     public void Given_Consumer_Registered_Stage_Before_Adding_Request_Flow_When_Adding_Request_Flow_Then_The_Declaration_Wins()
     {
@@ -225,8 +282,8 @@ public sealed class StageLifetimeTests
         StageInstances[0].ShouldBeSameAs(StageInstances[1]);
     }
 
-    // One descriptor is the point: ValidateOnBuild walks every one of them, and the descriptor
-    // AddStage leaves behind names a constructor the container may not be able to satisfy.
+    // ValidateOnBuild walks every descriptor, and the one AddStage leaves behind names a
+    // constructor the container may not be able to satisfy.
     [Fact]
     public void Given_Hand_Built_Stage_Replacing_The_Declaration_Then_Only_That_Descriptor_Remains()
     {
@@ -251,14 +308,20 @@ public sealed class StageLifetimeTests
 
     #region Initialization
 
-    // The container instantiates stages, so what they saw lands in statics; the constructor
-    // clears them per test.
+    // The container instantiates stages, so what they saw lands in statics, cleared per test.
     private static readonly List<ScopeMarker> StageMarkers = [];
     private static readonly List<ScopeMarker> HandlerMarkers = [];
     private static readonly List<object> StageInstances = [];
     private static int CountingStageConstructions;
     private static int TraceHandlerConstructions;
     private static int VoidTraceHandlerConstructions;
+    private static int ConcurrentStageConstructions;
+    private static int ConcurrentStageEntries;
+    private static int ConcurrentStagePeak;
+    private static int SecondEntryConstructions;
+
+    // Held incomplete until the overlapping stage has both calls in flight.
+    private static TaskCompletionSource<string> OverlapGate = new();
 
     public StageLifetimeTests()
     {
@@ -268,6 +331,11 @@ public sealed class StageLifetimeTests
         CountingStageConstructions = 0;
         TraceHandlerConstructions = 0;
         VoidTraceHandlerConstructions = 0;
+        ConcurrentStageConstructions = 0;
+        ConcurrentStageEntries = 0;
+        ConcurrentStagePeak = 0;
+        SecondEntryConstructions = 0;
+        OverlapGate = new TaskCompletionSource<string>();
     }
 
     #endregion
@@ -339,6 +407,46 @@ public sealed class StageLifetimeTests
 
     private static ServiceProvider BuildTraceChain(Type outerStageType)
         => BuildStageChain(outerStageType, typeof(CountingStage));
+
+    // The counting level declared scoped, so the container hands the same instance back on re-entry.
+    private static ServiceProvider BuildScopedTraceChain(Type outerStageType)
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<ScopeMarker>();
+        services.AddRequestFlow(o =>
+        {
+            o.RegisterHandlersFromAssemblyContaining<StageLifetimeTests>();
+            o.AddStage(outerStageType);
+            o.AddStage(typeof(CountingStage), s => s.AsScoped());
+        });
+
+        return services.BuildServiceProvider();
+    }
+
+    // The counting level under a stage that runs it twice at once, on the lifetime the test names.
+    private static ServiceProvider BuildOverlapChain(Action<StageOptions>? lifetime = null)
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<ScopeMarker>();
+        services.AddRequestFlow(o =>
+        {
+            o.RegisterHandlersFromAssemblyContaining<StageLifetimeTests>();
+            o.AddStage(typeof(OverlapNextStage));
+            o.AddStage(typeof(ConcurrentCountingStage), lifetime);
+        });
+
+        return services.BuildServiceProvider();
+    }
+
+    private static async Task SendOverlapAsync(ServiceProvider provider)
+        => await SendOverlapForResultAsync(provider);
+
+    private static async Task<string> SendOverlapForResultAsync(ServiceProvider provider)
+    {
+        using IServiceScope scope = provider.CreateScope();
+
+        return await scope.ServiceProvider.GetRequiredService<IRequestDispatcher>().SendAsync(new Overlap());
+    }
 
     private static async Task SendTraceAsync(ServiceProvider provider)
         => await SendTraceForResultAsync(provider);
@@ -465,6 +573,98 @@ public sealed class StageLifetimeTests
 
         public Task<string> HandleAsync(Trace request, IContinuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
+    }
+
+    public sealed record Overlap : IRequest<string>;
+
+    // Hands every walk the same gate task, so no walk finishes before the stage above releases it.
+    public sealed class OverlapHandler : IRequestHandler<Overlap, string>
+    {
+        public Task<string> HandleAsync(Overlap request, CancellationToken cancellationToken)
+            => OverlapGate.Task;
+    }
+
+    // Starts a second walk while the first is suspended on the handler, then releases the gate.
+    public sealed class OverlapNextStage : IRequestStage<Overlap, string>
+    {
+        public async Task<string> HandleAsync(
+            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            Task<string> first = next.InvokeAsync();
+            Task<string> second = next.InvokeAsync();
+
+            OverlapGate.TrySetResult("released");
+
+            // WhenAll, so a fault on either walk leaves neither task unobserved.
+            string[] responses = await Task.WhenAll(first, second);
+
+            return responses[0] + responses[1];
+        }
+    }
+
+    // Only the dispatching thread enters, since both calls are made before either can finish, so
+    // the peak needs no interlocked write of its own.
+    public sealed class ConcurrentCountingStage : IRequestStage<Overlap, string>
+    {
+        public ConcurrentCountingStage()
+            => ConcurrentStageConstructions++;
+
+        public async Task<string> HandleAsync(
+            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            int inside = Interlocked.Increment(ref ConcurrentStageEntries);
+            if (inside > ConcurrentStagePeak)
+                ConcurrentStagePeak = inside;
+
+            try
+            {
+                return await next.InvokeAsync();
+            }
+            finally
+            {
+                Interlocked.Decrement(ref ConcurrentStageEntries);
+            }
+        }
+    }
+
+    // Builds on the first entry and refuses on the second, the container failure a fan-out stage
+    // can hit on its second call while the first one is still running.
+    public sealed class SecondEntryFailsStage : IRequestStage<Overlap, string>
+    {
+        public SecondEntryFailsStage()
+        {
+            if (++SecondEntryConstructions > 1)
+                throw new InvalidOperationException("no second entry");
+        }
+
+        public Task<string> HandleAsync(
+            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
+    }
+
+    // Starts a second call while the first is parked on the handler. The second call throws before
+    // it can hand back a task, so `second` stays unassigned and the first walk is settled here
+    // rather than left running with nobody awaiting it.
+    public sealed class OverlapObservingStage : IRequestStage<Overlap, string>
+    {
+        public async Task<string> HandleAsync(
+            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+        {
+            Task<string> first = next.InvokeAsync();
+            Task<string>? second = null;
+            try
+            {
+                second = next.InvokeAsync();
+            }
+            catch (InvalidOperationException)
+            {
+                OverlapGate.TrySetResult("released");
+
+                return $"caught:{await first}";
+            }
+
+            return $"{await first}+{await second}";
+        }
     }
 
     // Nothing registers this, so any level that asks the container for it fails to build.

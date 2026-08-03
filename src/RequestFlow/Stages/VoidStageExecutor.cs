@@ -19,8 +19,6 @@ internal sealed class VoidStageExecutor<TRequest>(
     : StageExecutor<TRequest, NoResult>(stageTypes.Length, request, cancellationToken)
     where TRequest : IRequest<NoResult>
 {
-    private IRequestHandler<TRequest>? _handler;
-
     /// <inheritdoc />
     protected override object ResolveStage(int index) => services.GetRequiredService(stageTypes[index]);
 
@@ -31,7 +29,7 @@ internal sealed class VoidStageExecutor<TRequest>(
         if (typedShapes[index])
             return ((IRequestStage<TRequest, NoResult>)stage).HandleAsync(request, next, cancellationToken);
 
-        // The void shape's Task converts to Task<NoResult>, so both forms reach the same level object and share its guard state.
+        // The void shape's Task converts to Task<NoResult>, so both forms reach the same level object.
         return NoResultBridge.CompleteOrNull(
             ((IRequestStage<TRequest>)stage).HandleAsync(request, (IContinuation)next, cancellationToken));
     }
@@ -39,7 +37,7 @@ internal sealed class VoidStageExecutor<TRequest>(
     /// <inheritdoc />
     protected override Task<NoResult> InvokeHandlerAsync(TRequest request, CancellationToken cancellationToken)
         => NoResultBridge.CompleteOrNull(
-            (_handler ??= services.GetRequiredService<IRequestHandler<TRequest>>())
+            services.GetRequiredService<IRequestHandler<TRequest>>()
                 .HandleAsync(request, cancellationToken));
 
     /// <inheritdoc />
