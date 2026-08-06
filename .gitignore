@@ -24,6 +24,10 @@ artifacts/
 !.vscode/launch.json
 !.vscode/extensions.json
 
+# ── Local build settings (per-machine) ───────────────────────
+# Optional override file. Directory.Build.props imports it when it exists.
+Directory.Local.props
+
 # ── NuGet package output ─────────────────────────────────────
 # Packing RequestFlow / RequestFlow.Cqrs. Symbols too (.snupkg).
 *.nupkg

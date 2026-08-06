@@ -23,4 +23,7 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- Per-machine build settings, when the file exists. Not in the repo. -->
+  <Import Project="$(RepoRoot)Directory.Local.props" Condition="Exists('$(RepoRoot)Directory.Local.props')" />
+
 </Project>
