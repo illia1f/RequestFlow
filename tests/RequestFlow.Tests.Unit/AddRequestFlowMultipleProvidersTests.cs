@@ -47,6 +47,25 @@ public sealed class AddRequestFlowMultipleProvidersTests
         services.Count(d => d.ServiceType == typeof(IRequestHandler<Ping, string>)).ShouldBe(1);
     }
 
+    // Every provider built from one collection freezes off the same registry, so a handler declared
+    // after this provider was built still reaches its map. The descriptor never does, and the
+    // resolution the plan makes is where that shows up.
+    [Fact]
+    public async Task Given_Closing_Declared_After_The_Provider_Was_Built_When_Sending_Request_Via_That_Provider_Then_The_Handler_Cannot_Be_Resolved()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterGenericHandler(typeof(TagHandler<>), typeof(First)));
+        using ServiceProvider provider = services.BuildServiceProvider();
+        services.AddRequestFlow(o => o.RegisterGenericHandler(typeof(TagHandler<>), typeof(Second)));
+        IRequestDispatcher dispatcher = provider.GetRequiredService<IRequestDispatcher>();
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(
+            () => dispatcher.SendAsync(new Tag<Second>("x")));
+
+        thrown.ShouldNotBeOfType<HandlerNotFoundException>();
+        thrown.Message.ShouldContain(nameof(IRequestHandler<Tag<Second>, string>));
+    }
+
     #region Helpers
 
     public sealed record Tag<T>(string Payload) : IRequest<string>;

@@ -234,7 +234,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             await next.InvokeAsync();
             throw new TimeoutException("after next");
@@ -245,7 +245,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
             => throw new InvalidTimeZoneException("from stage");
     }
 
@@ -253,7 +253,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
@@ -261,7 +261,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
@@ -269,7 +269,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
                 Trace.Add("Token:cancelled");
@@ -278,12 +278,12 @@ public sealed class StageSemanticsTests
         }
     }
 
-    // Suspends on work of its own before delegating, the shape of a validation or caching stage.
+    // The shape of a validation or caching stage.
     public sealed class AwaitBeforeNextStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             await Task.Yield();
             Trace.Add("Await:enter");
@@ -297,7 +297,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             Trace.Add("Tracing:enter");
             TResponse response = await next.InvokeAsync();
@@ -310,7 +310,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             await next.InvokeAsync();
             return await next.InvokeAsync();
@@ -321,13 +321,13 @@ public sealed class StageSemanticsTests
     // offer both of. Each records which one ran.
     public sealed class BothShapesStage : IRequestStage<Wipe, NoResult>, IRequestStage<Wipe>
     {
-        public Task<NoResult> HandleAsync(Wipe request, IContinuation<NoResult> next, CancellationToken cancellationToken)
+        public Task<NoResult> HandleAsync(Wipe request, Continuation<NoResult> next, CancellationToken cancellationToken)
         {
             Trace.Add("BothShapes:typed");
             return next.InvokeAsync();
         }
 
-        public Task HandleAsync(Wipe request, IContinuation next, CancellationToken cancellationToken)
+        public Task HandleAsync(Wipe request, Continuation next, CancellationToken cancellationToken)
         {
             Trace.Add("BothShapes:void");
             return next.InvokeAsync();
@@ -338,7 +338,7 @@ public sealed class StageSemanticsTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             try
             {
@@ -357,7 +357,7 @@ public sealed class StageSemanticsTests
         public static int Entries;
 
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             Entries++;
             return next.InvokeAsync();

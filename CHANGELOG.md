@@ -8,17 +8,24 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 ## [Unreleased]
 
+### Added
+
+- `Continuation<TResponse>.Over(rest)` and `Continuation.Over(rest)` stand in for the rest of the chain with a delegate, so you can unit-test a stage with no container and no dispatcher. The delegate receives the token the stage passed to `InvokeAsync`; a call that names none falls back to `Over`'s optional second argument, which takes the place of the token the stage itself received. A default `Continuation` has no chain behind it, so `InvokeAsync` on one throws `InvalidOperationException`. [stages.md](docs/stages.md) has a retry stage tested this way.
+
 ### Changed
 
-- A level resolves its stage, and the bottom level resolves the handler, on every entry rather than once per dispatch. The lifetime a stage was registered with now decides what a repeated `next` call reaches: a transient stage is built again for the retry, a scoped one stays the same instance for the scope. A retry over a transient chain therefore gets a clean instance instead of the one the failed attempt left behind. The instances a repeated call leaves behind are the scope's to dispose, which matters most under a root-resolved dispatcher; [lifetimes.md](docs/lifetimes.md) has that case.
+- `IContinuation<TResponse>` and `IContinuation` are gone. A stage now takes `Continuation<TResponse>` or `Continuation`, two `readonly struct`s. They wrap a chain that is built once, when the dispatch map freezes, and every call carries its own provider and cancellation token through it. The calls you make on `next` do not change, so migrating a stage means editing one parameter type. Its tests take more: a struct cannot be substituted, so build a real one with `Over`.
+- Every entry into a level resolves the stage there, and the bottom level resolves the handler. That used to happen once per dispatch. So the lifetime you registered now decides what a second `next` call gets: a transient stage is built again, a scoped one comes back as the same instance. [lifetimes.md](docs/lifetimes.md) covers who disposes the extra instances when the dispatcher comes from the root provider.
 
 ### Removed
 
-- `OverlappingNextCallException`. Calling `next` while an earlier call is still running is no longer an error. Each call enters the levels below it on its own and keeps the token it was handed, so two calls from one stage run the rest of the chain side by side over no state of RequestFlow's that either can disturb. Fan-out shapes such as hedging and shadow comparison work now. What the guard used to rule out comes with it: a scoped or singleton stage under a stage that overlaps its calls is one instance inside two walks at once, so it has to be thread safe within a single dispatch and not only across dispatches. A transient stage is resolved per call and stays clear of it. A stage that starts a second call also owns the first one, and [stages.md](docs/stages.md) has the shape that keeps a failure on either call from abandoning a walk nobody awaits.
+- `OverlappingNextCallException`. A stage can now call `next` again while an earlier call is still running, which is what hedging and shadow comparison need. The catch: a scoped or singleton stage below an overlapping one is a single instance running in two walks at once, so it has to be thread safe inside one dispatch and not only across dispatches. A transient stage stays clear of that. [stages.md](docs/stages.md) shows how to keep a failure on one call from leaving the other walk unawaited.
 
 ### Performance
 
-- No atomic operations left on the `next` path. A single pass through N stages allocates what it did before, one object per level it enters; a repeated `next` call now allocates the levels it re-enters instead of reusing the first call's.
+- Allocation per dispatch no longer grows with the chain. Levels are built once, when the dispatch map freezes, so five stages cost what no stages cost. A repeated `next` call allocates nothing of RequestFlow's. Stage instances are still the container's to allocate, on the lifetime you registered.
+- No atomic operations left on the `next` path.
+- Void requests still cross a `Task` to `Task<NoResult>` bridge at every level. It is free for a level that already finished, and for a stage that hands back the task its own `next` call returned. A stage marked `async` pays one task per level of that shape.
 
 ## [1.0.0-preview.4] - 2026-08-03
 

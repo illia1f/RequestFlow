@@ -408,7 +408,6 @@ public sealed class StageLifetimeTests
     private static ServiceProvider BuildTraceChain(Type outerStageType)
         => BuildStageChain(outerStageType, typeof(CountingStage));
 
-    // The counting level declared scoped, so the container hands the same instance back on re-entry.
     private static ServiceProvider BuildScopedTraceChain(Type outerStageType)
     {
         var services = new ServiceCollection();
@@ -423,7 +422,6 @@ public sealed class StageLifetimeTests
         return services.BuildServiceProvider();
     }
 
-    // The counting level under a stage that runs it twice at once, on the lifetime the test names.
     private static ServiceProvider BuildOverlapChain(Action<StageOptions>? lifetime = null)
     {
         var services = new ServiceCollection();
@@ -491,7 +489,7 @@ public sealed class StageLifetimeTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             StageMarkers.Add(marker);
             StageInstances.Add(this);
@@ -505,7 +503,7 @@ public sealed class StageLifetimeTests
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             StageInstances.Add(this);
 
@@ -537,13 +535,13 @@ public sealed class StageLifetimeTests
 
     public sealed class SkipNextVoidStage : IRequestStage<VoidTrace>
     {
-        public Task HandleAsync(VoidTrace request, IContinuation next, CancellationToken cancellationToken)
+        public Task HandleAsync(VoidTrace request, Continuation next, CancellationToken cancellationToken)
             => Task.CompletedTask;
     }
 
     public sealed class DoubleNextVoidStage : IRequestStage<VoidTrace>
     {
-        public async Task HandleAsync(VoidTrace request, IContinuation next, CancellationToken cancellationToken)
+        public async Task HandleAsync(VoidTrace request, Continuation next, CancellationToken cancellationToken)
         {
             await next.InvokeAsync();
             await next.InvokeAsync();
@@ -552,14 +550,14 @@ public sealed class StageLifetimeTests
 
     public sealed class SkipNextStage : IRequestStage<Trace, string>
     {
-        public Task<string> HandleAsync(Trace request, IContinuation<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Trace request, Continuation<string> next, CancellationToken cancellationToken)
             => Task.FromResult("short-circuited");
     }
 
     public sealed class DoubleNextStage : IRequestStage<Trace, string>
     {
         public async Task<string> HandleAsync(
-            Trace request, IContinuation<string> next, CancellationToken cancellationToken)
+            Trace request, Continuation<string> next, CancellationToken cancellationToken)
         {
             await next.InvokeAsync();
             return await next.InvokeAsync();
@@ -571,24 +569,22 @@ public sealed class StageLifetimeTests
         public CountingStage()
             => CountingStageConstructions++;
 
-        public Task<string> HandleAsync(Trace request, IContinuation<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Trace request, Continuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
     public sealed record Overlap : IRequest<string>;
 
-    // Hands every walk the same gate task, so no walk finishes before the stage above releases it.
     public sealed class OverlapHandler : IRequestHandler<Overlap, string>
     {
         public Task<string> HandleAsync(Overlap request, CancellationToken cancellationToken)
             => OverlapGate.Task;
     }
 
-    // Starts a second walk while the first is suspended on the handler, then releases the gate.
     public sealed class OverlapNextStage : IRequestStage<Overlap, string>
     {
         public async Task<string> HandleAsync(
-            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+            Overlap request, Continuation<string> next, CancellationToken cancellationToken)
         {
             Task<string> first = next.InvokeAsync();
             Task<string> second = next.InvokeAsync();
@@ -610,7 +606,7 @@ public sealed class StageLifetimeTests
             => ConcurrentStageConstructions++;
 
         public async Task<string> HandleAsync(
-            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+            Overlap request, Continuation<string> next, CancellationToken cancellationToken)
         {
             int inside = Interlocked.Increment(ref ConcurrentStageEntries);
             if (inside > ConcurrentStagePeak)
@@ -627,8 +623,7 @@ public sealed class StageLifetimeTests
         }
     }
 
-    // Builds on the first entry and refuses on the second, the container failure a fan-out stage
-    // can hit on its second call while the first one is still running.
+    // The container failure a fan-out stage can hit on its second call while the first is still running.
     public sealed class SecondEntryFailsStage : IRequestStage<Overlap, string>
     {
         public SecondEntryFailsStage()
@@ -638,17 +633,16 @@ public sealed class StageLifetimeTests
         }
 
         public Task<string> HandleAsync(
-            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+            Overlap request, Continuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
-    // Starts a second call while the first is parked on the handler. The second call throws before
-    // it can hand back a task, so `second` stays unassigned and the first walk is settled here
-    // rather than left running with nobody awaiting it.
+    // The second call throws before it can hand back a task, so `second` stays unassigned and the
+    // first walk is settled here rather than left running with nobody awaiting it.
     public sealed class OverlapObservingStage : IRequestStage<Overlap, string>
     {
         public async Task<string> HandleAsync(
-            Overlap request, IContinuation<string> next, CancellationToken cancellationToken)
+            Overlap request, Continuation<string> next, CancellationToken cancellationToken)
         {
             Task<string> first = next.InvokeAsync();
             Task<string>? second = null;
@@ -676,14 +670,14 @@ public sealed class StageLifetimeTests
         public UnbuildableStage(MissingDependency dependency)
         { }
 
-        public Task<string> HandleAsync(Trace request, IContinuation<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Trace request, Continuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
     public sealed class CatchingStage : IRequestStage<Trace, string>
     {
         public async Task<string> HandleAsync(
-            Trace request, IContinuation<string> next, CancellationToken cancellationToken)
+            Trace request, Continuation<string> next, CancellationToken cancellationToken)
         {
             try
             {
@@ -710,7 +704,7 @@ public sealed class StageLifetimeTests
     public sealed class CatchingUnbuildableStage : IRequestStage<Unbuildable, string>
     {
         public async Task<string> HandleAsync(
-            Unbuildable request, IContinuation<string> next, CancellationToken cancellationToken)
+            Unbuildable request, Continuation<string> next, CancellationToken cancellationToken)
         {
             try
             {

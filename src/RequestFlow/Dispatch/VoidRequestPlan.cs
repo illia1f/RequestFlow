@@ -1,24 +1,20 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
 
 /// <summary>
-/// Closed plan for one void request. Resolves the standalone handler from the supplied
-/// provider on each call and completes with <see cref="NoResult"/>.
+/// Closed plan for one void request with no stages over it: the handler level on its own, resolving
+/// the standalone handler from the supplied provider on each call.
 /// </summary>
 internal sealed class VoidRequestPlan<TRequest> : RequestPlan<NoResult>
     where TRequest : IRequest<NoResult>
 {
+    private readonly LevelEntry<NoResult> _handler = ChainBuilder.VoidHandler<TRequest>();
+
     /// <inheritdoc />
     public override Task<NoResult> ExecuteAsync(
-        IRequest<NoResult> request, IServiceProvider services, CancellationToken cancellationToken)
-    {
-        var handler = services.GetRequiredService<IRequestHandler<TRequest>>();
-        Task task = NullTaskGuard.ThrowIfNull(
-            handler.HandleAsync((TRequest)request, cancellationToken), typeof(TRequest));
-        return NoResultBridge.Complete(task);
-    }
+        object request, IServiceProvider services, CancellationToken cancellationToken)
+        => _handler(request, services, cancellationToken);
 }

@@ -1,22 +1,21 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
 
 /// <summary>
-/// Closed plan for one void request wrapped in stages. The ordered stage types and the
-/// contract shape each one runs under are fixed when the dispatch map freezes; each stage
-/// instance and the handler resolve from the supplied provider when their level first runs, so
-/// DI lifetimes hold and a level the chain never reaches is never built.
+/// Closed plan for one void request wrapped in stages. The chain of levels, and the contract shape
+/// each one runs under, are settled when the dispatch map freezes; each level resolves its stage or
+/// handler from the supplied provider when it runs.
 /// </summary>
-internal sealed class StagedVoidRequestPlan<TRequest>(Type[] stageTypes, bool[] typedShapes) : RequestPlan<NoResult>
+internal sealed class StagedVoidRequestPlan<TRequest>(StageChain chain) : RequestPlan<NoResult>
     where TRequest : IRequest<NoResult>
 {
+    private readonly LevelEntry<NoResult> _root = ChainBuilder.Void<TRequest>(chain);
+
     /// <inheritdoc />
     public override Task<NoResult> ExecuteAsync(
-        IRequest<NoResult> request, IServiceProvider services, CancellationToken cancellationToken)
-        => new VoidStageExecutor<TRequest>(
-            stageTypes, typedShapes, services, (TRequest)request, cancellationToken).RunAsync();
+        object request, IServiceProvider services, CancellationToken cancellationToken)
+        => _root(request, services, cancellationToken);
 }

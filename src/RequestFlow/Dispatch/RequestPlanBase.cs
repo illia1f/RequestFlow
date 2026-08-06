@@ -26,8 +26,8 @@ internal abstract class RequestPlan<TResponse> : RequestPlanBase
     public sealed override Type ResponseType => typeof(TResponse);
 
     /// <summary>
-    /// Resolves the handler from <paramref name="services"/> and invokes it.
+    /// Enters the top level of this plan's chain, which is the handler itself when no stage applies.
     /// </summary>
     public abstract Task<TResponse> ExecuteAsync(
-        IRequest<TResponse> request, IServiceProvider services, CancellationToken cancellationToken);
+        object request, IServiceProvider services, CancellationToken cancellationToken);
 }
