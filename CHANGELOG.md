@@ -16,6 +16,7 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 - `IContinuation<TResponse>` and `IContinuation` are gone. A stage now takes `Continuation<TResponse>` or `Continuation`, two `readonly struct`s. They wrap a chain that is built once, when the dispatch map freezes, and every call carries its own provider and cancellation token through it. The calls you make on `next` do not change, so migrating a stage means editing one parameter type. Its tests take more: a struct cannot be substituted, so build a real one with `Over`.
 - Every entry into a level resolves the stage there, and the bottom level resolves the handler. That used to happen once per dispatch. So the lifetime you registered now decides what a second `next` call gets: a transient stage is built again, a scoped one comes back as the same instance. [lifetimes.md](docs/lifetimes.md) covers who disposes the extra instances when the dispatcher comes from the root provider.
+- A new logo, on the package icon and in the README. The icon is cropped to the R and the arrow and now fills its canvas horizontally, which is the axis nuget.org's 32x32 `contain` slot scales by. Its palette is brighter than the old purple, which nearly disappeared against the dark package page.
 
 ### Removed
 
