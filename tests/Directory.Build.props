@@ -7,10 +7,10 @@
     <!-- net462 matches the library's oldest target, so tests exercise that exact build.
          .NET Framework only runs on Windows. Requires the xunit runner pinned at 2.8.2. -->
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(TargetFrameworks);net462</TargetFrameworks>
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)tests.runsettings</RunSettingsFilePath>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <!-- ValidationFixtures lives here too, but it is a scanned library rather than a test host,
-         so it must not pull in the runner. -->
+    <!-- ValidationFixtures lives here too, but it is a scanned library rather than a test host, so it must not pull in the runner. -->
     <IsUnitTestProject Condition="'$(IsUnitTestProject)' == '' And $(MSBuildProjectName.EndsWith('.Tests.Unit'))">true</IsUnitTestProject>
   </PropertyGroup>
 

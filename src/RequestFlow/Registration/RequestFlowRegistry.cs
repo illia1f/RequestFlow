@@ -152,6 +152,7 @@ internal sealed class RequestFlowRegistry
         if (problems.Count > 0)
             throw new RequestFlowValidationException(problems);
 
+        // Duplicate handlers were reported above, so one plan lands per handler here.
         Dictionary<Type, RequestPlanBase> plans = [];
         foreach (var handler in _handlers)
         {
@@ -181,7 +182,9 @@ internal sealed class RequestFlowRegistry
             }
 
             Type[] stageTypes = ordered.ToArray();
-            chainsByRequest[handler.RequestType] = new StageChain(stageTypes, TypedShapesFor(handler, stageTypes));
+
+            chainsByRequest[handler.RequestType] =
+                new StageChain(stageTypes, TypedShapesFor(handler, stageTypes));
         }
 
         return new StagePlanSet(chainsByRequest, appliedStageTypes);
@@ -202,6 +205,7 @@ internal sealed class RequestFlowRegistry
         return typedShapes;
     }
 
+    // The staged plans build their own levels, keeping the reflection at this one call.
     private static RequestPlanBase CreatePlan(HandlerRegistration handler, StageChain chain)
     {
         if (chain.StageTypes.Length == 0)
@@ -209,22 +213,15 @@ internal sealed class RequestFlowRegistry
             Type planType = handler.IsVoid
                 ? typeof(VoidRequestPlan<>).MakeGenericType(handler.RequestType)
                 : typeof(RequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
+
             return (RequestPlanBase)Activator.CreateInstance(planType)!;
         }
 
-        // Wrapped in an object array on purpose: Type[] converts to object[], so handing
-        // stageTypes straight through would be read as one constructor argument per stage type.
-        if (handler.IsVoid)
-        {
-            Type voidPlanType = typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType);
-            return (RequestPlanBase)Activator.CreateInstance(
-                voidPlanType, [chain.StageTypes, chain.TypedShapes])!;
-        }
+        Type stagedPlanType = handler.IsVoid
+            ? typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType)
+            : typeof(StagedRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
 
-        Type stagedPlanType = typeof(StagedRequestPlan<,>)
-            .MakeGenericType(handler.RequestType, handler.ResponseType);
-
-        return (RequestPlanBase)Activator.CreateInstance(stagedPlanType, [(object)chain.StageTypes])!;
+        return (RequestPlanBase)Activator.CreateInstance(stagedPlanType, [chain])!;
     }
 }
 

@@ -316,7 +316,7 @@ public sealed class StagePipelineTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             Trace.Add("Recording:enter");
             TResponse response = await next.InvokeAsync();
@@ -329,7 +329,7 @@ public sealed class StagePipelineTests
         where TRequest : IRequest<TResponse>
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             Trace.Add("Second:enter");
             TResponse response = await next.InvokeAsync();
@@ -342,7 +342,7 @@ public sealed class StagePipelineTests
         where TRequest : IRequest<TResponse>, ITag
     {
         public async Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             Trace.Add("TaggedOnly:enter");
             TResponse response = await next.InvokeAsync();
@@ -355,7 +355,7 @@ public sealed class StagePipelineTests
         where TRequest : IRequest<TResponse>, INothingImplementsThis
     {
         public Task<TResponse> HandleAsync(
-            TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
         {
             Trace.Add("Unreachable:enter");
             return next.InvokeAsync();
@@ -367,7 +367,7 @@ public sealed class StagePipelineTests
         where TRequest : IRequest<string>
     {
         public async Task<string> HandleAsync(
-            TRequest request, IContinuation<string> next, CancellationToken cancellationToken)
+            TRequest request, Continuation<string> next, CancellationToken cancellationToken)
         {
             Trace.Add("ResponseBound:enter");
             string response = await next.InvokeAsync();
@@ -379,7 +379,7 @@ public sealed class StagePipelineTests
     public sealed class VoidRecordingStage<TRequest> : IRequestStage<TRequest>
         where TRequest : IRequest
     {
-        public async Task HandleAsync(TRequest request, IContinuation next, CancellationToken cancellationToken)
+        public async Task HandleAsync(TRequest request, Continuation next, CancellationToken cancellationToken)
         {
             Trace.Add("VoidRecording:enter");
             await next.InvokeAsync();
@@ -392,7 +392,7 @@ public sealed class StagePipelineTests
     public sealed class NotificationStage : IRequestStage<Notification, string>
     {
         public async Task<string> HandleAsync(
-            Notification request, IContinuation<string> next, CancellationToken cancellationToken)
+            Notification request, Continuation<string> next, CancellationToken cancellationToken)
         {
             Trace.Add("Notification:enter");
             string response = await next.InvokeAsync();
@@ -404,7 +404,7 @@ public sealed class StagePipelineTests
     public sealed class PingOnlyStage : IRequestStage<Ping, string>
     {
         public async Task<string> HandleAsync(
-            Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+            Ping request, Continuation<string> next, CancellationToken cancellationToken)
         {
             Trace.Add("PingOnly:enter");
             string response = await next.InvokeAsync();

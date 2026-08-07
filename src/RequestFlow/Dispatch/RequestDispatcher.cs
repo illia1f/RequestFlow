@@ -20,8 +20,7 @@ internal sealed class RequestDispatcher(DispatchMap map, IServiceProvider servic
 
         Type requestType = request.GetType();
 
-        // The map never stores a null plan, so a hit always carries one.
-        if (!_map.TryGet(requestType, out RequestPlanBase? plan))
+        if (!_map.TryGetPlanFor(requestType, out RequestPlanBase? plan))
             throw new HandlerNotFoundException(requestType);
 
         if (plan is not RequestPlan<TResponse> typedPlan)

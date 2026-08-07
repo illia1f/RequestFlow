@@ -258,13 +258,13 @@ public sealed class AddStageTests
     private sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
-        public Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+        public Task<TResponse> HandleAsync(TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
     private sealed class PingAuditStage : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
@@ -272,14 +272,14 @@ public sealed class AddStageTests
     // it even though it implements IRequestStage.
     private sealed class OneParameterStage<TRequest> : IRequestStage<Ping, string>
     {
-        public Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
     private sealed class ResponseBoundStage<TRequest> : IRequestStage<TRequest, string>
         where TRequest : IRequest<string>
     {
-        public Task<string> HandleAsync(TRequest request, IContinuation<string> next, CancellationToken cancellationToken)
+        public Task<string> HandleAsync(TRequest request, Continuation<string> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
@@ -288,20 +288,20 @@ public sealed class AddStageTests
     private sealed class SwappedStage<TResponse, TRequest> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
-        public Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken)
+        public Task<TResponse> HandleAsync(TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
     private sealed class VoidOnlyStage<TRequest> : IRequestStage<TRequest>
         where TRequest : IRequest
     {
-        public Task HandleAsync(TRequest request, IContinuation next, CancellationToken cancellationToken)
+        public Task HandleAsync(TRequest request, Continuation next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
     private sealed class WipeAuditStage : IRequestStage<Wipe>
     {
-        public Task HandleAsync(Wipe request, IContinuation next, CancellationToken cancellationToken)
+        public Task HandleAsync(Wipe request, Continuation next, CancellationToken cancellationToken)
             => next.InvokeAsync();
     }
 
@@ -310,7 +310,7 @@ public sealed class AddStageTests
 
     private abstract class AbstractStage : IRequestStage<Ping, string>
     {
-        public abstract Task<string> HandleAsync(Ping request, IContinuation<string> next, CancellationToken cancellationToken);
+        public abstract Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken);
     }
 
     #endregion

@@ -20,6 +20,10 @@ internal sealed class DispatchMap(Dictionary<Type, RequestPlanBase> plans)
 #endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGet(Type requestType, out RequestPlanBase? plan)
+    public bool TryGetPlanFor(Type requestType, out RequestPlanBase? plan)
         => _plans.TryGetValue(requestType, out plan);
+
+    public RequestPlanBase GetPlanFor(Type requestType)
+        => TryGetPlanFor(requestType, out RequestPlanBase? plan)
+            ? plan! : throw new KeyNotFoundException($"No plan frozen for {requestType}.");
 }

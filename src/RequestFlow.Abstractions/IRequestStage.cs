@@ -16,7 +16,7 @@ public interface IRequestStage<in TRequest, TResponse>
     /// Wraps the rest of the chain for <paramref name="request"/>. Invoke
     /// <paramref name="next"/> to continue, or skip it to short-circuit.
     /// </summary>
-    Task<TResponse> HandleAsync(TRequest request, IContinuation<TResponse> next, CancellationToken cancellationToken);
+    Task<TResponse> HandleAsync(TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -31,5 +31,5 @@ public interface IRequestStage<in TRequest>
     /// Wraps the rest of the chain for <paramref name="request"/>. Invoke
     /// <paramref name="next"/> to continue, or skip it to short-circuit.
     /// </summary>
-    Task HandleAsync(TRequest request, IContinuation next, CancellationToken cancellationToken);
+    Task HandleAsync(TRequest request, Continuation next, CancellationToken cancellationToken);
 }

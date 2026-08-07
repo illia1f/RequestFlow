@@ -4,4 +4,9 @@
     <Description>Zero-dependency contracts for RequestFlow: requests, handlers, and dispatch abstractions. Reference this from application layers; the RequestFlow package provides the runtime.</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="RequestFlow" Key="$(RequestFlowPublicKey)" />
+    <InternalsVisibleTo Include="RequestFlow.Tests.Unit" Key="$(RequestFlowPublicKey)" />
+  </ItemGroup>
+
 </Project>
