@@ -126,13 +126,16 @@ public sealed class StageClosingTests
     #region Initialization
 
     private readonly HandlerRegistration _pingHandler =
-        new(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false);
+        new(new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
+            ServiceLifetime.Transient);
 
     private readonly HandlerRegistration _taggedHandler =
-        new(typeof(TaggedHandler), typeof(Tagged), typeof(string), isVoid: false);
+        new(new HandlerDiscovery(typeof(TaggedHandler), typeof(Tagged), typeof(string), isVoid: false),
+            ServiceLifetime.Transient);
 
     private readonly HandlerRegistration _logHandler =
-        new(typeof(LogHandler), typeof(Log), typeof(NoResult), isVoid: true);
+        new(new HandlerDiscovery(typeof(LogHandler), typeof(Log), typeof(NoResult), isVoid: true),
+            ServiceLifetime.Transient);
 
     #endregion
 

@@ -110,7 +110,7 @@ public sealed class AddRequestFlowValidationTests
     {
         RequestFlowValidationException exception = ScanFixtureAssembly();
 
-        exception.Problems.ShouldContain(p => p.Contains(nameof(Lonely)));
+        exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Lonely)));
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class AddRequestFlowValidationTests
     {
         RequestFlowValidationException exception = ScanFixtureAssembly();
 
-        exception.Problems.ShouldContain(p => p.Contains(nameof(Duplicated)));
+        exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Duplicated)));
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class AddRequestFlowValidationTests
     {
         RequestFlowValidationException exception = ScanFixtureAssembly();
 
-        exception.Problems.ShouldContain(p => p.Contains(nameof(Orphaned)));
+        exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Orphaned)));
     }
 
     [Fact]
@@ -161,7 +161,7 @@ public sealed class AddRequestFlowValidationTests
     {
         RequestFlowValidationException exception = ScanFixtureAssembly(allowUnhandledRequests: true);
 
-        exception.Problems.ShouldNotContain(p => p.Contains(nameof(Lonely)));
+        exception.Problems.ShouldNotContain(p => p.Message.Contains(nameof(Lonely)));
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public sealed class AddRequestFlowValidationTests
     {
         RequestFlowValidationException exception = ScanFixtureAssembly(allowUnhandledRequests: true);
 
-        exception.Problems.ShouldContain(p => p.Contains(nameof(Duplicated)));
+        exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Duplicated)));
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public sealed class AddRequestFlowValidationTests
         RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldNotContain(p => p.Contains(nameof(Lonely)));
+        exception.Problems.ShouldNotContain(p => p.Message.Contains(nameof(Lonely)));
     }
 
     [Fact]
@@ -307,7 +307,7 @@ public sealed class AddRequestFlowValidationTests
         RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
             second.GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains(nameof(Lonely)));
+        exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Lonely)));
     }
 
     #region Helpers

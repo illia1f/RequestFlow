@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
+using RequestFlow.Tests.ValidationFixtures;
 
 namespace RequestFlow.Tests.Unit;
 
@@ -79,8 +80,12 @@ public sealed class StagePipelineTests
                 .AddStage(typeof(RecordingStage<,>), s => s.WhereHandlerImplements<IBillingHandler>())));
 
         exception.Problems.ShouldContain(p =>
-            p.Contains(nameof(RecordingStage<Ping, string>)) && p.Contains("more than once"));
-        exception.Problems.ShouldContain(p => p.Contains("handler filter does not make"));
+            p.Message.Contains(nameof(RecordingStage<Ping, string>)) && p.Message.Contains("more than once"));
+
+        // The two filters here are disjoint, so the stage never actually lands in one chain
+        // twice. The message states the rule instead of predicting a double run.
+        exception.Problems.ShouldContain(p => p.Message.Contains("whatever each call filtered on"));
+        exception.Problems.ShouldNotContain(p => p.Message.Contains("would run twice"));
     }
 
     [Fact]
@@ -116,7 +121,7 @@ public sealed class StagePipelineTests
         RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.Count(p => p.Contains(nameof(RecordingStage<Ping, string>))).ShouldBe(1);
+        exception.Problems.Count(p => p.Message.Contains(nameof(RecordingStage<Ping, string>))).ShouldBe(1);
     }
 
     [Fact]
@@ -138,8 +143,8 @@ public sealed class StagePipelineTests
                 .AddStage(typeof(RecordingStage<,>))
                 .AddStage<RecordingStage<Ping, string>>()));
 
-        exception.Problems.Count(p => p.Contains("resolve to")).ShouldBe(1);
-        exception.Problems.ShouldContain(p => p.Contains("RecordingStage") && p.Contains(nameof(Ping)));
+        exception.Problems.Count(p => p.Message.Contains("resolve to")).ShouldBe(1);
+        exception.Problems.ShouldContain(p => p.Message.Contains("RecordingStage") && p.Message.Contains(nameof(Ping)));
     }
 
     [Fact]
@@ -150,8 +155,8 @@ public sealed class StagePipelineTests
                 .AddStage(typeof(RecordingStage<,>))
                 .AddStage<RecordingStage<Notification, string>>()));
 
-        exception.Problems.Count(p => p.Contains("same stage class")).ShouldBe(1);
-        exception.Problems.ShouldContain(p => p.Contains("RecordingStage") && p.Contains(nameof(EmailNotification)));
+        exception.Problems.Count(p => p.Message.Contains("same stage class")).ShouldBe(1);
+        exception.Problems.ShouldContain(p => p.Message.Contains("RecordingStage") && p.Message.Contains(nameof(EmailNotification)));
     }
 
     [Fact]
@@ -162,8 +167,8 @@ public sealed class StagePipelineTests
                 .AddStage<RecordingStage<Notification, string>>()
                 .AddStage<RecordingStage<EmailNotification, string>>()));
 
-        exception.Problems.Count(p => p.Contains("same stage class")).ShouldBe(1);
-        exception.Problems.ShouldContain(p => p.Contains("RecordingStage") && p.Contains(nameof(EmailNotification)));
+        exception.Problems.Count(p => p.Message.Contains("same stage class")).ShouldBe(1);
+        exception.Problems.ShouldContain(p => p.Message.Contains("RecordingStage") && p.Message.Contains(nameof(EmailNotification)));
     }
 
     [Fact]
@@ -233,7 +238,55 @@ public sealed class StagePipelineTests
             Build(o => o.AddStage(typeof(UnreachableStage<,>)).DisallowUnusedStages()));
 
         exception.Problems.ShouldContain(p =>
-            p.Contains("UnreachableStage") && p.Contains("no registered request"));
+            p.Message.Contains("UnreachableStage") && p.Message.Contains("no registered request"));
+    }
+
+    [Fact]
+    public void Given_Stage_Reaching_Only_The_Second_Handler_Of_One_Request_When_Strict_Then_Does_Not_Report_The_Stage()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o
+            .RegisterHandlersFromAssembly(typeof(Forked).Assembly)
+            .AddStage<ForkedIntStage>()
+            .DisallowUnusedStages());
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
+            services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.ShouldContain(p => p.Code == "RF0101" && p.Subject == typeof(Forked));
+        exception.Problems.ShouldNotContain(p => p.Code == "RF0105");
+    }
+
+    [Fact]
+    public void Given_Two_Declarations_Colliding_Only_On_The_Second_Handler_When_Resolving_Dispatcher_Then_Reports_The_Collision()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o
+            .RegisterHandlersFromAssembly(typeof(Forked).Assembly)
+            .AddStage(typeof(IntBoundStage<>))
+            .AddStage<IntBoundStage<Forked>>());
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
+            services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.ShouldContain(p =>
+            p.Code == "RF0104" && p.Subject == typeof(IntBoundStage<>) && p.Message.Contains(nameof(Forked)));
+    }
+
+    // One closing per handler is one stage per chain, however many chains the request has.
+    [Fact]
+    public void Given_Two_Closings_Reaching_A_Handler_Each_When_Resolving_Dispatcher_Then_Reports_No_Collision()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o
+            .RegisterHandlersFromAssembly(typeof(Forked).Assembly)
+            .AddStage<RecordingStage<Forked, string>>()
+            .AddStage<RecordingStage<Forked, int>>());
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
+            services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.ShouldNotContain(p => p.Code == "RF0104");
     }
 
     #region Initialization
@@ -310,6 +363,24 @@ public sealed class StagePipelineTests
             Trace.Add("Wipe:handled");
             return Task.CompletedTask;
         }
+    }
+
+    // Declared closed over Forked's int contract, so it reaches ForkedIntHandler and not
+    // ForkedStringHandler.
+    public sealed class ForkedIntStage : IRequestStage<Forked, int>
+    {
+        public Task<int> HandleAsync(
+            Forked request, Continuation<int> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
+    }
+
+    // Bound to the int contract by its constraint, so on Forked it reaches ForkedIntHandler only.
+    public sealed class IntBoundStage<TRequest> : IRequestStage<TRequest, int>
+        where TRequest : IRequest<int>
+    {
+        public Task<int> HandleAsync(
+            TRequest request, Continuation<int> next, CancellationToken cancellationToken)
+            => next.InvokeAsync();
     }
 
     public sealed class RecordingStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>

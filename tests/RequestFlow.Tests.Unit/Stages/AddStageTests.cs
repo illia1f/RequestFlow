@@ -131,7 +131,9 @@ public sealed class AddStageTests
 
         result.ValidDeclarations.ShouldBeEmpty();
         result.Problems.Count.ShouldBe(1);
-        result.Problems[0].ShouldContain("does not use as its request");
+        result.Problems[0].Code.ShouldBe("RF0012");
+        result.Problems[0].Subject.ShouldBe(typeof(OneParameterStage<>));
+        result.Problems[0].Message.ShouldContain("does not use as its request");
     }
 
     [Fact]
@@ -142,7 +144,9 @@ public sealed class AddStageTests
         StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
         result.ValidDeclarations.ShouldBeEmpty();
-        result.Problems[0].ShouldContain("does not implement IRequestStage");
+        result.Problems[0].Code.ShouldBe("RF0011");
+        result.Problems[0].Subject.ShouldBe(typeof(NotAStage));
+        result.Problems[0].Message.ShouldContain("does not implement IRequestStage");
     }
 
     [Fact]
@@ -153,7 +157,9 @@ public sealed class AddStageTests
         StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
         result.ValidDeclarations.ShouldBeEmpty();
-        result.Problems[0].ShouldContain("is abstract");
+        result.Problems[0].Code.ShouldBe("RF0009");
+        result.Problems[0].Subject.ShouldBe(typeof(AbstractStage));
+        result.Problems[0].Message.ShouldContain("is abstract");
     }
 
     [Fact]
@@ -176,7 +182,9 @@ public sealed class AddStageTests
         StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
         result.ValidDeclarations.ShouldBeEmpty();
-        result.Problems[0].ShouldContain("in that order");
+        result.Problems[0].Code.ShouldBe("RF0012");
+        result.Problems[0].Subject.ShouldBe(typeof(SwappedStage<,>));
+        result.Problems[0].Message.ShouldContain("in that order");
     }
 
     [Fact]
@@ -222,6 +230,34 @@ public sealed class AddStageTests
 
         result.ValidDeclarations.Count.ShouldBe(1);
         result.Problems.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Given_Interface_Stage_When_Validating_Then_Reports_Interface()
+    {
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(IRequestStage<Ping, string>), null)];
+
+        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+
+        result.ValidDeclarations.ShouldBeEmpty();
+        result.Problems[0].Code.ShouldBe("RF0008");
+        result.Problems[0].Subject.ShouldBe(typeof(IRequestStage<Ping, string>));
+        result.Problems[0].Message.ShouldContain("is an interface");
+    }
+
+    [Fact]
+    public void Given_Partially_Closed_Stage_When_Validating_Then_Reports_Partially_Closed()
+    {
+        Type openParameter = typeof(List<>).GetGenericArguments()[0];
+        Type partiallyClosed = typeof(OneParameterStage<>).MakeGenericType(openParameter);
+        StageDeclaration[] declarations = [new StageDeclaration(partiallyClosed, null)];
+
+        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+
+        result.ValidDeclarations.ShouldBeEmpty();
+        result.Problems[0].Code.ShouldBe("RF0010");
+        result.Problems[0].Subject.ShouldBe(partiallyClosed);
+        result.Problems[0].Message.ShouldContain("is partially closed");
     }
 
     #region Initialization

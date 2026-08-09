@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
@@ -10,7 +11,7 @@ public sealed class HandlerScannerTests
     {
         ScanResult result = ScanSelf();
 
-        HandlerRegistration registration = result.Handlers
+        HandlerDiscovery registration = result.Handlers
             .Where(h => h.ImplementationType == typeof(ScanPingHandler))
             .ShouldHaveSingleItem();
         registration.RequestType.ShouldBe(typeof(ScanPing));
@@ -23,7 +24,7 @@ public sealed class HandlerScannerTests
     {
         ScanResult result = ScanSelf();
 
-        HandlerRegistration registration = result.Handlers
+        HandlerDiscovery registration = result.Handlers
             .Where(h => h.ImplementationType == typeof(ScanVoidHandler))
             .ShouldHaveSingleItem();
         registration.RequestType.ShouldBe(typeof(ScanVoid));

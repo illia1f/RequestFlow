@@ -6,7 +6,7 @@ namespace RequestFlow.Tests.Unit;
 public sealed class RequestFlowRegistryTests
 {
     [Fact]
-    public void Given_One_Applicable_Stage_When_Building_The_Dispatch_Map_Then_Request_Gets_The_Staged_Plan()
+    public void Given_An_Applicable_Stage_When_Building_The_Dispatch_Map_Then_Request_Gets_The_Staged_Plan()
     {
         DispatchMap map = BuildMap(o => o.AddStage(typeof(WrapStage<,>)));
 
@@ -16,29 +16,9 @@ public sealed class RequestFlowRegistryTests
     }
 
     [Fact]
-    public void Given_One_Applicable_Stage_When_Building_The_Dispatch_Map_Then_Void_Request_Gets_The_Staged_Void_Plan()
+    public void Given_An_Applicable_Stage_When_Building_The_Dispatch_Map_Then_Void_Request_Gets_The_Staged_Void_Plan()
     {
         DispatchMap map = BuildMap(o => o.AddStage(typeof(WrapStage<,>)));
-
-        map.TryGetPlanFor(typeof(Purge), out RequestPlanBase? plan);
-
-        plan.ShouldBeOfType<StagedVoidRequestPlan<Purge>>();
-    }
-
-    [Fact]
-    public void Given_Two_Applicable_Stages_When_Building_The_Dispatch_Map_Then_Request_Gets_The_General_Staged_Plan()
-    {
-        DispatchMap map = BuildMap(o => o.AddStage(typeof(WrapStage<,>)).AddStage(typeof(ExtraStage<,>)));
-
-        map.TryGetPlanFor(typeof(Echo), out RequestPlanBase? plan);
-
-        plan.ShouldBeOfType<StagedRequestPlan<Echo, string>>();
-    }
-
-    [Fact]
-    public void Given_Two_Applicable_Stages_When_Building_The_Dispatch_Map_Then_Void_Request_Gets_The_General_Staged_Void_Plan()
-    {
-        DispatchMap map = BuildMap(o => o.AddStage(typeof(WrapStage<,>)).AddStage(typeof(ExtraStage<,>)));
 
         map.TryGetPlanFor(typeof(Purge), out RequestPlanBase? plan);
 
@@ -111,14 +91,6 @@ public sealed class RequestFlowRegistryTests
     }
 
     public sealed class WrapStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
-        where TRequest : IRequest<TResponse>
-    {
-        public Task<TResponse> HandleAsync(
-            TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
-            => next.InvokeAsync();
-    }
-
-    public sealed class ExtraStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
         public Task<TResponse> HandleAsync(

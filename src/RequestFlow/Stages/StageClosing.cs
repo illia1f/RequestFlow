@@ -1,5 +1,3 @@
-// Startup only: nothing here runs on the dispatch path.
-
 using System;
 
 namespace RequestFlow;

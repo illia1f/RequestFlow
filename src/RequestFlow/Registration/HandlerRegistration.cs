@@ -1,43 +1,39 @@
 using System;
-using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
 
 /// <summary>
-/// Container-neutral description of one discovered handler.
+/// Container-neutral description of one discovered handler and the lifetime it registers under.
 /// </summary>
-internal sealed class HandlerRegistration(Type implementationType, Type requestType, Type responseType, bool isVoid)
+/// <remarks>
+/// The <c>AddRequestFlow</c> call stamps its own lifetime here, since each call decides for the
+/// handlers it found.
+/// </remarks>
+internal sealed class HandlerRegistration(HandlerDiscovery discovery, ServiceLifetime lifetime)
 {
     /// <summary>
     /// The concrete handler class discovered by the scan.
     /// </summary>
-    public Type ImplementationType { get; } = implementationType;
+    public Type ImplementationType { get; } = discovery.ImplementationType;
 
     /// <summary>
     /// The closed request type the handler handles.
     /// </summary>
-    public Type RequestType { get; } = requestType;
+    public Type RequestType { get; } = discovery.RequestType;
 
     /// <summary>
     /// The response type; <see cref="NoResult"/> for void handlers.
     /// </summary>
-    public Type ResponseType { get; } = responseType;
+    public Type ResponseType { get; } = discovery.ResponseType;
 
     /// <summary>
     /// True when the handler implements <see cref="IRequestHandler{TRequest}"/>.
     /// </summary>
-    public bool IsVoid { get; } = isVoid;
-}
-
-/// <summary>
-/// Handlers and request types discovered by one scan pass.
-/// </summary>
-internal sealed class ScanResult(IReadOnlyList<HandlerRegistration> handlers, IReadOnlyList<Type> requestTypes)
-{
-    public IReadOnlyList<HandlerRegistration> Handlers { get; } = handlers;
+    public bool IsVoid { get; } = discovery.IsVoid;
 
     /// <summary>
-    /// Every discovered request type, handled or not; validation reports the difference.
+    /// The lifetime the <c>AddRequestFlow</c> call that found this handler registers it with.
     /// </summary>
-    public IReadOnlyList<Type> RequestTypes { get; } = requestTypes;
+    public ServiceLifetime Lifetime { get; } = lifetime;
 }

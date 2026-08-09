@@ -581,95 +581,6 @@ public sealed class ChainExecutionTests
         await result;
     }
 
-    [Fact]
-    public async Task Given_One_Stage_When_Running_The_Chain_Then_Stage_Wraps_The_Handler()
-    {
-        List<string> log = [];
-        var sut = PingChain(new RecordingStage<Outer>("only", log));
-
-        string result = await sut.RunAsync();
-
-        result.ShouldBe("hi:handled");
-        log.ShouldBe(["only:enter", "only:exit"]);
-    }
-
-    [Fact]
-    public async Task Given_One_Stage_That_Calls_Next_Twice_When_Running_The_Chain_Then_Handler_Runs_Again()
-    {
-        List<string> log = [];
-        var sut = PingChain(new DoubleNextStage("only", log));
-
-        await sut.RunAsync();
-
-        log.ShouldBe(["only:enter", "only:exit"]);
-        await _pingHandler.Received(2).HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Given_One_Stage_That_Calls_Next_Again_Before_The_First_Call_Completes_When_Running_The_Chain_Then_Both_Walks_Reach_The_Handler()
-    {
-        var gate = new TaskCompletionSource<string>();
-        var handler = new GatedPingHandler<Outer>(gate.Task);
-        var sut = PingChainFor(handler, new OverlappingNextStage(gate));
-
-        await sut.RunAsync();
-
-        handler.Calls.ShouldBe(2);
-    }
-
-    [Fact]
-    public void Given_One_Stage_That_Returns_A_Null_Task_When_Running_The_Chain_Then_Throws_Naming_The_Stage()
-    {
-        var sut = PingChain(new NullTaskStage());
-
-        StageNullTaskException exception = Should.Throw<StageNullTaskException>(() => sut.RunAsync());
-
-        exception.StageType.ShouldBe(typeof(NullTaskStage));
-    }
-
-    [Fact]
-    public void Given_One_Stage_And_Handler_That_Returns_A_Null_Task_When_Running_The_Chain_Then_Throws_Naming_The_Request()
-    {
-        object[] stages = [new NilPassThroughStage()];
-        var sut = new ChainRunner<Nil, string>(
-            TypedChain<Nil, string>(StageTypes(stages)),
-            new Nil(),
-            ChainProvider<IRequestHandler<Nil, string>>(new NilHandler(), stages),
-            CancellationToken.None);
-
-        HandlerNullTaskException exception = Should.Throw<HandlerNullTaskException>(() => sut.RunAsync());
-
-        exception.RequestType.ShouldBe(typeof(Nil));
-    }
-
-    [Fact]
-    public async Task Given_One_Typed_Form_Stage_When_Running_The_Void_Chain_Then_It_Wraps_The_Handler()
-    {
-        var logHandler = Substitute.For<IRequestHandler<Log>>();
-        List<string> log = [];
-        var sut = LogChain(logHandler, new RecordingVoidStage(log));
-
-        NoResult result = await sut.RunAsync();
-
-        result.ShouldBe(NoResult.Value);
-        log.ShouldBe(["enter", "exit"]);
-        await logHandler.Received(1).HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task Given_One_Void_Form_Stage_That_Calls_Next_Twice_When_Running_The_Void_Chain_Then_Handler_Runs_Again()
-    {
-        var handler = Substitute.For<IRequestHandler<Log>>();
-        handler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-        List<string> log = [];
-        var sut = LogChain(handler, new DoubleNextVoidStage(log));
-
-        await sut.RunAsync();
-
-        log.ShouldBe(["void:enter", "void:exit"]);
-        await handler.Received(2).HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>());
-    }
-
     #region Initialization
 
     private readonly IRequestHandler<Ping, string> _pingHandler;
@@ -1122,13 +1033,6 @@ public sealed class ChainExecutionTests
     {
         public Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken)
             => null!;
-    }
-
-    // Delegates straight to next, so the null task the handler returns is the one reported.
-    private sealed class NilPassThroughStage : IRequestStage<Nil, string>
-    {
-        public Task<string> HandleAsync(Nil request, Continuation<string> next, CancellationToken cancellationToken)
-            => next.InvokeAsync();
     }
 
     private sealed class NullTaskOnFirstAttemptStage : IRequestStage<Ping, string>

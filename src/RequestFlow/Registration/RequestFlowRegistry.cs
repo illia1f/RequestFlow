@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
 
@@ -14,8 +15,8 @@ internal sealed class RequestFlowRegistry
     private readonly List<Type> _requestTypes = [];
 
     // _problems keeps the report in first-seen order; _seenProblems makes the dedup O(1).
-    private readonly List<string> _problems = [];
-    private readonly HashSet<string> _seenProblems = [];
+    private readonly List<RequestFlowValidationProblem> _problems = [];
+    private readonly HashSet<RequestFlowValidationProblem> _seenProblems = [];
     private readonly HashSet<Assembly> _assemblies = [];
     private readonly HashSet<GenericHandlerClosing> _closings = [];
     private readonly List<StageDeclaration> _stageDeclarations = [];
@@ -61,8 +62,8 @@ internal sealed class RequestFlowRegistry
     public IReadOnlyList<HandlerRegistration> Handlers => _handlers;
 
     /// <summary>
-    /// Appends one call's shape-valid stage declarations. A stage declared twice would run
-    /// twice, so duplicates are reported at freeze rather than skipped here.
+    /// Appends one call's shape-valid stage declarations. A stage belongs to a chain once, so
+    /// duplicates are reported at freeze rather than skipped here.
     /// </summary>
     public void AddStageDeclarations(IReadOnlyList<StageDeclaration> declarations)
         => _stageDeclarations.AddRange(declarations);
@@ -110,13 +111,13 @@ internal sealed class RequestFlowRegistry
     public void Add(
         IReadOnlyList<HandlerRegistration> handlers,
         IReadOnlyList<Type> requestTypes,
-        IReadOnlyList<string> problems)
+        IReadOnlyList<RequestFlowValidationProblem> problems)
     {
         _handlers.AddRange(handlers);
         _requestTypes.AddRange(requestTypes);
 
-        // The validator is the only producer of problem strings, so string identity is a
-        // safe dedup key for the same declaration repeated across calls.
+        // A problem compares by value and is deterministic per declaration, so the same
+        // declaration repeated across calls dedups to one entry.
         foreach (var problem in problems)
         {
             if (_seenProblems.Add(problem))
@@ -125,48 +126,57 @@ internal sealed class RequestFlowRegistry
     }
 
     /// <summary>
-    /// Validates everything accumulated and builds the dispatch map for the resolving
-    /// provider.
+    /// Validates everything accumulated, including any rule registered with
+    /// <c>AddValidationRule</c> and resolved from <paramref name="provider"/>, and builds the
+    /// dispatch map for the resolving provider.
     /// </summary>
     /// <exception cref="RequestFlowValidationException"/>
-    public DispatchMap BuildDispatchMap()
+    /// <exception cref="InvalidOperationException"/>
+    public DispatchMap BuildDispatchMap(IServiceProvider provider)
     {
-        List<string> problems =
-        [
-            .. _problems,
-            .. RegistrationValidator.ValidateDuplicateHandlers(_handlers),
-            .. RegistrationValidator.ValidateDuplicateStages(_stageDeclarations),
-            .. RegistrationValidator.ValidateAliasedStages(_stageDeclarations, _handlers, ClosingCache),
-        ];
-        if (!UnhandledRequestsAllowed)
-            problems.AddRange(RegistrationValidator.ValidateUnhandledRequests(_handlers, _requestTypes));
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            _handlers, _requestTypes, _stageDeclarations, ClosingCache);
 
-        // Built before the throw, because the strict check needs to know which stages applied.
-        StagePlanSet stagePlans = BuildStagePlans();
-        if (UnusedStagesDisallowed)
-        {
-            problems.AddRange(
-                RegistrationValidator.ValidateUnusedStages(_stageDeclarations, stagePlans.AppliedStageTypes));
-        }
+        // One context for the whole pass, so a built-in rule and a registered one read the same facts.
+        RequestFlowValidationContext context = new(model, UnhandledRequestsAllowed, UnusedStagesDisallowed);
+
+        List<RequestFlowValidationProblem> problems = ValidationRuleRunner.Run(
+            context, BuiltInRules(), provider.GetServices<IRequestFlowValidationRule>(), _problems);
 
         if (problems.Count > 0)
             throw new RequestFlowValidationException(problems);
+
+        Dictionary<Type, StageChain> chainsByRequest = BuildStagePlans();
 
         // Duplicate handlers were reported above, so one plan lands per handler here.
         Dictionary<Type, RequestPlanBase> plans = [];
         foreach (var handler in _handlers)
         {
-            plans[handler.RequestType] = CreatePlan(handler, stagePlans.ChainsByRequest[handler.RequestType]);
+            plans[handler.RequestType] = CreatePlan(handler, chainsByRequest[handler.RequestType]);
         }
 
         return new DispatchMap(plans);
     }
 
-    // Ordering and chain shape are decided at freeze, never per AddRequestFlow call.
-    private StagePlanSet BuildStagePlans()
+    private IEnumerable<IRequestFlowValidationRule> BuiltInRules()
+    {
+        yield return new DuplicateHandlerRule();
+
+        if (!UnhandledRequestsAllowed)
+            yield return new UnhandledRequestRule();
+
+        yield return new DuplicateStageRule();
+        yield return new AliasedStageRule();
+
+        if (UnusedStagesDisallowed)
+            yield return new UnusedStageRule();
+
+        yield return new MultiContractRequestRule();
+    }
+
+    private Dictionary<Type, StageChain> BuildStagePlans()
     {
         Dictionary<Type, StageChain> chainsByRequest = [];
-        HashSet<Type> appliedStageTypes = [];
         List<Type> ordered = [];
 
         foreach (var handler in _handlers)
@@ -178,7 +188,6 @@ internal sealed class RequestFlowRegistry
                     continue;
 
                 ordered.Add(closedStageType);
-                appliedStageTypes.Add(declaration.StageType);
             }
 
             Type[] stageTypes = ordered.ToArray();
@@ -187,7 +196,7 @@ internal sealed class RequestFlowRegistry
                 new StageChain(stageTypes, TypedShapesFor(handler, stageTypes));
         }
 
-        return new StagePlanSet(chainsByRequest, appliedStageTypes);
+        return chainsByRequest;
     }
 
     // Only a void request can take stages of either contract shape, so only its chain records
@@ -205,7 +214,6 @@ internal sealed class RequestFlowRegistry
         return typedShapes;
     }
 
-    // The staged plans build their own levels, keeping the reflection at this one call.
     private static RequestPlanBase CreatePlan(HandlerRegistration handler, StageChain chain)
     {
         if (chain.StageTypes.Length == 0)
@@ -223,17 +231,6 @@ internal sealed class RequestFlowRegistry
 
         return (RequestPlanBase)Activator.CreateInstance(stagedPlanType, [chain])!;
     }
-}
-
-/// <summary>
-/// The stage chain for each request type, plus the stage types that reached at least one
-/// request.
-/// </summary>
-internal sealed class StagePlanSet(Dictionary<Type, StageChain> chainsByRequest, HashSet<Type> appliedStageTypes)
-{
-    public Dictionary<Type, StageChain> ChainsByRequest { get; } = chainsByRequest;
-
-    public ISet<Type> AppliedStageTypes { get; } = appliedStageTypes;
 }
 
 /// <summary>

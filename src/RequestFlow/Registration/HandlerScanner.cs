@@ -12,7 +12,7 @@ internal static class HandlerScanner
 {
     public static ScanResult Scan(IReadOnlyList<Assembly> assemblies)
     {
-        List<HandlerRegistration> handlers = [];
+        List<HandlerDiscovery> handlers = [];
         List<Type> requestTypes = [];
 
         foreach (var assembly in assemblies)
@@ -22,7 +22,7 @@ internal static class HandlerScanner
                 if (type is null || type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
                     continue;
 
-                handlers.AddRange(CollectHandlers(type));
+                handlers.AddRange(Discover(type));
 
                 if (IsRequestType(type))
                     requestTypes.Add(type);
@@ -45,9 +45,9 @@ internal static class HandlerScanner
         }
     }
 
-    internal static List<HandlerRegistration> CollectHandlers(Type type)
+    internal static List<HandlerDiscovery> Discover(Type type)
     {
-        List<HandlerRegistration> handlers = [];
+        List<HandlerDiscovery> handlers = [];
 
         foreach (var iface in type.GetInterfaces())
         {
@@ -58,12 +58,12 @@ internal static class HandlerScanner
             if (definition == typeof(IRequestHandler<,>))
             {
                 Type[] args = iface.GetGenericArguments();
-                handlers.Add(new HandlerRegistration(type, args[0], args[1], isVoid: false));
+                handlers.Add(new HandlerDiscovery(type, args[0], args[1], isVoid: false));
             }
             else if (definition == typeof(IRequestHandler<>))
             {
                 Type[] args = iface.GetGenericArguments();
-                handlers.Add(new HandlerRegistration(type, args[0], typeof(NoResult), isVoid: true));
+                handlers.Add(new HandlerDiscovery(type, args[0], typeof(NoResult), isVoid: true));
             }
         }
 
@@ -80,4 +80,44 @@ internal static class HandlerScanner
 
         return false;
     }
+}
+
+/// <summary>
+/// One handler the scan found, before registration decides how it lives.
+/// </summary>
+internal sealed class HandlerDiscovery(
+    Type implementationType, Type requestType, Type responseType, bool isVoid)
+{
+    /// <summary>
+    /// The concrete handler class discovered by the scan.
+    /// </summary>
+    public Type ImplementationType { get; } = implementationType;
+
+    /// <summary>
+    /// The closed request type the handler handles.
+    /// </summary>
+    public Type RequestType { get; } = requestType;
+
+    /// <summary>
+    /// The response type; <see cref="NoResult"/> for void handlers.
+    /// </summary>
+    public Type ResponseType { get; } = responseType;
+
+    /// <summary>
+    /// True when the handler implements <see cref="IRequestHandler{TRequest}"/>.
+    /// </summary>
+    public bool IsVoid { get; } = isVoid;
+}
+
+/// <summary>
+/// Handlers and request types discovered by one scan pass.
+/// </summary>
+internal sealed class ScanResult(IReadOnlyList<HandlerDiscovery> handlers, IReadOnlyList<Type> requestTypes)
+{
+    public IReadOnlyList<HandlerDiscovery> Handlers { get; } = handlers;
+
+    /// <summary>
+    /// Every discovered request type, handled or not; validation reports the difference.
+    /// </summary>
+    public IReadOnlyList<Type> RequestTypes { get; } = requestTypes;
 }
