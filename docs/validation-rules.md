@@ -6,6 +6,8 @@ Rules run once, when the dispatch map freezes: at the first dispatcher resolutio
 
 The built-in checks are fixed. A rule adds checks to the pass and cannot remove or replace one.
 
+[`samples/Orders.Api`](../samples/README.md) has two working rules, and a command-line flag that makes them fail alongside a built-in check and the CQRS one.
+
 ## Writing a rule
 
 Implement `IRequestFlowValidationRule`. `Validate` receives a `RequestFlowValidationContext` and returns every problem it found:

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Source references, not packages: a change to the public surface breaks this sample's build. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\RequestFlow\RequestFlow.csproj" />
+    <ProjectReference Include="..\..\src\RequestFlow.Cqrs\RequestFlow.Cqrs.csproj" />
+    <ProjectReference Include="..\Orders.Api.Violations\Orders.Api.Violations.csproj" />
+  </ItemGroup>
+  <!-- ASP.NET Core generates the OpenAPI document; the UI assets are a separate package. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+    <!-- Microsoft.AspNetCore.OpenApi resolves Microsoft.OpenApi 2.0.0, which CVE-2026-49451 hits
+         with a stack overflow on a circular schema reference. The fix landed in 2.7.5 and this
+         pin takes the current 2.x. SwaggerUI has no package dependencies and is not involved. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
+  </ItemGroup>
+
+</Project>
