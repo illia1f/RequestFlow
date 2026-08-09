@@ -6,11 +6,11 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
-## [Unreleased]
+## [1.0.0-preview.6] - 2026-08-09
 
 ### Added
 
-- `IRequestFlowValidationRule`: any package or application can add its own checks to the startup validation pass with `AddValidationRule<T>()` and report into the same exception as the built-in checks. A rule reads the whole registration picture, including the `AllowUnhandledRequests` and `DisallowUnusedStages` opt-ins, off `RequestFlowValidationContext`. A rule that throws is reported as `RF0107` and the rules after it still run. [validation-rules.md](docs/validation-rules.md) covers writing, registering, and testing one.
+- `IRequestFlowValidationRule`: any package or application can add its own checks to the startup validation pass with `AddValidationRule<T>()` and report into the same exception as the built-in checks. A rule reads the whole registration picture off `RequestFlowValidationContext`, including the `AllowUnhandledRequests` and `DisallowUnusedStages` opt-ins. A rule that throws is reported as `RF0107` and the rules after it still run; [validation-rules.md](docs/validation-rules.md) covers writing, registering, and testing one.
 - `RequestFlowModelBuilder` builds a `RequestFlowModel` by hand and `BuildContext` wraps one in the context a rule receives, which is how a rule is unit tested without a container.
 - Startup validation rejects a request type that implements more than one `IRequest<TResponse>` contract (`RF0106`). The extra contract used to pass the freeze and fail every dispatch under it with `ResponseTypeMismatchException`.
 - `AddCqrs` rejects a request classified as both a command and a query (`CQRS0001`).
@@ -88,7 +88,8 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
-[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.5...HEAD
+[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.6...HEAD
+[1.0.0-preview.6]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.5...v1.0.0-preview.6
 [1.0.0-preview.5]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.4...v1.0.0-preview.5
 [1.0.0-preview.4]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.3...v1.0.0-preview.4
 [1.0.0-preview.3]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.2...v1.0.0-preview.3
