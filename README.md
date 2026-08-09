@@ -41,7 +41,7 @@ Fast is a claim to prove, not to assert. A BenchmarkDotNet suite against the oth
 | `IPipelineBehavior<,>`                               | `IRequestStage<,>`                                    |
 | `services.AddMediatR(...)`                           | `services.AddRequestFlow(...)`                        |
 
-What doesn't move yet: notifications (`INotification` / `Publish`) and streaming. Both are on the [roadmap](ROADMAP.md) for after v1.0. Notifications return as events, an in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`); streaming arrives through `IAsyncEnumerable<T>`. Neither is built today, so if your codebase leans on either, hold the migration until they land.
+What doesn't move yet: notifications (`INotification` / `Publish`) and streaming. Both are on the [roadmap](ROADMAP.md) for v1.0. Notifications return as events, an in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`); streaming arrives through `IAsyncEnumerable<T>`. Neither is built today, so if your codebase leans on either, hold the migration until they land.
 
 ## Packages
 
