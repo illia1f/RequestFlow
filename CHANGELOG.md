@@ -6,6 +6,22 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
+## [Unreleased]
+
+### Added
+
+- `IRequestFlowValidationRule`: any package or application can add its own checks to the startup validation pass with `AddValidationRule<T>()` and report into the same exception as the built-in checks. A rule reads the whole registration picture, including the `AllowUnhandledRequests` and `DisallowUnusedStages` opt-ins, off `RequestFlowValidationContext`. A rule that throws is reported as `RF0107` and the rules after it still run. [validation-rules.md](docs/validation-rules.md) covers writing, registering, and testing one.
+- `RequestFlowModelBuilder` builds a `RequestFlowModel` by hand and `BuildContext` wraps one in the context a rule receives, which is how a rule is unit tested without a container.
+- Startup validation rejects a request type that implements more than one `IRequest<TResponse>` contract (`RF0106`). The extra contract used to pass the freeze and fail every dispatch under it with `ResponseTypeMismatchException`.
+- `AddCqrs` rejects a request classified as both a command and a query (`CQRS0001`).
+- `ProblemCodes` and `CqrsProblemCodes` are public and ship in the abstractions packages, so an assembly referencing only those can match `ProblemCodes.UnhandledRequest` instead of a literal string.
+- The model reports lifetimes as `RequestFlowLifetime` rather than the container's `ServiceLifetime`, since `RequestFlow.Abstractions` takes no dependency on the DI package. Handlers and stages also report the contract they implement as `ContractType`, so a kind contributed on top of a core contract, such as `ICommandHandler`, comes through under its own. Every list on the model is read-only.
+
+### Changed
+
+- `RequestFlowValidationException.Problems` holds `RequestFlowValidationProblem` values (stable code, message, offending type) instead of strings, and the public constructor takes the same list, so a call site passing strings no longer compiles. Message lines now read `RF0101: ...`, so anything matching on the old text breaks. Repeated registrations collapse into one problem each, where a request with three handlers used to report two identical lines.
+- Stage declarations that alias one stage class report a single `RF0104` naming every declaration in the collision, instead of a line per colliding pair. `RF0104` also no longer fires for two closings of one stage class on a request with more than one handler: that request already fails on `RF0101`, and the collision surfaces once the duplicate handler is gone.
+
 ## [1.0.0-preview.5] - 2026-08-07
 
 ### Added

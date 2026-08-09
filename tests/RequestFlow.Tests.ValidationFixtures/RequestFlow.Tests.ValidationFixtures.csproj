@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RequestFlow.Abstractions\RequestFlow.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\RequestFlow.Cqrs.Abstractions\RequestFlow.Cqrs.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

@@ -9,7 +9,12 @@ What RequestFlow registers, with which lifetime, and what you can change.
 | Handlers (`IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
 | Stages (`IRequestStage<TRequest, TResponse>`, `IRequestStage<TRequest>`)       | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage` call |
 | `IRequestDispatcher`                                                           | Scoped                                                     | Yes, `WithTransientDispatcher` |
+| Validation rules (`IRequestFlowValidationRule`)                                | Singleton, added by `AddValidationRule` and by `AddCqrs`    | Not through those calls; register your own descriptor for another lifetime |
 | Dispatch map (internal handler lookup)                                         | Singleton, built the first time the dispatcher is resolved | No                             |
+
+The lifetimes in the first two rows are readable at the freeze. A validation rule of your own reads the lifetime of every handler and stage off its model, so a house rule such as "no singleton stages here" can fail the start instead of waiting for a code review ([validation-rules.md](validation-rules.md#the-model)).
+
+A rule is resolved while the dispatch map is built, so it comes from the root provider, and a provider that validates scopes throws there. A scoped rule throws ``Cannot resolve scoped service 'System.Collections.Generic.IEnumerable`1[RequestFlow.IRequestFlowValidationRule]' from root provider``, which names the enumerable rather than the rule, so look for the descriptor you registered scoped. A rule whose constructor takes a scoped dependency throws `Cannot consume scoped service` instead, naming the dependency and `RequestFlow.IRequestFlowValidationRule`, and `ValidateOnBuild` reports that one at `BuildServiceProvider`. [validation-rules.md](validation-rules.md) covers writing and registering one.
 
 ## Configuring handler lifetime
 

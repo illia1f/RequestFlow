@@ -101,3 +101,14 @@ IServiceProvider provider = services.BuildServiceProvider().ValidateRequestFlow(
 ```
 
 All problems are reported in one `RequestFlowValidationException`, not one at a time (see [exceptions.md](exceptions.md)). The container's own `ValidateOnBuild` cannot catch these problems; [lifetimes.md](lifetimes.md) explains why and covers validation timing in detail.
+
+## Checks of your own
+
+`AddRequestFlow` returns a builder, and `AddValidationRule` puts a check of yours in the same startup pass:
+
+```csharp
+services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<Program>())
+    .AddValidationRule<RequestNameRule>();
+```
+
+The rule sees every registered request, handler, and stage, and reports into the same exception as the built-in checks. [validation-rules.md](validation-rules.md) covers writing, registering, and testing one.

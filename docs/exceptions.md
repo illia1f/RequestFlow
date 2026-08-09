@@ -6,12 +6,14 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 
 | Exception                        | Thrown from              | When                                                          |
 | -------------------------------- | ------------------------ | -------------------------------------------------------------- |
-| `RequestFlowValidationException` | Startup validation       | Any registration problem; one throw lists all of them          |
+| `RequestFlowValidationException` | Startup validation       | Any registration problem, or a validation rule that threw; one throw lists all of them |
 | `HandlerNotFoundException`       | `SendAsync`              | The dispatched request type has no registered handler          |
 | `ResponseTypeMismatchException`  | `SendAsync`              | The call site's response type differs from the registered one  |
 | `HandlerNullTaskException`       | `SendAsync`              | A handler returned a null task from `HandleAsync`              |
 | `StageNullTaskException`         | `SendAsync`              | A stage returned a null task from `HandleAsync`                |
 | `InvalidOperationException`      | `WhereHandlerImplements` | A second handler filter added to one stage                     |
+| `InvalidOperationException`      | Startup validation       | A validation rule returned null, or a null problem             |
+| `InvalidOperationException` (the container's) | Startup validation | A validation rule depends on a RequestFlow dispatcher and the provider validates scopes; without that check nothing throws and startup hangs |
 | `ArgumentNullException`          | All public entry points  | A required argument is null                                    |
 | `ArgumentException`              | `RegisterGenericHandler` | `closingTypes` contains a null element                         |
 
@@ -21,30 +23,36 @@ The RequestFlow types live in the `RequestFlow` namespace in the `RequestFlow.Ab
 
 Thrown when RequestFlow validates everything registered: the first time a dispatcher is resolved, or earlier if `ValidateRequestFlow` runs at startup (see [lifetimes.md](lifetimes.md) for validation timing). Problems accumulate across every `AddRequestFlow` call and surface as one exception. The message and the `Problems` property list all of them, so one failed start reports everything at once. Failed validation does not stick: every later dispatcher resolution validates again and throws the same list.
 
-| Problem message starts with                          | Cause                                                                         | Fix                                                                    |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `Request '...' has no handler.`                      | A scanned request type no handler covers                                       | Write the handler, scan its assembly, or call `AllowUnhandledRequests`  |
-| `Request '...' has more than one handler...`         | Two handlers cover the same request, via scan or generic closings              | Remove one; exactly one handler per request                             |
-| `'...' is not an open generic type definition...`    | `RegisterGenericHandler(typeof(AuditHandler<Foo>), ...)` or a non-generic type | Pass the open definition: `typeof(AuditHandler<>)`                      |
-| `'...' is abstract...`                               | An abstract class passed to `RegisterGenericHandler`                           | Register a concrete handler class                                       |
-| `'...' has N generic parameters...`                  | An open generic with more than one type parameter                              | Only single-parameter generic handlers are supported                    |
-| `'...' does not implement IRequestHandler.`          | The type is not a handler                                                      | Implement `IRequestHandler<TRequest, TResponse>` or `IRequestHandler<TRequest>` |
-| `Generic handler '...' declares no closing types...` | `RegisterGenericHandler(typeof(AuditHandler<>))` with no closings              | Declare at least one closing type                                       |
-| `Closing type '...' ... is not a closed type.`       | An open generic passed as a closing type                                       | Close it first: `typeof(Audit<Order>)`, not `typeof(Audit<>)`           |
-| `Generic handler '...' cannot be closed over '...'...` | The closing type violates the handler's generic constraints                  | Pick a closing type that satisfies the `where` clauses                  |
+`Problems` holds `RequestFlowValidationProblem` values: a stable `Code`, a `Message` saying what to fix, and the `Subject` type at fault where the problem has one. Each line of the exception message is one problem, printed as `CODE: message`. A rule of your own reports into the same list, and [validation-rules.md](validation-rules.md) covers writing one.
+
+| Code     | Problem message starts with                          | Cause                                                                         | Fix                                                                    |
+| -------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `RF0101` | `Request '...' has more than one handler...`         | Two handlers cover the same request, via scan or generic closings              | Remove one; exactly one handler per request                             |
+| `RF0102` | `Request '...' has no handler.`                      | A scanned request type no handler covers                                       | Write the handler, scan its assembly, or call `AllowUnhandledRequests`  |
+| `RF0106` | `Request '...' implements more than one request contract...` | The type implements two `IRequest<TResponse>` contracts, directly or through interfaces; a void request carries `IRequest<NoResult>` | Keep one contract; split the type if both responses are needed |
+| `RF0107` | `Validation rule '...' threw ...`                    | A rule of yours or a package's threw out of `Validate`. That rule's findings were dropped, every other rule still reported, and the message names the exception type and text | Fix the rule, or catch inside it and report a problem so the message can name what was being checked |
+| `RF0001` | `'...' is not an open generic type definition...`    | `RegisterGenericHandler(typeof(AuditHandler<Foo>), ...)` or a non-generic type | Pass the open definition: `typeof(AuditHandler<>)`                      |
+| `RF0002` | `'...' is abstract...`                               | An abstract class passed to `RegisterGenericHandler`                           | Register a concrete handler class                                       |
+| `RF0003` | `'...' has N generic parameters...`                  | An open generic with more than one type parameter                              | Only single-parameter generic handlers are supported                    |
+| `RF0004` | `'...' does not implement IRequestHandler.`          | The type is not a handler                                                      | Implement `IRequestHandler<TRequest, TResponse>` or `IRequestHandler<TRequest>` |
+| `RF0005` | `Generic handler '...' declares no closing types...` | `RegisterGenericHandler(typeof(AuditHandler<>))` with no closings              | Declare at least one closing type                                       |
+| `RF0006` | `Closing type '...' ... is not a closed type.`       | An open generic passed as a closing type                                       | Close it first: `typeof(Audit<Order>)`, not `typeof(Audit<>)`           |
+| `RF0007` | `Generic handler '...' cannot be closed over '...'...` | The closing type violates the handler's generic constraints                  | Pick a closing type that satisfies the `where` clauses                  |
 
 Stages registered with `AddStage` bring their own checks (see [stages.md](stages.md)); their problems land in the same exception:
 
-| Problem message starts with                              | Cause                                                                        | Fix                                                                     |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `'...' is an interface; only concrete stage classes...`  | An interface passed to `AddStage`                                              | Register the implementing class                                          |
-| `'...' is abstract; only concrete stage classes...`      | An abstract class passed to `AddStage`                                         | Register a concrete stage class                                          |
-| `'...' is partially closed...`                           | A stage type with some type parameters bound and some open                     | Pass the open definition or a fully closed type                           |
-| `'...' does not implement IRequestStage...`              | The registered type is not a stage                                             | Implement `IRequestStage<TRequest, TResponse>` or `IRequestStage<TRequest>` |
-| `'...' declares generic parameters <...> that its IRequestStage implementation does not use...` | An open generic stage whose contract does not name its own parameters as the request | Implement the contract with the stage's own parameters, request first    |
-| `Stage '...' from assembly '...' is registered more than once...` | The same stage type in two `AddStage` calls                             | Remove the duplicate; a handler filter does not make it distinct          |
-| `Stages '...' and '...' both resolve to '...'` / `Stages '...' and '...' are the same stage class...` | An open definition registered next to its own closed form, or two closings of one class reaching the same request | Remove one of the two `AddStage` calls |
-| `Stage '...' from assembly '...' applies to no registered request...` | `DisallowUnusedStages` is on and the stage reached nothing            | Widen its constraints, scan the assembly holding its requests, or drop the opt-in |
+| Code     | Problem message starts with                              | Cause                                                                        | Fix                                                                     |
+| -------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `RF0008` | `'...' is an interface; only concrete stage classes...`  | An interface passed to `AddStage`                                              | Register the implementing class                                          |
+| `RF0009` | `'...' is abstract; only concrete stage classes...`      | An abstract class passed to `AddStage`                                         | Register a concrete stage class                                          |
+| `RF0010` | `'...' is partially closed...`                           | A stage type with some type parameters bound and some open                     | Pass the open definition or a fully closed type                           |
+| `RF0011` | `'...' does not implement IRequestStage...`              | The registered type is not a stage                                             | Implement `IRequestStage<TRequest, TResponse>` or `IRequestStage<TRequest>` |
+| `RF0012` | `'...' declares generic parameters <...> that its IRequestStage implementation does not use...` | An open generic stage whose contract does not name its own parameters as the request | Implement the contract with the stage's own parameters, request first    |
+| `RF0103` | `Stage '...' from assembly '...' is registered more than once...` | The same stage type in two `AddStage` calls                             | Remove the duplicate; a handler filter does not make it distinct          |
+| `RF0104` | `Stages '...' and '...' both resolve to '...'` / `Stages ... are the same stage class...` | An open definition registered next to its own closed form, or several closings of one class reaching the same request; one problem names every declaration in the group. A request with more than one handler has one chain per handler, so only declarations resolving to one closed type collide there | Keep one of the named `AddStage` calls and remove the rest |
+| `RF0105` | `Stage '...' from assembly '...' applies to no registered request...` | `DisallowUnusedStages` is on and the stage reached nothing. A request with no handler gets no stage chain, so a stage aimed only at unhandled requests lands here too | Widen its constraints, scan the assembly holding its requests, add the missing handler, or drop the opt-in |
+
+One more code comes from the CQRS package: `CQRS0001` for a request classified as both a command and a query. `AddCqrs` contributes that check as a rule.
 
 Example: a contracts assembly scanned without its handlers fails at startup, not per request.
 
@@ -54,8 +62,8 @@ services.AddRequestFlow(o => o
 
 // First dispatcher resolution (or ValidateRequestFlow) throws:
 // RequestFlowValidationException: RequestFlow registration is invalid:
-// Request 'Contracts.CreateOrder' has no handler.
-// Request 'Contracts.CancelOrder' has no handler.
+// RF0102: Request 'Contracts.CreateOrder' has no handler.
+// RF0102: Request 'Contracts.CancelOrder' has no handler.
 ```
 
 If the assembly intentionally contains only requests, opt out with `AllowUnhandledRequests`:
@@ -153,7 +161,11 @@ The base class is abstract with no public constructor, so those two are the only
 
 ## Plain InvalidOperationException
 
-One case is left with no type of its own. Adding a second `WhereHandlerImplements` to one stage throws from the `AddStage` configure delegate, with a message starting `This stage already filters on '...'`. A stage takes one handler filter, so give the target handlers one shared contract instead.
+Two cases are left with no type of their own. Adding a second `WhereHandlerImplements` to one stage throws from the `AddStage` configure delegate, with a message starting `This stage already filters on '...'`. A stage takes one handler filter, so give the target handlers one shared contract instead.
+
+The second comes from a broken validation rule: a rule that returns null instead of an empty sequence, or a sequence with a null problem in it, throws at the freeze with a message naming the rule. Those two are the only rule failures that come out this way. An exception the rule throws from its own code is reported as `RF0107` in the validation exception instead, and the rules after it still run (see [validation-rules.md](validation-rules.md)).
+
+One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher needs the map the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, rejects the rule earlier with `Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton 'RequestFlow.IRequestFlowValidationRule'`, since the dispatcher is scoped and a rule is a singleton. Both point at the same fix: take `IRequestDispatcher`, `ICommandDispatcher`, and `IQueryDispatcher` out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
 
 ## Argument validation
 
@@ -168,6 +180,9 @@ Argument checks at the public surface throw immediately at the call site:
 | `RegisterGenericHandler`              | `ArgumentException`     | `closingTypes` contains a null element  |
 | `AddStage`                            | `ArgumentNullException` | `stageType` is null                     |
 | `ValidateRequestFlow`                 | `ArgumentNullException` | `provider` is null                      |
+| `new RequestFlowValidationException`  | `ArgumentNullException` | `problems` is null                      |
+| `RequestFlowModelBuilder`, `RequestModelBuilder` | `ArgumentNullException` | A required `Type` argument is null |
+| `RequestFlowModelBuilder`, `RequestModelBuilder` | `ArgumentException` | `contractType` is not an open generic interface built on the handler or stage contract ([validation-rules.md](validation-rules.md#the-model)) |
 
 ## What RequestFlow never wraps
 

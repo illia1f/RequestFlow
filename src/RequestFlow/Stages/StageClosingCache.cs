@@ -1,5 +1,3 @@
-// Startup only: nothing here runs on the dispatch path.
-
 using System;
 using System.Collections.Generic;
 
@@ -7,9 +5,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// Remembers each <see cref="StageClosing"/> answer per declaration and handler pair; null
-/// records "does not apply". Registration, the freeze, and the aliased-stage check all walk
-/// the same cross product, so the registry owns one instance and each pair pays the
-/// reflective closing once.
+/// records "does not apply".
 /// </summary>
 internal sealed class StageClosingCache
 {
@@ -36,7 +32,7 @@ internal sealed class StageClosingCache
         }
     }
 
-    // Every caller hands back the same declaration and handler instances the registry holds, so reference identity is the key.
+    // Callers pass the declaration and handler instances the registry holds, so reference identity is enough for the key.
     private readonly struct ClosingKey(StageDeclaration declaration, HandlerRegistration handler)
         : IEquatable<ClosingKey>
     {

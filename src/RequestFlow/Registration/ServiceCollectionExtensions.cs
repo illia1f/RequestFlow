@@ -42,20 +42,20 @@ public static class ServiceCollectionExtensions
         IReadOnlyList<Assembly> newAssemblies = registry.AddNewAssemblies(options.Assemblies);
         ScanResult scan = HandlerScanner.Scan(newAssemblies);
 
-        List<HandlerRegistration> handlers = CollectHandlers(scan, closed);
+        List<HandlerRegistration> handlers = scan.Registrations(closed, options.HandlerLifetime);
 
         StageDeclarationResult stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
         registry.AddStageDeclarations(stages.ValidDeclarations);
         if (options.UnusedStagesDisallowed)
             registry.DisallowUnusedStages();
 
-        List<string> problems = [.. declarations.Problems, .. closed.Problems, .. stages.Problems];
+        List<RequestFlowValidationProblem> problems = [.. declarations.Problems, .. closed.Problems, .. stages.Problems];
         registry.Add(handlers, scan.RequestTypes, problems);
 
-        RegisterHandlers(services, handlers, options.HandlerLifetime);
+        RegisterHandlers(services, handlers);
         RegisterStages(services, registry);
 
-        services.TryAddSingleton(_ => registry.BuildDispatchMap());
+        services.TryAddSingleton(sp => registry.BuildDispatchMap(sp));
         services.TryAdd(new ServiceDescriptor(
             typeof(IRequestDispatcher), typeof(RequestDispatcher), options.DispatcherLifetime));
 
@@ -73,12 +73,17 @@ public static class ServiceCollectionExtensions
         return expanded;
     }
 
-    private static List<HandlerRegistration> CollectHandlers(ScanResult scan, ClosingResult closed)
+    private static List<HandlerRegistration> Registrations(
+        this ScanResult scan, ClosingResult closed, ServiceLifetime lifetime)
     {
-        List<HandlerRegistration> handlers = [.. scan.Handlers];
+        List<HandlerRegistration> handlers = [];
+        foreach (var discovery in scan.Handlers)
+            handlers.Add(new HandlerRegistration(discovery, lifetime));
+
         foreach (var closedType in closed.ClosedTypes)
         {
-            handlers.AddRange(HandlerScanner.CollectHandlers(closedType));
+            foreach (var discovery in HandlerScanner.Discover(closedType))
+                handlers.Add(new HandlerRegistration(discovery, lifetime));
         }
 
         return handlers;
@@ -97,15 +102,14 @@ public static class ServiceCollectionExtensions
         return registry;
     }
 
-    private static void RegisterHandlers(
-        IServiceCollection services, IReadOnlyList<HandlerRegistration> handlers, ServiceLifetime lifetime)
+    private static void RegisterHandlers(IServiceCollection services, IReadOnlyList<HandlerRegistration> handlers)
     {
         foreach (var handler in handlers)
         {
             Type service = handler.IsVoid
                 ? typeof(IRequestHandler<>).MakeGenericType(handler.RequestType)
                 : typeof(IRequestHandler<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
-            services.Add(new ServiceDescriptor(service, handler.ImplementationType, lifetime));
+            services.Add(new ServiceDescriptor(service, handler.ImplementationType, handler.Lifetime));
         }
     }
 

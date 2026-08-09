@@ -74,7 +74,9 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains("ConstrainedHandler") && p.Contains(nameof(Plain)));
+        exception.Problems.ShouldContain(p =>
+            p.Code == "RF0007" && p.Subject == typeof(ConstrainedHandler<>)
+            && p.Message.Contains("ConstrainedHandler") && p.Message.Contains(nameof(Plain)));
     }
 
     [Fact]
@@ -90,7 +92,7 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains("more than one handler"));
+        exception.Problems.ShouldContain(p => p.Message.Contains("more than one handler"));
     }
 
     [Fact]
@@ -115,12 +117,13 @@ public sealed class RegisterGenericHandlerTests
     }
 
     [Theory]
-    [InlineData(typeof(string))]
-    [InlineData(typeof(AuditHandler<Order>))]
-    [InlineData(typeof(TwoParamHandler<,>))]
-    [InlineData(typeof(List<>))]
-    [InlineData(typeof(AbstractAuditHandler<>))]
-    public void Given_Invalid_Handler_Type_When_Resolving_Dispatcher_Then_Validation_Reports_Declaration(Type handlerType)
+    [InlineData(typeof(string), "RF0001")]
+    [InlineData(typeof(AuditHandler<Order>), "RF0001")]
+    [InlineData(typeof(AbstractAuditHandler<>), "RF0002")]
+    [InlineData(typeof(TwoParamHandler<,>), "RF0003")]
+    [InlineData(typeof(List<>), "RF0004")]
+    public void Given_Invalid_Handler_Type_When_Resolving_Dispatcher_Then_Validation_Reports_Declaration(
+        Type handlerType, string expectedCode)
     {
         var services = new ServiceCollection();
         services.AddRequestFlow(o => o.RegisterGenericHandler(handlerType, typeof(Order)));
@@ -129,7 +132,8 @@ public sealed class RegisterGenericHandlerTests
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
         string handlerName = handlerType.Name.Split('`')[0];
-        exception.Problems.ShouldContain(p => p.Contains(handlerName));
+        exception.Problems.ShouldContain(p =>
+            p.Code == expectedCode && p.Subject == handlerType && p.Message.Contains(handlerName));
     }
 
     [Fact]
@@ -149,7 +153,8 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains("no closing types"));
+        exception.Problems.ShouldContain(p =>
+            p.Code == "RF0005" && p.Subject == typeof(AuditHandler<>) && p.Message.Contains("no closing types"));
     }
 
     [Fact]
@@ -169,7 +174,8 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains("is not a closed type"));
+        exception.Problems.ShouldContain(p =>
+            p.Code == "RF0006" && p.Subject == typeof(List<>) && p.Message.Contains("is not a closed type"));
     }
 
     [Fact]
@@ -186,9 +192,9 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.ShouldContain(p => p.Contains("System.String"));
-        exception.Problems.ShouldContain(p => p.Contains("ConstrainedHandler") && p.Contains(nameof(Plain)));
-        exception.Problems.ShouldContain(p => p.Contains(nameof(Lonely)));
+        exception.Problems.ShouldContain(p => p.Message.Contains("System.String"));
+        exception.Problems.ShouldContain(p => p.Message.Contains("ConstrainedHandler") && p.Message.Contains(nameof(Plain)));
+        exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Lonely)));
     }
 
     [Fact]
@@ -201,7 +207,7 @@ public sealed class RegisterGenericHandlerTests
         var exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
 
-        exception.Problems.Count(p => p.Contains("System.String")).ShouldBe(1);
+        exception.Problems.Count(p => p.Message.Contains("System.String")).ShouldBe(1);
     }
 
     #region Initialization

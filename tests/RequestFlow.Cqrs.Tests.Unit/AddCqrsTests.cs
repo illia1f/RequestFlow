@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RequestFlow;
 using RequestFlow.Cqrs;
 
@@ -158,10 +159,73 @@ public sealed class AddCqrsRegistrationTests
             () => ((RequestFlowBuilder)null!).AddCqrs());
     }
 
+    [Fact]
+    public void Given_Add_Cqrs_When_Registering_Then_The_Split_Rule_Is_Registered_Once()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddCqrsTests>())
+            .AddCqrs()
+            .AddCqrs();
+
+        services.Count(d =>
+            d.ServiceType == typeof(IRequestFlowValidationRule)
+            && d.ImplementationType == typeof(CommandQuerySplitRule)).ShouldBe(1);
+    }
+
+    [Fact]
+    public void Given_A_Confused_Request_When_Validating_With_Cqrs_Then_Throws_With_The_Split_Problem()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o =>
+            {
+                o.RegisterHandlersFromAssembly(typeof(RequestFlow.Tests.ValidationFixtures.Confused).Assembly);
+                o.AllowUnhandledRequests();
+            })
+            .AddCqrs();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception =
+            Should.Throw<RequestFlowValidationException>(() => provider.ValidateRequestFlow());
+
+        exception.Problems.ShouldContain(p =>
+            p.Code == "CQRS0001" && p.Subject == typeof(RequestFlow.Tests.ValidationFixtures.Confused));
+    }
+
+    [Fact]
+    public void Given_Cqrs_Handlers_When_Validating_Then_A_Rule_Sees_The_Command_Contracts()
+    {
+        var rule = new CapturingRule();
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddCqrsTests>()).AddCqrs();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IRequestFlowValidationRule>(rule));
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        provider.ValidateRequestFlow();
+
+        ContractOf(rule, typeof(AddCqrsTests.CreateOrder)).ShouldBe(typeof(ICommandHandler<,>));
+        ContractOf(rule, typeof(AddCqrsTests.CancelOrder)).ShouldBe(typeof(ICommandHandler<>));
+        ContractOf(rule, typeof(AddCqrsTests.GetOrder)).ShouldBe(typeof(IQueryHandler<,>));
+    }
+
     #region Helpers
 
     private static RequestFlowBuilder RegisterRequestFlow(IServiceCollection services)
         => services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddCqrsTests>());
+
+    private static Type ContractOf(CapturingRule rule, Type requestType)
+        => rule.Model!.Requests.Single(r => r.RequestType == requestType).Handlers.Single().ContractType;
+
+    private sealed class CapturingRule : IRequestFlowValidationRule
+    {
+        public RequestFlowModel? Model { get; private set; }
+
+        public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
+        {
+            Model = context.Model;
+
+            return [];
+        }
+    }
 
     #endregion
 }
