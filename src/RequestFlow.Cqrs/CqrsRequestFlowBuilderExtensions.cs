@@ -16,6 +16,10 @@ public static class CqrsRequestFlowBuilderExtensions
     /// Registers the typed dispatchers <see cref="ICommandDispatcher"/> and
     /// <see cref="IQueryDispatcher"/>. Command and query handlers need no extra
     /// registration; the <c>AddRequestFlow</c> assembly scan discovers them.
+    /// <para>
+    /// Also adds a singleton validation rule to the startup pass. A request classified as both a
+    /// command and a query fails the freeze with <c>CQRS0001</c>.
+    /// </para>
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     public static RequestFlowBuilder AddCqrs(this RequestFlowBuilder builder)
@@ -25,6 +29,9 @@ public static class CqrsRequestFlowBuilderExtensions
 
         builder.Services.TryAddTransient<ICommandDispatcher, CqrsDispatcher>();
         builder.Services.TryAddTransient<IQueryDispatcher, CqrsDispatcher>();
+
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IRequestFlowValidationRule, CommandQuerySplitRule>());
 
         return builder;
     }

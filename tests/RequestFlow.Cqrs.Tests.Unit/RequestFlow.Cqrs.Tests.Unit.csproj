@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RequestFlow\RequestFlow.csproj" />
     <ProjectReference Include="..\..\src\RequestFlow.Cqrs\RequestFlow.Cqrs.csproj" />
+    <ProjectReference Include="..\..\tests\RequestFlow.Tests.ValidationFixtures\RequestFlow.Tests.ValidationFixtures.csproj" />
   </ItemGroup>
 
 </Project>
