@@ -299,5 +299,5 @@ Stage problems surface with every other registration problem, in the one `Reques
 - The stage type implements `IRequestStage<TRequest, TResponse>` or `IRequestStage<TRequest>` and is a concrete class.
 - An open generic stage uses its own type parameters as its contract's request, so it can close over the requests it dispatches with.
 - A partially closed generic is rejected; register the open definition or a fully closed type.
-- No stage type is registered twice, and no two declarations reach one request as the same stage class.
+- No stage type is registered twice, and no two declarations reach one request as the same stage class. A request with more than one handler has one chain per handler, so only declarations resolving to one closed type count as a collision there.
 - With `DisallowUnusedStages`, every stage reaches at least one request.

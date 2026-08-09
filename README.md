@@ -59,6 +59,7 @@ Contracts live in their own packages so your domain layer, and any future add-on
 - [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, which requests a stage reaches, filters
 - [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
 - [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
+- [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): contributing custom checks to startup validation, the model rules see, built-in problem codes
 
 ## Contributing
 
