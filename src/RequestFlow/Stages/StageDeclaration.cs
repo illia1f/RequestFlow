@@ -5,8 +5,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// One registered stage: the stage type, the family it belongs to, the optional handler contract
-/// that narrows which requests it reaches, and its lifetime. Position in the registry's list is
-/// execution order.
+/// that narrows which requests it reaches, and its lifetime. Position in the registry's list is execution order.
 /// </summary>
 internal sealed class StageDeclaration(
     Type stageType, Type? handlerFilter, StageFamily family, ServiceLifetime lifetime = ServiceLifetime.Transient)
@@ -21,9 +20,8 @@ internal sealed class StageDeclaration(
 }
 
 /// <summary>
-/// The contracts one kind of stage is written against, and the handler contracts it can wrap. The
-/// two families never mix: a stream declaration cannot close over a task handler, and the reverse
-/// is equally impossible.
+/// The contracts one kind of stage is written against, and the handler contracts it can wrap.
+/// The two families never mix: a stream declaration cannot close over a task handler, and the reverse is equally impossible.
 /// </summary>
 internal sealed class StageFamily
 {
@@ -105,8 +103,7 @@ internal sealed class StageFamily
     public Type[] Contracts { get; }
 
     /// <summary>
-    /// The registration call that adds a stage of this family: <c>AddStage</c> or
-    /// <c>AddStreamStage</c>.
+    /// The registration call that adds a stage of this family: <c>AddStage</c> or <c>AddStreamStage</c>.
     /// </summary>
     public string CallName { get; }
 

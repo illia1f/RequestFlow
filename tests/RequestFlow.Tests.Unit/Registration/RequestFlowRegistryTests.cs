@@ -36,8 +36,8 @@ public sealed class RequestFlowRegistryTests
     }
 
     // A plan builds its levels when the map freezes, so a dispatch reaches that same plan: it asks
-    // the container for the levels in chain order and for nothing the freeze itself needed. Building
-    // a plan per call would take the registry, which holds the reflection, and show up here.
+    // the container for the levels in chain order and for nothing the freeze itself needed.
+    // Building a plan per call would take the registry, which holds the reflection, and show up here.
     [Fact]
     public async Task Given_A_Staged_Request_When_Dispatching_Twice_Then_Both_Calls_Only_Resolve_The_Frozen_Levels()
     {

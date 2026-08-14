@@ -7,8 +7,7 @@ namespace RequestFlow;
 /// Container-neutral description of one discovered handler and the lifetime it registers under.
 /// </summary>
 /// <remarks>
-/// The <c>AddRequestFlow</c> call stamps its own lifetime here, since each call decides for the
-/// handlers it found.
+/// The <c>AddRequestFlow</c> call stamps its own lifetime here, since each call decides for the handlers it found.
 /// </remarks>
 internal sealed class HandlerRegistration(HandlerDiscovery discovery, ServiceLifetime lifetime)
 {
@@ -38,8 +37,7 @@ internal sealed class HandlerRegistration(HandlerDiscovery discovery, ServiceLif
     public Type Contract { get; } = discovery.Contract;
 
     /// <summary>
-    /// The open definition of <see cref="Contract"/>, which is what tells one handler family from
-    /// another.
+    /// The open definition of <see cref="Contract"/>, which is what tells one handler family from another.
     /// </summary>
     public Type ContractDefinition { get; } = discovery.ContractDefinition;
 

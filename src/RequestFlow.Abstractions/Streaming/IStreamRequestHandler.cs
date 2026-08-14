@@ -18,8 +18,7 @@ public interface IStreamRequestHandler<in TRequest, TItem>
     /// <remarks>
     /// An implementation written as an async iterator decorates its token parameter with
     /// <c>[EnumeratorCancellation]</c>, which is what the compiler asks for and costs nothing here:
-    /// the dispatcher has already joined the token it hands over with the one the enumeration was
-    /// given.
+    /// the dispatcher has already joined the token it hands over with the one the enumeration was given.
     /// </remarks>
     IAsyncEnumerable<TItem> Handle(TRequest request, CancellationToken cancellationToken);
 }

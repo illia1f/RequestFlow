@@ -5,9 +5,9 @@ using System.Threading;
 namespace RequestFlow;
 
 /// <summary>
-/// Enters one level of a frozen stream chain: a stage, or the handler beneath the last one. A
-/// <see cref="StreamContinuation{TItem}"/> holds one of these and calls it again on every
-/// <see cref="StreamContinuation{TItem}.Invoke"/>.
+/// Enters one level of a frozen stream chain: a stage, or the handler beneath the last one.
+/// A <see cref="StreamContinuation{TItem}"/> holds one of these and calls
+/// it again on every <see cref="StreamContinuation{TItem}.Invoke"/>.
 /// </summary>
 /// <remarks>
 /// The request travels as an object and the cast to its own type happens inside the level, where

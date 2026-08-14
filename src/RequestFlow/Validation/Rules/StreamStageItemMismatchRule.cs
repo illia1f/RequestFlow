@@ -12,8 +12,7 @@ namespace RequestFlow;
 /// covariant, but closing is invariant in the item, so such a stage compiles and then wraps no
 /// handler. Only <see cref="UnusedStageRule"/> would notice, and only behind
 /// <c>DisallowUnusedStages</c>, so this rule runs unconditionally for a stage that wrapped
-/// nothing. A stage that reached any request is not reported, since skipping the rest can be
-/// deliberate scoping.
+/// nothing. A stage that reached any request is not reported, since skipping the rest can be deliberate scoping.
 /// <para>
 /// A filtered call wraps nothing when its filter admits no handler, which says nothing about its
 /// item type, so only requests with a handler the filter admits are examined. The filter and the
@@ -51,8 +50,7 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
 
             foreach (var request in context.Model.Requests)
             {
-                // A filter the request's handlers fail is why this stage skipped it, whatever its
-                // item type.
+                // A filter the request's handlers fail is why this stage skipped it, whatever its item type.
                 if (handlerFilter is not null && !Admits(handlerFilter, request))
                     continue;
 

@@ -80,12 +80,11 @@ public readonly struct Continuation<TResponse>
     /// </summary>
     /// <param name="cancellationToken">
     /// The token every level below this stage runs under, the handler included. Omit it, or
-    /// pass <see cref="CancellationToken.None"/>, to continue under the token this stage
-    /// received.
+    /// pass <see cref="CancellationToken.None"/>, to continue under the token this stage received.
     /// </param>
     /// <exception cref="InvalidOperationException">
-    /// This continuation is the default value of its type, so it has no chain below it. Build one
-    /// with <see cref="Over"/>.
+    /// This continuation is the default value of its type, so it has no chain below it.
+    /// Build one with <see cref="Over"/>.
     /// </exception>
     // Inlined so the guard and the token choice fold into the stage's call, leaving the delegate call.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

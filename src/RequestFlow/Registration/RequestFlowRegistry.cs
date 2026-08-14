@@ -34,8 +34,7 @@ internal sealed class RequestFlowRegistry
         => UnhandledRequestsAllowed = true;
 
     /// <summary>
-    /// True once any <c>AddRequestFlow</c> call asked for a stage that applies to nothing to be
-    /// fatal.
+    /// True once any <c>AddRequestFlow</c> call asked for a stage that applies to nothing to be fatal.
     /// </summary>
     public bool UnusedStagesDisallowed { get; private set; }
 
@@ -46,8 +45,7 @@ internal sealed class RequestFlowRegistry
         => UnusedStagesDisallowed = true;
 
     /// <summary>
-    /// Every stage declaration accumulated so far, in registration order, which is execution
-    /// order.
+    /// Every stage declaration accumulated so far, in registration order, which is execution order.
     /// </summary>
     public IReadOnlyList<StageDeclaration> StageDeclarations => _stageDeclarations;
 

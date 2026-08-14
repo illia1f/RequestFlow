@@ -3,8 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Thrown when a stream stage returns a null sequence from Handle, at the point the chain enters
-/// that stage's level.
+/// Thrown when a stream stage returns a null sequence from Handle, at the point the chain enters that stage's level.
 /// </summary>
 public sealed class StageNullStreamException(Type stageType)
     : NullStreamException(

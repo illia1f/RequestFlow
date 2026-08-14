@@ -5,8 +5,7 @@ using System.Collections.ObjectModel;
 namespace RequestFlow;
 
 /// <summary>
-/// One <c>AddStage</c> or <c>AddStreamStage</c> call, holding the stage type the application
-/// wrote.
+/// One <c>AddStage</c> or <c>AddStreamStage</c> call, holding the stage type the application wrote.
 /// </summary>
 /// <remarks>
 /// Read <see cref="ReachedRequests"/> for the requests the call landed on, and read the rest of the
@@ -42,9 +41,9 @@ public sealed class StageDeclarationModel
     /// </summary>
     /// <remarks>
     /// Derived from the chains the model holds, so it lists every request whose
-    /// <see cref="RequestModel.Stages"/> contains a closing of this <see cref="StageType"/>. Two
-    /// calls registering one stage type report the same requests, whatever each call filtered on.
-    /// That registration already fails under <c>RF0103</c>.
+    /// <see cref="RequestModel.Stages"/> contains a closing of this <see cref="StageType"/>.
+    /// Two calls registering one stage type report the same requests, whatever each call
+    /// filtered on. That registration already fails under <c>RF0103</c>.
     /// </remarks>
     public IReadOnlyList<Type> ReachedRequests { get; }
 

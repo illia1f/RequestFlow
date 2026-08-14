@@ -7,8 +7,8 @@ namespace RequestFlow;
 
 /// <summary>
 /// Builds one level of a stream chain: a stage, or the handler beneath the last one. A level is
-/// built when the dispatch map freezes and closes over its position, reaching its stage or handler
-/// through the contract.
+/// built when the dispatch map freezes and closes over its position, reaching its stage or
+/// handler through the contract.
 /// </summary>
 internal static class StreamLevelFactory
 {

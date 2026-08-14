@@ -68,8 +68,7 @@ public sealed class StreamCancellationTests
         });
     }
 
-    // The handler sees the dispatch token as an ordinary argument, so it needs no attribute to
-    // observe cancellation.
+    // The handler sees the dispatch token as an ordinary argument, so it needs no attribute to observe cancellation.
     [Fact]
     public async Task Given_A_Dispatch_Token_When_Enumerating_Then_The_Handler_Receives_A_Token_It_Can_Observe()
     {
@@ -107,8 +106,8 @@ public sealed class StreamCancellationTests
     }
 
     // The walk joins the dispatch token with the enumeration one and hands the join down as an
-    // ordinary argument, so a WithCancellation token reaches an undecorated handler too. The
-    // attribute only silences CS8425.
+    // ordinary argument, so a WithCancellation token reaches an undecorated handler too.
+    // The attribute only silences CS8425.
     [Fact]
     public async Task Given_An_Undecorated_Handler_When_The_Iteration_Token_Is_Cancelled_Then_The_Walk_Stops()
     {

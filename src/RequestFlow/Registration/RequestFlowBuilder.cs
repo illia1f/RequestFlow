@@ -30,8 +30,7 @@ public sealed class RequestFlowBuilder
     /// needs the dispatch map the freeze has not finished building, and the container blocks on
     /// itself, so startup hangs with no exception. A provider that validates scopes throws first,
     /// since the dispatcher is scoped and a rule is a singleton. Handlers and stages resolve
-    /// without touching the map, but a singleton rule holding one keeps that instance for the
-    /// provider's lifetime.
+    /// without touching the map, but a singleton rule holding one keeps that instance for the provider's lifetime.
     /// </para>
     /// </remarks>
     public RequestFlowBuilder AddValidationRule<TRule>()

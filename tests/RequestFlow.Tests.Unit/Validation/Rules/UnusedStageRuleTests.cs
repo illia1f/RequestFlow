@@ -45,8 +45,7 @@ public sealed class UnusedStageRuleTests
         problems.Count.ShouldBe(1);
     }
 
-    // The application asked for the unhandled requests, so a handler is not the fix it is
-    // waiting for.
+    // The application asked for the unhandled requests, so a handler is not the fix it is waiting for.
     [Fact]
     public void Given_Unhandled_Requests_Allowed_When_Validating_Then_The_Message_Names_The_Opt_In_Word_For_Word()
     {

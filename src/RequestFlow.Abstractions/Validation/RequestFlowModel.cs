@@ -19,8 +19,7 @@ namespace RequestFlow;
 /// </para>
 /// <para>
 /// The opt-in flags are not here. <c>AllowUnhandledRequests</c> and <c>DisallowUnusedStages</c>
-/// pick which built-in rules run, and a rule reads them off
-/// <see cref="RequestFlowValidationContext"/>.
+/// pick which built-in rules run, and a rule reads them off <see cref="RequestFlowValidationContext"/>.
 /// </para>
 /// <para>
 /// The library builds this. A rule test builds one with <see cref="RequestFlowModelBuilder"/>.
@@ -45,8 +44,7 @@ public sealed class RequestFlowModel
     public IReadOnlyList<RequestModel> Requests { get; }
 
     /// <summary>
-    /// One entry per <c>AddStage</c> or <c>AddStreamStage</c> call, in the order the calls ran,
-    /// duplicates included.
+    /// One entry per <c>AddStage</c> or <c>AddStreamStage</c> call, in the order the calls ran, duplicates included.
     /// </summary>
     public IReadOnlyList<StageDeclarationModel> StageDeclarations { get; }
 }

@@ -4,8 +4,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> and by
-/// <c>IStreamDispatcher.Stream</c> when the dispatched request type has no entry in the
-/// dispatch map.
+/// <c>IStreamDispatcher.Stream</c> when the dispatched request type has no entry in the dispatch map.
 /// </summary>
 public sealed class HandlerNotFoundException(Type requestType)
     : InvalidOperationException(

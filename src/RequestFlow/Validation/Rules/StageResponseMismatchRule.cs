@@ -9,10 +9,10 @@ namespace RequestFlow;
 /// <remarks>
 /// The task twin of <see cref="StreamStageItemMismatchRule"/>. The stage contract's constraint
 /// accepts a wider response because <c>IRequest&lt;TResponse&gt;</c> is covariant, but closing is
-/// invariant in the response, so such a stage compiles and then wraps no handler. Only
-/// <see cref="UnusedStageRule"/> would notice, and only behind <c>DisallowUnusedStages</c>, so this
-/// rule runs unconditionally for a stage that wrapped nothing. A stage that reached any request is
-/// not reported, since skipping the rest can be deliberate scoping.
+/// invariant in the response, so such a stage compiles and then wraps no handler.
+/// Only <see cref="UnusedStageRule"/> would notice, and only behind <c>DisallowUnusedStages</c>, so
+/// this rule runs unconditionally for a stage that wrapped nothing. A stage that reached any
+/// request is not reported, since skipping the rest can be deliberate scoping.
 /// <para>
 /// A filtered call wraps nothing when its filter admits no handler, which says nothing about its
 /// response type, so only requests with a handler the filter admits are examined. The filter and the
@@ -54,13 +54,11 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
 
             foreach (var request in context.Model.Requests)
             {
-                // A filter the request's handlers fail is why this stage skipped it, whatever its
-                // response type.
+                // A filter the request's handlers fail is why this stage skipped it, whatever its response type.
                 if (handlerFilter is not null && !Admits(handlerFilter, request))
                     continue;
 
-                // No sole contract, no response type to hold the stage to; RF0106 reports the
-                // ambiguity.
+                // No sole contract, no response type to hold the stage to; RF0106 reports the ambiguity.
                 Type? declaredResponse = RequestContracts.SoleDeclaredResponse(request.RequestType);
                 if (declaredResponse is null)
                     continue;

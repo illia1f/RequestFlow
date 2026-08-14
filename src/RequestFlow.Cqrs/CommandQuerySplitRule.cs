@@ -5,8 +5,7 @@ namespace RequestFlow.Cqrs;
 
 /// <summary>
 /// Reports every request classified as both a command and a query. Checks contract
-/// assignability, not response shapes, so it also catches ICommand&lt;A&gt; next to
-/// IQuery&lt;B&gt;.
+/// assignability, not response shapes, so it also catches ICommand&lt;A&gt; next to IQuery&lt;B&gt;.
 /// </summary>
 internal sealed class CommandQuerySplitRule : IRequestFlowValidationRule
 {

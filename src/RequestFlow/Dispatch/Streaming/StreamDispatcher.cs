@@ -45,9 +45,8 @@ internal sealed class StreamDispatcher(DispatchMap map, IServiceProvider service
         using CancellationTokenSource? linked =
             TokenLink.Combine(cancellationToken, iterationToken, out CancellationToken token);
 
-        // The joined token travels only as the Handle argument. WithCancellation here would tie it
-        // back onto the returned sequence and override a token a stage substituted for the levels
-        // below it.
+        // The joined token travels only as the Handle argument. 
+        // WithCancellation here would tie it back onto the returned sequence and override a token a stage substituted for the levels below it.
         await foreach (TItem item in plan.Execute(request, services, token).ConfigureAwait(false))
         {
             yield return item;

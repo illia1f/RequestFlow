@@ -523,8 +523,7 @@ public sealed class RegistrationSnapshotTests
 
     private abstract record Second : IRequest<string>;
 
-    // Not real IRequestHandler implementers: the builder only reads the Type off a manually
-    // built HandlerRegistration.
+    // Not real IRequestHandler implementers: the builder only reads the Type off a manually built HandlerRegistration.
     private sealed class FirstHandler
     { }
 

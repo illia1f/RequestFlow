@@ -5,8 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// Reshapes the registry's raw accumulations into the frozen snapshot every validation rule
-/// reads.
+/// Reshapes the registry's raw accumulations into the frozen snapshot every validation rule reads.
 /// </summary>
 internal static class RegistrationSnapshot
 {
@@ -47,7 +46,8 @@ internal static class RegistrationSnapshot
         Dictionary<Type, Type> memoStreamContracts = [];
         Dictionary<Type, Dictionary<Type, Type>> memoClosingContracts = [];
 
-        // Reused across declarations: one declaration reaching two handlers as the same closed type is one chain slot, not two.
+        // Reused across declarations: one declaration reaching two handlers as the same closed type
+        // is one chain slot, not two.
         HashSet<Type> closedPerDeclaration = [];
 
         List<RequestModel> requests = [];

@@ -4,8 +4,7 @@ using RequestFlow.Cqrs;
 namespace Orders.Api.Rules;
 
 /// <summary>
-/// A request a command handler covers has to end in "Command", and one a query handler covers in
-/// "Query".
+/// A request a command handler covers has to end in "Command", and one a query handler covers in "Query".
 /// </summary>
 public sealed class CommandNamingRule : IRequestFlowValidationRule
 {

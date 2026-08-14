@@ -40,8 +40,7 @@ public sealed class ClosedStageModel
     /// </summary>
     /// <remarks>
     /// The type the container resolves. A two-parameter stage over a void request closes over
-    /// <see cref="NoResult"/> here, so read <see cref="HandlerModel.IsVoid"/> rather than these
-    /// type arguments.
+    /// <see cref="NoResult"/> here, so read <see cref="HandlerModel.IsVoid"/> rather than these type arguments.
     /// </remarks>
     public Type ClosedType { get; }
 
@@ -49,8 +48,8 @@ public sealed class ClosedStageModel
     /// The open generic stage contract this closing satisfies.
     /// </summary>
     /// <remarks>
-    /// <c>IRequestStage</c>, an interface built on one, or the stage contract of another family such
-    /// as <c>IStreamRequestStage</c>.
+    /// <c>IRequestStage</c>, an interface built on one, or the stage contract of another
+    /// family such as <c>IStreamRequestStage</c>.
     /// </remarks>
     public Type ContractType { get; }
 }

@@ -32,7 +32,8 @@ internal sealed class StageClosingCache
         }
     }
 
-    // Callers pass the declaration and handler instances the registry holds, so reference identity is enough for the key.
+    // Callers pass the declaration and handler instances the registry holds, so reference identity
+    // is enough for the key.
     private readonly struct ClosingKey(StageDeclaration declaration, HandlerRegistration handler)
         : IEquatable<ClosingKey>
     {

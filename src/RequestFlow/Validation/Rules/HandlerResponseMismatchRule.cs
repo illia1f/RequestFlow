@@ -5,8 +5,8 @@ namespace RequestFlow;
 
 /// <summary>
 /// Reports a handler whose response type is not the one its request declares. The dispatch map holds
-/// one plan per request type, closed over the handler's response, so the pair would only fail once
-/// somebody dispatched it.
+/// one plan per request type, closed over the handler's response, so the pair would only fail
+/// once somebody dispatched it.
 /// </summary>
 /// <remarks>
 /// The task twin of the item check in <see cref="StreamRequestContractRule"/>. It exists because

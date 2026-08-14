@@ -3,8 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> when a stage returns a null
-/// task from HandleAsync.
+/// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> when a stage returns a null task from HandleAsync.
 /// </summary>
 public sealed class StageNullTaskException(Type stageType)
     : NullTaskException(

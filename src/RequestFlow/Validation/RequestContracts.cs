@@ -3,8 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Reads the response type a request type declares, for the rules that hold a handler or a stage to
-/// it.
+/// Reads the response type a request type declares, for the rules that hold a handler or a stage to it.
 /// </summary>
 internal static class RequestContracts
 {

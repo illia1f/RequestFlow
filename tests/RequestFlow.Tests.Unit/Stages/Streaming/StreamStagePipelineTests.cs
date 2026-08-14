@@ -309,8 +309,7 @@ public sealed class StreamStagePipelineTests
             => throw new InvalidTimeZoneException("from stage");
     }
 
-    // Declared for the base request, so contravariance on TRequest is the only thing that can reach
-    // FastPulse.
+    // Declared for the base request, so contravariance on TRequest is the only thing that can reach FastPulse.
     public sealed class PulseStage : IStreamRequestStage<Pulse, int>
     {
         public IAsyncEnumerable<int> Handle(

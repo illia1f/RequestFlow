@@ -51,8 +51,7 @@ public sealed class StreamContinuationTests
         seen.ShouldBe(named.Token);
     }
 
-    // Invoke enters the level below on the call, so a stage that invokes and drops the sequence has
-    // already run it.
+    // Invoke enters the level below on the call, so a stage that invokes and drops the sequence has already run it.
     [Fact]
     public void Given_A_Continuation_Over_A_Delegate_When_Invoking_Without_Enumerating_Then_The_Delegate_Has_Run()
     {

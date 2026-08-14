@@ -14,13 +14,12 @@ public interface IStreamRequestStage<in TRequest, TItem>
 {
     /// <summary>
     /// Wraps the rest of the chain for <paramref name="request"/>. Invoke <paramref name="next"/>
-    /// to continue, or skip it to short-circuit. The items may be observed, filtered, projected,
-    /// or cut short.
+    /// to continue, or skip it to short-circuit. The items may be observed, filtered, projected, or cut short.
     /// </summary>
     /// <remarks>
     /// An implementation written as an async iterator decorates its token parameter with
-    /// <c>[EnumeratorCancellation]</c>, under the same rule as
-    /// <see cref="IStreamRequestHandler{TRequest, TItem}.Handle"/>.
+    /// <c>[EnumeratorCancellation]</c>, under the same
+    /// rule as <see cref="IStreamRequestHandler{TRequest, TItem}.Handle"/>.
     /// </remarks>
     IAsyncEnumerable<TItem> Handle(
         TRequest request, StreamContinuation<TItem> next, CancellationToken cancellationToken);

@@ -6,8 +6,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// Closed plan for one stream request wrapped in stages. The chain of levels is built when the
-/// dispatch map freezes; each level resolves its stage or handler from the supplied provider when
-/// it runs.
+/// dispatch map freezes; each level resolves its stage or handler from the supplied provider when it runs.
 /// </summary>
 internal sealed class StagedStreamPlan<TRequest, TItem>(StageChain chain) : StreamPlan<TItem>
     where TRequest : IStreamRequest<TItem>

@@ -47,8 +47,7 @@ public sealed class ForkedIntHandler : IRequestHandler<Forked, int>
 
 /// <summary>
 /// A request whose handler declares a wider response type than the contract; startup validation
-/// must report it under RF0112. Covariance on <c>IRequest&lt;TResponse&gt;</c> is what lets the pair
-/// compile.
+/// must report it under RF0112. Covariance on <c>IRequest&lt;TResponse&gt;</c> is what lets the pair compile.
 /// </summary>
 public sealed record Wide : IRequest<string>;
 
@@ -88,8 +87,8 @@ public sealed class ConfusedHandler : IRequestHandler<Confused, int>
 }
 
 /// <summary>
-/// A void command also classified as a query; exercises the split rule's void-command path.
-/// Unhandled, like <see cref="Lonely"/>.
+/// A void command also classified as a query; exercises the split rule's
+/// void-command path. Unhandled, like <see cref="Lonely"/>.
 /// </summary>
 public sealed record VoidConfused : ICommand, IQuery<int>;
 
@@ -128,8 +127,7 @@ public sealed class MixedFamiliesHandler : IRequestHandler<MixedFamilies, string
 
 /// <summary>
 /// A stream request whose handler declares a wider item type than the contract; startup validation
-/// must report it under RF0110. Covariance on <c>IStreamRequest&lt;TItem&gt;</c> is what lets the
-/// pair compile.
+/// must report it under RF0110. Covariance on <c>IStreamRequest&lt;TItem&gt;</c> is what lets the pair compile.
 /// </summary>
 public sealed record WideStream : IStreamRequest<string>;
 

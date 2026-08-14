@@ -111,8 +111,8 @@ public sealed class HandlerResponseMismatchRuleTests
 
     #region Helpers
 
-    // Abstract keeps these out of the scanner when other tests scan this assembly; the rule reads a
-    // type's interfaces only.
+    // Abstract keeps these out of the scanner when other tests scan this assembly; the rule reads
+    // a type's interfaces only.
     private abstract record StringAsk : IRequest<string>;
 
     private abstract record VoidAsk : IRequest;

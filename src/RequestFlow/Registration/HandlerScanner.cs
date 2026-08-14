@@ -119,8 +119,7 @@ internal sealed class HandlerDiscovery(
     public Type Contract { get; } = contract;
 
     /// <summary>
-    /// The open definition of <see cref="Contract"/>, which is what tells one handler family from
-    /// another.
+    /// The open definition of <see cref="Contract"/>, which is what tells one handler family from another.
     /// </summary>
     public Type ContractDefinition { get; } = contract.GetGenericTypeDefinition();
 }

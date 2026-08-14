@@ -5,8 +5,7 @@ using System.Threading.Tasks;
 namespace RequestFlow.Cqrs;
 
 /// <summary>
-/// Default <see cref="ICommandDispatcher"/> and <see cref="IQueryDispatcher"/>
-/// forwarding to <see cref="IRequestDispatcher"/>.
+/// Default <see cref="ICommandDispatcher"/> and <see cref="IQueryDispatcher"/> forwarding to <see cref="IRequestDispatcher"/>.
 /// </summary>
 internal sealed class CqrsDispatcher(IRequestDispatcher dispatcher) : ICommandDispatcher, IQueryDispatcher
 {

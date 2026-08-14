@@ -18,8 +18,7 @@ namespace RequestFlow;
 /// passes a memo it owns for that snapshot. <see cref="Of"/> takes one per family, since a type
 /// implementing a contract from each would otherwise get one family's answer for both.
 /// <see cref="OfClosing"/> keys its memo by the closed core contract as well, since one stage type
-/// can satisfy a different contract per request. A shared static memo would need a lock and would
-/// outlive the freeze.
+/// can satisfy a different contract per request. A shared static memo would need a lock and would outlive the freeze.
 /// </para>
 /// </remarks>
 internal static class StageContract

@@ -5,8 +5,7 @@ namespace RequestFlow;
 /// <summary>
 /// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> and by
 /// <c>IStreamDispatcher.Stream</c> when the dispatched request type has a registered handler,
-/// but the call site's response type argument differs from the one the handler was registered
-/// with.
+/// but the call site's response type argument differs from the one the handler was registered with.
 /// </summary>
 public sealed class ResponseTypeMismatchException(Type requestType, Type expected, Type actual)
     : InvalidOperationException(

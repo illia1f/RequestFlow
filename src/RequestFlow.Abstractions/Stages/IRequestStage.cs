@@ -13,8 +13,8 @@ public interface IRequestStage<in TRequest, TResponse>
     where TRequest : IRequest<TResponse>
 {
     /// <summary>
-    /// Wraps the rest of the chain for <paramref name="request"/>. Invoke
-    /// <paramref name="next"/> to continue, or skip it to short-circuit.
+    /// Wraps the rest of the chain for <paramref name="request"/>.
+    /// Invoke <paramref name="next"/> to continue, or skip it to short-circuit.
     /// </summary>
     Task<TResponse> HandleAsync(TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken);
 }
@@ -28,8 +28,8 @@ public interface IRequestStage<in TRequest>
     where TRequest : IRequest<NoResult>
 {
     /// <summary>
-    /// Wraps the rest of the chain for <paramref name="request"/>. Invoke
-    /// <paramref name="next"/> to continue, or skip it to short-circuit.
+    /// Wraps the rest of the chain for <paramref name="request"/>.
+    /// Invoke <paramref name="next"/> to continue, or skip it to short-circuit.
     /// </summary>
     Task HandleAsync(TRequest request, Continuation next, CancellationToken cancellationToken);
 }

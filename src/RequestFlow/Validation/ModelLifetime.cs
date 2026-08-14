@@ -8,8 +8,7 @@ namespace RequestFlow;
 /// </summary>
 /// <remarks>
 /// The model ships in the dependency-free abstractions package, so it cannot name
-/// <see cref="ServiceLifetime"/>. An unknown value throws rather than passing a wrong lifetime to
-/// a rule.
+/// <see cref="ServiceLifetime"/>. An unknown value throws rather than passing a wrong lifetime to a rule.
 /// </remarks>
 internal static class ModelLifetime
 {

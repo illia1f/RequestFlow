@@ -4,8 +4,7 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Detects registration problems. The shape checks live here; the freeze-time checks live in
-/// <c>Validation/</c> rules.
+/// Detects registration problems. The shape checks live here; the freeze-time checks live in <c>Validation/</c> rules.
 /// </summary>
 internal static class RegistrationValidator
 {
