@@ -32,7 +32,6 @@ internal sealed class UnusedStageRule : IRequestFlowValidationRule
                 applied.Add(closing.DeclaredType);
         }
 
-        List<RequestFlowValidationProblem> problems = [];
         HashSet<Type> reportedStages = [];
         foreach (var stage in context.Model.StageDeclarations)
         {
@@ -53,10 +52,8 @@ internal sealed class UnusedStageRule : IRequestFlowValidationRule
                           "unused, so the missing handler may be the fix.";
                 }
 
-                problems.Add(new RequestFlowValidationProblem(ProblemCodes.UnusedStage, message, stage.StageType));
+                yield return new RequestFlowValidationProblem(ProblemCodes.UnusedStage, message, stage.StageType);
             }
         }
-
-        return problems;
     }
 }

@@ -13,16 +13,12 @@ namespace RequestFlow;
 /// </remarks>
 internal static class HandlerContract
 {
-    public static Type Of(Type handlerType, Type requestType, Type? responseType)
+    public static Type Of(Type handlerType, Type closedCoreContract)
     {
-        Type core = responseType is null
-            ? typeof(IRequestHandler<>).MakeGenericType(requestType)
-            : typeof(IRequestHandler<,>).MakeGenericType(requestType, responseType);
-
         List<Type> candidates = [];
         foreach (var iface in handlerType.GetInterfaces())
         {
-            if (iface.IsGenericType && iface != core && core.IsAssignableFrom(iface))
+            if (iface.IsGenericType && iface != closedCoreContract && closedCoreContract.IsAssignableFrom(iface))
                 candidates.Add(iface);
         }
 
@@ -32,7 +28,7 @@ internal static class HandlerContract
                 return candidate.GetGenericTypeDefinition();
         }
 
-        return core.GetGenericTypeDefinition();
+        return closedCoreContract.GetGenericTypeDefinition();
     }
 
     private static bool DerivesFromAll(Type candidate, List<Type> others)

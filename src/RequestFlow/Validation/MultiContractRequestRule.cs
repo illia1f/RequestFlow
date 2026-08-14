@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace RequestFlow;
 
@@ -20,8 +19,6 @@ internal sealed class MultiContractRequestRule : IRequestFlowValidationRule
 {
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
     {
-        List<RequestFlowValidationProblem> problems = [];
-
         // Reused per request; GetInterfaces already returns each closed interface once.
         List<Type> contracts = [];
 
@@ -37,27 +34,11 @@ internal sealed class MultiContractRequestRule : IRequestFlowValidationRule
             if (contracts.Count < 2)
                 continue;
 
-            problems.Add(new RequestFlowValidationProblem(
+            yield return new RequestFlowValidationProblem(
                 ProblemCodes.MultiContractRequest,
-                $"Request '{request.RequestType.FullName}' implements more than one request contract ({FormatContracts(contracts)}); " +
+                $"Request '{request.RequestType.FullName}' implements more than one request contract ({ContractFormatting.Format("IRequest", contracts)}); " +
                 $"dispatch resolves one response type per request, so keep one contract and split the type if both responses are needed.",
-                request.RequestType));
+                request.RequestType);
         }
-
-        return problems;
-    }
-
-    private static string FormatContracts(List<Type> contracts)
-    {
-        var names = new StringBuilder();
-        for (int i = 0; i < contracts.Count; i++)
-        {
-            if (i > 0)
-                names.Append(", ");
-
-            names.Append("IRequest<").Append(contracts[i].GetGenericArguments()[0].FullName).Append('>');
-        }
-
-        return names.ToString();
     }
 }

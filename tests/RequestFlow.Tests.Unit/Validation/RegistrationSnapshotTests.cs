@@ -20,9 +20,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Handler_For_Unscanned_Request_When_Building_Model_Then_Request_Is_Included()
     {
-        var registration = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        HandlerRegistration registration = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [registration], requestTypes: [], stageDeclarations: [], closings: new StageClosingCache());
@@ -36,12 +35,10 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Duplicate_Handlers_When_Building_Model_Then_Both_Are_Listed()
     {
-        var first = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var second = new HandlerRegistration(
-            new HandlerDiscovery(typeof(SecondPingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        HandlerRegistration first = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        HandlerRegistration second = Handler(
+            typeof(SecondPingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [first, second], requestTypes: [typeof(Ping)], stageDeclarations: [], closings: new StageClosingCache());
@@ -52,10 +49,9 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Applicable_Stage_When_Building_Model_Then_Chain_Names_Declaration_And_Closed_Type()
     {
-        var registration = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        HandlerRegistration registration = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [registration], requestTypes: [typeof(Ping)], stageDeclarations: [declaration],
@@ -69,8 +65,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Stage_Declarations_When_Building_Model_Then_Stages_Keep_Registration_Order_And_Duplicates()
     {
-        var first = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
-        var second = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        var first = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
+        var second = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [], requestTypes: [], stageDeclarations: [first, second], closings: new StageClosingCache());
@@ -82,9 +78,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Scanned_And_Handler_Only_Requests_When_Building_Model_Then_Scanned_Request_Comes_First()
     {
-        var registration = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        HandlerRegistration registration = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [registration], requestTypes: [typeof(Purge)], stageDeclarations: [], closings: new StageClosingCache());
@@ -97,13 +92,11 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Duplicate_Handlers_And_A_Stage_When_Building_Model_Then_Chain_Holds_One_Closing_Per_Handler()
     {
-        var first = new HandlerRegistration(
-            new HandlerDiscovery(typeof(MultiPingStringHandler), typeof(MultiPing), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var second = new HandlerRegistration(
-            new HandlerDiscovery(typeof(MultiPingIntHandler), typeof(MultiPing), typeof(int), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        HandlerRegistration first = Handler(
+            typeof(MultiPingStringHandler), typeof(MultiPing), typeof(string), typeof(IRequestHandler<MultiPing, string>));
+        HandlerRegistration second = Handler(
+            typeof(MultiPingIntHandler), typeof(MultiPing), typeof(int), typeof(IRequestHandler<MultiPing, int>));
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [first, second], requestTypes: [typeof(MultiPing)], stageDeclarations: [declaration],
@@ -118,13 +111,11 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Stage_Closing_Only_Over_The_Second_Handler_When_Building_Model_Then_Chain_Includes_It()
     {
-        var first = new HandlerRegistration(
-            new HandlerDiscovery(typeof(MultiPingStringHandler), typeof(MultiPing), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var second = new HandlerRegistration(
-            new HandlerDiscovery(typeof(MultiPingIntHandler), typeof(MultiPing), typeof(int), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(IntResultStage<>), handlerFilter: null);
+        HandlerRegistration first = Handler(
+            typeof(MultiPingStringHandler), typeof(MultiPing), typeof(string), typeof(IRequestHandler<MultiPing, string>));
+        HandlerRegistration second = Handler(
+            typeof(MultiPingIntHandler), typeof(MultiPing), typeof(int), typeof(IRequestHandler<MultiPing, int>));
+        var declaration = new StageDeclaration(typeof(IntResultStage<>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [first, second], requestTypes: [typeof(MultiPing)], stageDeclarations: [declaration],
@@ -137,7 +128,7 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Unhandled_Request_And_A_Stage_Declaration_When_Building_Model_Then_Chain_Is_Empty()
     {
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [], requestTypes: [typeof(Ping)], stageDeclarations: [declaration], closings: new StageClosingCache());
@@ -148,8 +139,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Distinct_Stage_Declarations_When_Building_Model_Then_Stages_Preserve_Declared_Order()
     {
-        var first = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
-        var second = new StageDeclaration(typeof(ExtraStage<,>), handlerFilter: null);
+        var first = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
+        var second = new StageDeclaration(typeof(ExtraStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [], requestTypes: [], stageDeclarations: [first, second], closings: new StageClosingCache());
@@ -162,10 +153,9 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Stage_That_Does_Not_Apply_To_The_Handler_When_Building_Model_Then_Chain_Excludes_It()
     {
-        var registration = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(PurgeOnlyStage), handlerFilter: null);
+        HandlerRegistration registration = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        var declaration = new StageDeclaration(typeof(PurgeOnlyStage), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [registration], requestTypes: [typeof(Ping)], stageDeclarations: [declaration],
@@ -177,10 +167,9 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Void_Stage_Declaration_When_Capturing_Then_The_Void_Contract_Is_Recorded()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(VoidHandler), typeof(VoidRequest), typeof(NoResult), isVoid: true),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(VoidStage), handlerFilter: null);
+        HandlerRegistration handler = Handler(
+            typeof(VoidHandler), typeof(VoidRequest), typeof(NoResult), typeof(IRequestHandler<VoidRequest>), isVoid: true);
+        var declaration = new StageDeclaration(typeof(VoidStage), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(VoidRequest)], [declaration], new StageClosingCache());
@@ -193,10 +182,9 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Typed_Stage_Declaration_When_Capturing_Then_The_Typed_Contract_Is_Recorded()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        HandlerRegistration handler = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Ping)], [declaration], new StageClosingCache());
@@ -209,9 +197,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Handler_Implementing_A_Derived_Contract_When_Capturing_Then_The_Derived_Contract_Is_Recorded()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(AuditedHandler), typeof(Audited), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        HandlerRegistration handler = Handler(
+            typeof(AuditedHandler), typeof(Audited), typeof(string), typeof(IRequestHandler<Audited, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Audited)], [], new StageClosingCache());
@@ -223,9 +210,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Void_Handler_Implementing_A_Derived_Contract_When_Capturing_Then_The_Derived_Contract_Is_Recorded()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(AuditedVoidHandler), typeof(AuditedVoid), typeof(NoResult), isVoid: true),
-            ServiceLifetime.Transient);
+        HandlerRegistration handler = Handler(
+            typeof(AuditedVoidHandler), typeof(AuditedVoid), typeof(NoResult), typeof(IRequestHandler<AuditedVoid>), isVoid: true);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(AuditedVoid)], [], new StageClosingCache());
@@ -237,9 +223,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Handler_Implementing_Two_Derived_Contracts_When_Capturing_Then_The_Core_Contract_Is_Recorded()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(TwiceDerivedHandler), typeof(TwiceDerived), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        HandlerRegistration handler = Handler(
+            typeof(TwiceDerivedHandler), typeof(TwiceDerived), typeof(string), typeof(IRequestHandler<TwiceDerived, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(TwiceDerived)], [], new StageClosingCache());
@@ -251,10 +236,9 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Stage_Implementing_A_Derived_Contract_When_Capturing_Then_The_Derived_Contract_Is_Recorded()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(AuditedStage<,>), handlerFilter: null);
+        HandlerRegistration handler = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        var declaration = new StageDeclaration(typeof(AuditedStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Ping)], [declaration], new StageClosingCache());
@@ -264,15 +248,32 @@ public sealed class RegistrationSnapshotTests
             .Stages.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IAuditedStage<,>));
     }
 
+    // A stage can implement a package contract for one request and only the core contract for
+    // another, so each closing records the contract that closing satisfies.
+    [Fact]
+    public void Given_A_Stage_Deriving_For_One_Request_Only_When_Capturing_Then_Each_Closing_Records_Its_Own_Contract()
+    {
+        HandlerRegistration first = Handler(
+            typeof(FirstHandler), typeof(First), typeof(string), typeof(IRequestHandler<First, string>));
+        HandlerRegistration second = Handler(
+            typeof(SecondHandler), typeof(Second), typeof(string), typeof(IRequestHandler<Second, string>));
+        var declaration = new StageDeclaration(typeof(SplitContractStage), handlerFilter: null, StageFamily.Request);
+
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            [first, second], [typeof(First), typeof(Second)], [declaration], new StageClosingCache());
+
+        model.Requests[0].Stages.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IAuditedStage<,>));
+        model.Requests[1].Stages.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IRequestStage<,>));
+    }
+
     // The closed type is what the container resolves, so the void request's chain names NoResult
     // even though the handler reports no response.
     [Fact]
     public void Given_A_Typed_Stage_Over_A_Void_Request_When_Capturing_Then_The_Closing_Closes_Over_No_Result()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PurgeHandler), typeof(Purge), typeof(NoResult), isVoid: true),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        HandlerRegistration handler = Handler(
+            typeof(PurgeHandler), typeof(Purge), typeof(NoResult), typeof(IRequestHandler<Purge>), isVoid: true);
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Purge)], [declaration], new StageClosingCache());
@@ -289,9 +290,9 @@ public sealed class RegistrationSnapshotTests
     public void Given_A_Handler_Registered_With_A_Lifetime_When_Capturing_Then_The_Model_Reports_It(
         ServiceLifetime registered, RequestFlowLifetime expected)
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            registered);
+        HandlerRegistration handler = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>),
+            lifetime: registered);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [handler], requestTypes: [typeof(Ping)], stageDeclarations: [],
@@ -304,12 +305,11 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_Handlers_Registered_With_Different_Lifetimes_When_Capturing_Then_Each_Reports_Its_Own()
     {
-        var scoped = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Scoped);
-        var transient = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PurgeHandler), typeof(Purge), typeof(NoResult), isVoid: true),
-            ServiceLifetime.Transient);
+        HandlerRegistration scoped = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>),
+            lifetime: ServiceLifetime.Scoped);
+        HandlerRegistration transient = Handler(
+            typeof(PurgeHandler), typeof(Purge), typeof(NoResult), typeof(IRequestHandler<Purge>), isVoid: true);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [scoped, transient], requestTypes: [typeof(Ping), typeof(Purge)], stageDeclarations: [],
@@ -326,7 +326,7 @@ public sealed class RegistrationSnapshotTests
     public void Given_A_Stage_Registered_With_A_Lifetime_When_Capturing_Then_The_Model_Reports_It(
         ServiceLifetime registered, RequestFlowLifetime expected)
     {
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, registered);
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request, registered);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [], [], [declaration], new StageClosingCache());
@@ -337,9 +337,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Void_Handler_When_Capturing_Then_The_Handler_Reports_Void()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PurgeHandler), typeof(Purge), typeof(NoResult), isVoid: true),
-            ServiceLifetime.Transient);
+        HandlerRegistration handler = Handler(
+            typeof(PurgeHandler), typeof(Purge), typeof(NoResult), typeof(IRequestHandler<Purge>), isVoid: true);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Purge)], [], new StageClosingCache());
@@ -352,9 +351,8 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Typed_Handler_When_Capturing_Then_The_Handler_Does_Not_Report_Void()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        HandlerRegistration handler = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Ping)], [], new StageClosingCache());
@@ -366,10 +364,9 @@ public sealed class RegistrationSnapshotTests
     [Fact]
     public void Given_A_Request_With_No_Handler_When_Capturing_Then_The_Declaration_Does_Not_Claim_It()
     {
-        var handler = new HandlerRegistration(
-            new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
-        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null);
+        HandlerRegistration handler = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             [handler], [typeof(Ping), typeof(Purge)], [declaration], new StageClosingCache());
@@ -379,6 +376,11 @@ public sealed class RegistrationSnapshotTests
     }
 
     #region Helpers
+
+    private static HandlerRegistration Handler(
+        Type handlerType, Type requestType, Type responseType, Type contractType,
+        bool isVoid = false, ServiceLifetime lifetime = ServiceLifetime.Transient)
+        => new(new HandlerDiscovery(handlerType, requestType, responseType, isVoid, contractType), lifetime);
 
     public sealed record Ping : IRequest<string>;
 
@@ -514,6 +516,29 @@ public sealed class RegistrationSnapshotTests
         public Task<TResponse> HandleAsync(
             TRequest request, Continuation<TResponse> next, CancellationToken cancellationToken)
             => next.InvokeAsync();
+    }
+
+    // Abstract keeps the pair out of whole-assembly scans; the snapshot reads types only.
+    private abstract record First : IRequest<string>;
+
+    private abstract record Second : IRequest<string>;
+
+    // Not real IRequestHandler implementers: the builder only reads the Type off a manually
+    // built HandlerRegistration.
+    private sealed class FirstHandler
+    { }
+
+    private sealed class SecondHandler
+    { }
+
+    // Implements the package contract for First and only the core contract for Second.
+    private abstract class SplitContractStage : IAuditedStage<First, string>, IRequestStage<Second, string>
+    {
+        public abstract Task<string> HandleAsync(
+            First request, Continuation<string> next, CancellationToken cancellationToken);
+
+        public abstract Task<string> HandleAsync(
+            Second request, Continuation<string> next, CancellationToken cancellationToken);
     }
 
     #endregion

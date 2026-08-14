@@ -125,13 +125,13 @@ Two problems are equal when their code, message, and subject match, so a test ca
 | --- | --- |
 | `RequestFlowModel` | `Requests`, every known request type; `StageDeclarations`, every stage declaration in registration order |
 | `RequestModel` | `RequestType`, the `Handlers` covering it, and `Stages`, its closed stage chain in execution order |
-| `HandlerModel` | `HandlerType`; `ResponseType`, null for a void handler, which `IsVoid` reports as a `bool`; `Lifetime`, what this handler is registered with; and `ContractType`, the handler contract it implements |
-| `StageDeclarationModel` | `StageType`, the type `AddStage` was given; `ReachedRequests`, the requests that stage type reached; `Lifetime`, what the stage is registered with; and `ContractType`, the stage contract it implements |
-| `ClosedStageModel` | `DeclaredType`, the type `AddStage` was given; `ClosedType`, the stage that runs for this request; and `ContractType` |
+| `HandlerModel` | `HandlerType`; `ResponseType`, the item type for a stream handler and null for a void one, which `IsVoid` reports as a `bool`; `Lifetime`, what this handler is registered with; and `ContractType`, the handler contract it implements |
+| `StageDeclarationModel` | `StageType`, the type `AddStage` or `AddStreamStage` was given; `ReachedRequests`, the requests that stage type reached; `Lifetime`, what the stage is registered with; and `ContractType`, the stage contract it implements |
+| `ClosedStageModel` | `DeclaredType`, the type the registering call was given; `ClosedType`, the stage that runs for this request; and `ContractType` |
 
 `ReachedRequests` is derived from the chains rather than recorded at registration: it holds every request whose `Stages` contains a closing of that `StageType`, in request order. A declaration that closed for nothing has an empty list, and so does one aimed only at requests without a handler, because those get no chain to close into. A model a test builds by hand derives it the same way, from the `AddStage` calls under `AddRequest`, matched on the declared type. Pass `AddStageDeclaration`'s type as `AddStage`'s `declaredType` there; naming the closed type instead leaves `ReachedRequests` empty for a stage the freeze would report as reaching the request.
 
-`StageDeclarationModel.Lifetime` is a `RequestFlowLifetime`: `Transient`, `Scoped`, or `Singleton`. It comes from the declaration's own `AddStage` call, which is where all three are reachable, `AsSingleton` and `AsScoped` included ([lifetimes.md](lifetimes.md)). A singleton stage is shared across concurrent dispatches, so a rule of your own can hold a convention about which stages may take one. The enum mirrors the container's `ServiceLifetime` rather than naming it, because `RequestFlow.Abstractions` takes no package dependencies, the DI abstractions included, so an assembly referencing only the contracts can still read a lifetime.
+`StageDeclarationModel.Lifetime` is a `RequestFlowLifetime`: `Transient`, `Scoped`, or `Singleton`. It comes from the declaration's own `AddStage` call, which is where all three are reachable, `AsSingleton` and `AsScoped` included ([lifetimes.md](lifetimes.md)). A singleton stage is shared across concurrent dispatches, so a rule of your own can hold a convention about which stages may take one. The enum mirrors the container's `ServiceLifetime` rather than naming it, because `RequestFlow.Abstractions` does not reference the DI abstractions, so an assembly referencing only the contracts can still read a lifetime.
 
 `HandlerModel.Lifetime` is the same enum, transient or scoped. Each `AddRequestFlow` call decides for the handlers it found ([lifetimes.md](lifetimes.md#lifetime-is-per-registration-call)), so two handlers in one registration can differ and each carries its own:
 
@@ -151,7 +151,7 @@ foreach (RequestModel request in context.Model.Requests)
 
 Naming the handler is the point of reading it there: the rule can say which one to change. What it reports is what `AddRequestFlow` registered. A handler the application registers by hand afterwards wins at resolution without changing this value. A model a test builds by hand names the lifetime on `AddHandler`, and records transient without it.
 
-`ContractType` is a `Type`, not an enum, so a package can implement its own handler or stage contract and have it recorded there without RequestFlow needing to know that contract exists ahead of time. The freeze records the most derived contract the type implements: a handler written against `ICommandHandler<TCommand, TResponse>` comes through as `typeof(ICommandHandler<,>)`, and a plain one as `typeof(IRequestHandler<,>)`. When two contracts apply and neither derives from the other, the core contract is recorded rather than one of the two. A rule matching on it compares against the exact contract it declared itself, rather than switching over a fixed set of cases the core would otherwise have to enumerate. The builder takes an open generic interface built on the family the entry belongs to and throws `ArgumentException` on anything else. A handler entry takes `IRequestHandler<TRequest>`, `IRequestHandler<TRequest, TResponse>`, or an interface deriving from one, and a stage entry does the same for `IRequestStage`. A class, a closed interface, and an unrelated open interface such as `IEquatable<>` are all rejected, since none of them matches a comparison a rule would write.
+`ContractType` is a `Type`, not an enum, so a package can implement its own handler or stage contract and have it recorded there without RequestFlow needing to know that contract exists ahead of time. The freeze records the most derived contract the type implements: a handler written against `ICommandHandler<TCommand, TResponse>` comes through as `typeof(ICommandHandler<,>)`, and a plain one as `typeof(IRequestHandler<,>)`. When two contracts apply and neither derives from the other, the core contract is recorded rather than one of the two. A rule matching on it compares against the exact contract it declared itself, rather than switching over a fixed set of cases the core would otherwise have to enumerate. The builder takes an open generic interface and throws `ArgumentException` on anything else. A handler entry usually names `IRequestHandler<TRequest>`, `IRequestHandler<TRequest, TResponse>`, or an interface deriving from one, and a stage entry does the same for `IRequestStage`. A contract from another family is recorded as it was given, since `RequestFlow.Abstractions` cannot name every contract a package might add and so does not test membership of a family. A class and a closed interface are still rejected, because neither matches a comparison a rule would write.
 
 Requests come in scan order, followed by request types only a handler brought in. Closing a stage needs a handler, so a request nothing handles has an empty chain whatever stages would otherwise reach it.
 
@@ -179,14 +179,14 @@ Skipping it is right whether or not the application opted in. With the flag off,
 
 ## Built-in codes
 
-Codes are stable and never renumbered. `RF0001` to `RF0012` are shape checks on a single declaration, recorded by the `AddRequestFlow` call that made it. The `RF01xx` codes are whole-picture checks that run at the freeze, except `RF0107`, which the pass reports about a rule that threw rather than about a registration. [exceptions.md](exceptions.md) has the cause and the fix behind each one. The `RF` constants live on `ProblemCodes` in `RequestFlow.Abstractions`, and the CQRS one on `CqrsProblemCodes` in `RequestFlow.Cqrs.Abstractions`, so a caller matches `ProblemCodes.UnhandledRequest` rather than a literal without referencing the runtime packages.
+Codes are stable and never renumbered. `RF0001` to `RF0012` are shape checks on a single declaration, recorded by the `AddRequestFlow` call that made it. The `RF01xx` codes are whole-picture checks that run at the freeze, except `RF0107`, which the pass reports about a rule that threw rather than about a registration. Numbering is allocation order rather than run order: `RF0108` to `RF0113` are freeze checks like `RF0101` to `RF0106`, and they run after all of them. [exceptions.md](exceptions.md) has the cause and the fix behind each one. The `RF` constants live on `ProblemCodes` in `RequestFlow.Abstractions`, and the CQRS one on `CqrsProblemCodes` in `RequestFlow.Cqrs.Abstractions`, so a caller matches `ProblemCodes.UnhandledRequest` rather than a literal without referencing the runtime packages.
 
 | Code | Problem |
 | --- | --- |
 | `RF0001` | `RegisterGenericHandler` got a type that is not an open generic definition |
 | `RF0002` | `RegisterGenericHandler` got an abstract class |
 | `RF0003` | A generic handler declares more than one type parameter |
-| `RF0004` | A declared handler type does not implement `IRequestHandler` |
+| `RF0004` | A declared handler type does not implement `IRequestHandler` or `IStreamRequestHandler` |
 | `RF0005` | A generic handler declaration names no closing types |
 | `RF0006` | A closing type is itself open |
 | `RF0007` | A closing type violates the handler's generic constraints |
@@ -202,8 +202,14 @@ Codes are stable and never renumbered. `RF0001` to `RF0012` are shape checks on 
 | `RF0105` | A stage applies to no registered request; reported only under `DisallowUnusedStages` |
 | `RF0106` | A request implements more than one `IRequest<TResponse>` contract |
 | `RF0107` | A validation rule threw; reported by the pass, not by a rule |
+| `RF0108` | A request implements more than one `IStreamRequest<TItem>` contract |
+| `RF0109` | A request implements both `IRequest<TResponse>` and `IStreamRequest<TItem>` |
+| `RF0110` | A stream handler's item type is not the one its request declares |
+| `RF0111` | A stream stage's item type is not the one its request declares; reported only when the stage wrapped no handler |
+| `RF0112` | A handler's response type is not the one its request declares |
+| `RF0113` | A stage's response type is not the one its request declares; reported only when the stage wrapped no handler |
 | `CQRS0001` | A request is classified as both a command and a query; contributed by `AddCqrs` |
 
-Problems come out in a fixed order: the shape problems first, then the built-in checks `RF0101` to `RF0106` in the order above, then the rules the container holds, in registration order. An `RF0107` takes the place of whatever the rule that threw would have reported, so it lands in that rule's position in the list.
+Problems come out in a fixed order: the shape problems first, then the built-in checks `RF0101` to `RF0106` in the order above, then the stream codes `RF0108` to `RF0111`, then `RF0112` and `RF0113`, then the rules the container holds, in registration order. `RF0108` to `RF0110` come from one rule that walks the requests in scan order and reports each request's problems together, so they group by request rather than by code. The remaining three come from a rule each: `RF0112` walks the requests in scan order, `RF0111` and `RF0113` walk the stage declarations in registration order. An `RF0107` takes the place of whatever the rule that threw would have reported, so it lands in that rule's position in the list.
 
 Give your own codes a prefix that names where they come from, the way `CQRS0001` names the CQRS package. `RF` is reserved for RequestFlow.

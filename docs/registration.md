@@ -18,6 +18,7 @@ services.AddRequestFlow(o => o
 | `RegisterHandlersFromAssembly(assembly)`      | Scans the given assembly                                                        |
 | `RegisterGenericHandler(handlerType, ...)`    | Closes an open generic handler over the declared types                          |
 | `AddStage(stageType, configure?)`             | Wraps applicable handlers in a stage; `configure` narrows its reach and sets its lifetime (see [stages.md](stages.md)) |
+| `AddStreamStage(stageType, configure?)`       | The same for stream handlers, on a chain of its own (see [streaming.md](streaming.md)) |
 | `DisallowUnusedStages()`                      | Fails startup validation when a stage reaches no request (see [stages.md](stages.md)) |
 | `AllowUnhandledRequests()`                    | Skips the missing-handler check at startup validation                           |
 | `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |
@@ -25,9 +26,9 @@ services.AddRequestFlow(o => o
 
 ## What the scan picks up
 
-The scan looks at every concrete class in the configured assemblies and registers those that implement `IRequestHandler<TRequest, TResponse>` or `IRequestHandler<TRequest>`. A class implementing several handler interfaces registers once per interface, so one class can handle several request types.
+The scan looks at every concrete class in the configured assemblies and registers those that implement `IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, or `IStreamRequestHandler<TRequest, TItem>`. A class implementing several handler interfaces registers once per interface, so one class can handle several request types.
 
-The scan also records every request type it sees. Startup validation uses that list to report requests no handler covers.
+The scan also records every request type it sees, `IStreamRequest<TItem>` included. Startup validation uses that list to report requests no handler covers.
 
 Abstract classes, interfaces, and open generic definitions are skipped. Open generic handlers need an explicit declaration, covered below.
 

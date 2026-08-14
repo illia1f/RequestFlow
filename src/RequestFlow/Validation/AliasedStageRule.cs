@@ -26,8 +26,6 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
 {
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
     {
-        List<RequestFlowValidationProblem> problems = [];
-
         // One message per colliding set of declarations, not per request they collide on.
         HashSet<DeclarationSet> reported = [];
 
@@ -89,14 +87,12 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
 
                 // The stage class, not the request: the group is reported once, so a subject
                 // taken from the request would follow scan order.
-                problems.Add(new RequestFlowValidationProblem(
+                yield return new RequestFlowValidationProblem(
                     ProblemCodes.AliasedStage,
                     BuildMessage(request.RequestType, members, chainRuns[key], oneChain),
-                    stageClass));
+                    stageClass);
             }
         }
-
-        return problems;
     }
 
     private static Type StageClassOf(Type closedType)
@@ -107,8 +103,10 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
     private static string BuildMessage(
         Type requestType, List<ClosedStageModel> members, int chainRuns, bool oneChain)
     {
+        string callName = StageFamily.FromContract(members[0].ContractType).CallName;
+
         string runs;
-        string fix = "keep one of the AddStage calls and remove the rest.";
+        string fix = $"keep one of the {callName} calls and remove the rest.";
         if (!oneChain)
         {
             runs = "more than once";
@@ -116,7 +114,7 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
         else if (chainRuns == 2)
         {
             runs = "twice";
-            fix = "remove one of the two AddStage calls.";
+            fix = $"remove one of the two {callName} calls.";
         }
         else
         {

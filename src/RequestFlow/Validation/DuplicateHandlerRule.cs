@@ -17,18 +17,15 @@ internal sealed class DuplicateHandlerRule : IRequestFlowValidationRule
 {
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
     {
-        List<RequestFlowValidationProblem> problems = [];
         foreach (var request in context.Model.Requests)
         {
             if (request.Handlers.Count > 1)
             {
-                problems.Add(new RequestFlowValidationProblem(
+                yield return new RequestFlowValidationProblem(
                     ProblemCodes.DuplicateHandler,
                     $"Request '{request.RequestType.FullName}' has more than one handler; exactly one is required.",
-                    request.RequestType));
+                    request.RequestType);
             }
         }
-
-        return problems;
     }
 }

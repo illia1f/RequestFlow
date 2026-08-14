@@ -79,27 +79,21 @@ internal sealed class RequestFlowRegistry
     /// Adds the assemblies not registered by an earlier call and returns the newly added ones.
     /// </summary>
     public IReadOnlyList<Assembly> AddNewAssemblies(IReadOnlyList<Assembly> assemblies)
-    {
-        List<Assembly> added = [];
-        foreach (var assembly in assemblies)
-        {
-            if (_assemblies.Add(assembly))
-                added.Add(assembly);
-        }
-
-        return added;
-    }
+        => AddUnseen(assemblies, _assemblies);
 
     /// <summary>
     /// Adds the closings not declared by an earlier call and returns the newly added ones.
     /// </summary>
-    public IReadOnlyList<GenericHandlerClosing> AddNewClosings(IReadOnlyList<GenericHandlerClosing> closings)
+    public IReadOnlyList<GenericHandlerClosing> AddNewClosings(IEnumerable<GenericHandlerClosing> closings)
+        => AddUnseen(closings, _closings);
+
+    private static IReadOnlyList<T> AddUnseen<T>(IEnumerable<T> items, HashSet<T> seen)
     {
-        List<GenericHandlerClosing> added = [];
-        foreach (var closing in closings)
+        List<T> added = [];
+        foreach (var item in items)
         {
-            if (_closings.Add(closing))
-                added.Add(closing);
+            if (seen.Add(item))
+                added.Add(item);
         }
 
         return added;
@@ -160,18 +154,27 @@ internal sealed class RequestFlowRegistry
 
     private IEnumerable<IRequestFlowValidationRule> BuiltInRules()
     {
+        // Built once, since three rules read it.
+        StageDeclarationFacts facts = new(_stageDeclarations);
+
         yield return new DuplicateHandlerRule();
 
         if (!UnhandledRequestsAllowed)
             yield return new UnhandledRequestRule();
 
-        yield return new DuplicateStageRule();
+        yield return new DuplicateStageRule(facts);
         yield return new AliasedStageRule();
 
         if (UnusedStagesDisallowed)
             yield return new UnusedStageRule();
 
         yield return new MultiContractRequestRule();
+        yield return new StreamRequestContractRule();
+        yield return new StreamStageItemMismatchRule(facts);
+
+        // Last, so the problems a freeze reports stay in ascending code order.
+        yield return new HandlerResponseMismatchRule();
+        yield return new StageResponseMismatchRule(facts);
     }
 
     private Dictionary<Type, StageChain> BuildStagePlans()
@@ -216,20 +219,30 @@ internal sealed class RequestFlowRegistry
 
     private static RequestPlanBase CreatePlan(HandlerRegistration handler, StageChain chain)
     {
-        if (chain.StageTypes.Length == 0)
-        {
-            Type planType = handler.IsVoid
-                ? typeof(VoidRequestPlan<>).MakeGenericType(handler.RequestType)
-                : typeof(RequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
+        bool staged = chain.StageTypes.Length > 0;
+        Type planType = PlanTypeFor(handler, staged);
 
-            return (RequestPlanBase)Activator.CreateInstance(planType)!;
+        return staged
+            ? (RequestPlanBase)Activator.CreateInstance(planType, [chain])!
+            : (RequestPlanBase)Activator.CreateInstance(planType)!;
+    }
+
+    private static Type PlanTypeFor(HandlerRegistration handler, bool staged)
+    {
+        if (handler.ContractDefinition == typeof(IStreamRequestHandler<,>))
+        {
+            return staged
+                ? typeof(StagedStreamPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType)
+                : typeof(StreamPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
         }
 
-        Type stagedPlanType = handler.IsVoid
-            ? typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType)
-            : typeof(StagedRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
+        if (handler.IsVoid)
+            return staged ? typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType)
+                : typeof(VoidRequestPlan<>).MakeGenericType(handler.RequestType);
 
-        return (RequestPlanBase)Activator.CreateInstance(stagedPlanType, [chain])!;
+        return staged
+            ? typeof(StagedRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType)
+            : typeof(RequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
     }
 }
 

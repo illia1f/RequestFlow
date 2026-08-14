@@ -31,6 +31,11 @@ internal static class StageClosing
         closedStageType = null!;
         reason = string.Empty;
 
+        // A stream declaration never closes against a task handler, or the reverse. This is what
+        // keeps the two chains separate.
+        if (!declaration.Family.Handles(handler.ContractDefinition))
+            return false;
+
         if (declaration.HandlerFilter is not null
             && !declaration.HandlerFilter.IsAssignableFrom(handler.ImplementationType))
             return false;
@@ -62,7 +67,7 @@ internal static class StageClosing
             candidate = stageType;
         }
 
-        if (!SatisfiesContract(candidate, handler))
+        if (!SatisfiesContract(candidate, declaration.Family, handler))
             return false;
 
         reason = isOpen
@@ -78,16 +83,16 @@ internal static class StageClosing
 
     // Honors the in TRequest variance, so a closed stage written against a base request type
     // also applies to requests that inherit the contract.
-    private static bool SatisfiesContract(Type candidate, HandlerRegistration handler)
+    private static bool SatisfiesContract(Type candidate, StageFamily family, HandlerRegistration handler)
     {
-        Type contract = typeof(IRequestStage<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
+        Type contract = family.TypedContract.MakeGenericType(handler.RequestType, handler.ResponseType);
         if (contract.IsAssignableFrom(candidate))
             return true;
 
-        if (!handler.IsVoid)
+        if (family.VoidContract is null || !handler.IsVoid)
             return false;
 
-        Type voidContract = typeof(IRequestStage<>).MakeGenericType(handler.RequestType);
+        Type voidContract = family.VoidContract.MakeGenericType(handler.RequestType);
         return voidContract.IsAssignableFrom(candidate);
     }
 

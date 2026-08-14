@@ -3,14 +3,15 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> when the dispatched
-/// request type has a registered handler, but the call site's response type argument
-/// differs from the one the handler was registered with.
+/// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> and by
+/// <c>IStreamDispatcher.Stream</c> when the dispatched request type has a registered handler,
+/// but the call site's response type argument differs from the one the handler was registered
+/// with.
 /// </summary>
 public sealed class ResponseTypeMismatchException(Type requestType, Type expected, Type actual)
     : InvalidOperationException(
         $"Request type '{requestType.FullName}' is registered with response type '{expected.FullName}', " +
-        $"but SendAsync was called with response type '{actual.FullName}'. Check the call site's type argument.")
+        $"but the call site used response type '{actual.FullName}'. Check the call site's type argument.")
 {
     /// <summary>
     /// The dispatched request type.

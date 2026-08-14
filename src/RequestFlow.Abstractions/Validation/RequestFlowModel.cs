@@ -8,8 +8,9 @@ namespace RequestFlow;
 /// The requests and stages registration recorded, frozen and handed to every validation rule.
 /// </summary>
 /// <remarks>
-/// One <c>AddStage</c> call is counted once in <see cref="StageDeclarations"/> and again in every
-/// request it applies to. A stage that fits no request is only in <see cref="StageDeclarations"/>.
+/// One <c>AddStage</c> or <c>AddStreamStage</c> call is counted once in
+/// <see cref="StageDeclarations"/> and again in every request it applies to. A stage that fits no
+/// request is only in <see cref="StageDeclarations"/>.
 /// <para>
 /// A declaration the shape checks rejected is not here, so <c>AddStage</c> given a type that is
 /// not a stage is reported without reaching a rule. Past that nothing is filtered. A request with
@@ -44,7 +45,8 @@ public sealed class RequestFlowModel
     public IReadOnlyList<RequestModel> Requests { get; }
 
     /// <summary>
-    /// One entry per <c>AddStage</c> call, in the order the calls ran, duplicates included.
+    /// One entry per <c>AddStage</c> or <c>AddStreamStage</c> call, in the order the calls ran,
+    /// duplicates included.
     /// </summary>
     public IReadOnlyList<StageDeclarationModel> StageDeclarations { get; }
 }

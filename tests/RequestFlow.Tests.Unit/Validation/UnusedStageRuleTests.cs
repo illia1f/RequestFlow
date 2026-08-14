@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit.Validation;
@@ -94,6 +95,25 @@ public sealed class UnusedStageRuleTests
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
         problems.ShouldHaveSingleItem().Message.ShouldBe(BaseMessage(typeof(string)));
+    }
+
+    [Fact]
+    public void Given_A_Stream_Stage_Reaching_Nothing_When_Unused_Stages_Are_Disallowed_Then_Reports_It()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o =>
+        {
+            o.RegisterHandlersFromAssemblyContaining<UnusedStageRuleTests>();
+            o.AddStreamStage<RequestFlow.Tests.ValidationFixtures.UnreachedStreamStage>();
+            o.DisallowUnusedStages();
+        });
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.ShouldContain(p =>
+            p.Code == "RF0105"
+            && p.Subject == typeof(RequestFlow.Tests.ValidationFixtures.UnreachedStreamStage));
     }
 
     #region Initialization

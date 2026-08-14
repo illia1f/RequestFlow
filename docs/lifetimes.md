@@ -6,9 +6,9 @@ What RequestFlow registers, with which lifetime, and what you can change.
 
 | Service                                                                        | Lifetime                                                   | Configurable                   |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------ |
-| Handlers (`IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
-| Stages (`IRequestStage<TRequest, TResponse>`, `IRequestStage<TRequest>`)       | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage` call |
-| `IRequestDispatcher`                                                           | Scoped                                                     | Yes, `WithTransientDispatcher` |
+| Handlers (`IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, `IStreamRequestHandler<TRequest, TItem>`) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
+| Stages (`IRequestStage<TRequest, TResponse>`, `IRequestStage<TRequest>`, `IStreamRequestStage<TRequest, TItem>`)       | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage` or `AddStreamStage` call |
+| `IRequestDispatcher`, `IStreamDispatcher`                                      | Scoped                                                     | Yes, `WithTransientDispatcher`, which moves both |
 | Validation rules (`IRequestFlowValidationRule`)                                | Singleton, added by `AddValidationRule` and by `AddCqrs`    | Not through those calls; register your own descriptor for another lifetime |
 | Dispatch map (internal handler lookup)                                         | Singleton, built the first time the dispatcher is resolved | No                             |
 
@@ -73,7 +73,7 @@ services.AddRequestFlow(o => o
 Stages get the singleton option handlers do not, because a stage is usually the cross-cutting kind of class that holds no dependency worth pinning. The rest of the container's rules still apply:
 
 - A singleton stage is shared by every dispatch in the process, so it has to be thread safe, and anything it injects lives as long as it does.
-- A scoped stage resolved from the root provider is the quiet case. With scope validation on, the resolution throws at dispatch. With it off, the root provider builds the stage and caches it there, so one instance serves every dispatch until the process exits. A chain arrives there through `WithTransientDispatcher` plus a dispatcher injected into a singleton. A unit-of-work stage shared across every request corrupts data rather than failing.
+- A scoped stage resolved from the root provider is the quiet case. With scope validation on, the resolution throws when the level runs: at dispatch on the task path, at the first enumeration on a stream. With it off, the root provider builds the stage and caches it there, so one instance serves every dispatch until the process exits. A chain arrives there through `WithTransientDispatcher` plus a dispatcher injected into a singleton. A unit-of-work stage shared across every request corrupts data rather than failing.
 - A stage above that overlaps its `next` calls runs the levels below it side by side. So within one dispatch, a scoped or singleton stage under it is entered twice at once and has to be thread safe on that path too. Only transient stays clear of it, because every call resolves an instance of its own. [stages.md](stages.md) has the shape.
 - A transient stage that owns an `IDisposable` is tracked by the scope that resolved it, which is the root scope for a root-resolved dispatcher.
 - Repeated `next` calls multiply that. A level is resolved once per entry, so a retry stage that makes three attempts leaves three instances behind, and a hedging stage leaves one per branch. Inside a request scope they are disposed when the request ends. Under a root-resolved dispatcher they go on the root provider's disposal list instead. Nothing releases them until the process exits, and the list grows with every dispatch.
@@ -100,6 +100,8 @@ public sealed class OutboxWorker(IServiceScopeFactory scopeFactory) : Background
     }
 }
 ```
+
+The same pattern serves `IStreamDispatcher`, with one more rule: finish the enumeration inside the scope. A stream resolves its handler and stages from the dispatching scope on the first enumeration, not on the `Stream` call, so a sequence carried out of the `using` block throws `ObjectDisposedException` when it is finally enumerated. Keep the `await foreach` inside the block that created the scope.
 
 ## Switching the dispatcher to transient
 

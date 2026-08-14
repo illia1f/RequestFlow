@@ -1,8 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Zero-dependency contracts for RequestFlow: requests, handlers, and dispatch abstractions. Reference this from application layers; the RequestFlow package provides the runtime.</Description>
+    <Description>Contracts for RequestFlow: requests, handlers, streaming, and dispatch abstractions. No dependencies on modern .NET; Microsoft.Bcl.AsyncInterfaces on netstandard2.0 and net462. Reference this from application layers; the RequestFlow package provides the runtime.</Description>
   </PropertyGroup>
+
+  <!-- netstandard2.0 and net462 have no IAsyncEnumerable. The two modern targets have it inbox and
+       pack with an empty dependency group. Keep the version aligned with what
+       Microsoft.Extensions.DependencyInjection.Abstractions already resolves downlevel. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' Or '$(TargetFramework)' == 'net462'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="RequestFlow" Key="$(RequestFlowPublicKey)" />

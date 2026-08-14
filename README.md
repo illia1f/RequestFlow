@@ -39,14 +39,17 @@ Fast is a claim to prove, not to assert. A BenchmarkDotNet suite against the oth
 | `IMediator.Send(...)`                                | `IRequestDispatcher.SendAsync(...)`                   |
 | void requests through `Unit`                         | void handlers return plain `Task`, no `Unit` anywhere |
 | `IPipelineBehavior<,>`                               | `IRequestStage<,>`                                    |
+| `IStreamRequest<TResponse>`                          | `IStreamRequest<TItem>`, `RequestFlow` namespace      |
+| `IStreamRequestHandler<,>` with `Handle`             | same interface and same method name                   |
+| `IMediator.CreateStream(...)`                        | `IStreamDispatcher.Stream(...)`                       |
 | `services.AddMediatR(...)`                           | `services.AddRequestFlow(...)`                        |
 
-What doesn't move yet: notifications (`INotification` / `Publish`) and streaming. Both are on the [roadmap](ROADMAP.md) for v1.0. Notifications return as events, an in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`); streaming arrives through `IAsyncEnumerable<T>`. Neither is built today, so if your codebase leans on either, hold the migration until they land.
+What doesn't move yet: notifications (`INotification` / `Publish`). They are on the [roadmap](ROADMAP.md) for v1.0 and return as events, an in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`). Nothing is built there today, so if your codebase leans on notifications, hold the migration until they land.
 
 ## Packages
 
-- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestDispatcher`, `IRequestStage`, `NoResult`. Depends on nothing.
-- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** is the runtime: dispatcher, `AddRequestFlow` with assembly scanning, startup validation. Depends on Abstractions and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestDispatcher`, `IRequestStage`, `NoResult`, and the streaming set: `IStreamRequest`, `IStreamDispatcher`, `IStreamRequestHandler`, `IStreamRequestStage`. Depends on nothing on `net8.0` and `net10.0`; on `netstandard2.0` and `net462` it carries one Microsoft package, `Microsoft.Bcl.AsyncInterfaces`, which supplies `IAsyncEnumerable<T>` there.
+- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** is the runtime: both dispatchers, `AddRequestFlow` with assembly scanning, startup validation. Depends on `RequestFlow.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
 - **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds the CQRS contracts: `ICommand`, `IQuery`, their handler interfaces, `ICommandDispatcher`, `IQueryDispatcher`. Depends on `RequestFlow.Abstractions` only.
 - **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** is the CQRS runtime: typed dispatcher implementations, registered with `AddRequestFlow(...).AddCqrs()`. Depends on the contracts package and the core runtime.
 
@@ -57,6 +60,7 @@ Contracts live in their own packages so your domain layer, and any future add-on
 - [Getting started](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md): install, first request and handler, dispatching
 - [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
 - [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, which requests a stage reaches, filters
+- [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests over `IAsyncEnumerable`, stream stages, cancellation, and which package a stream handler needs
 - [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
 - [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
 - [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): contributing custom checks to startup validation, the model rules see, built-in problem codes

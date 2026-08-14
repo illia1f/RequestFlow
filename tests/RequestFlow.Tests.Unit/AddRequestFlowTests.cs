@@ -282,6 +282,19 @@ public sealed class AddRequestFlowValidationTests
     }
 
     [Fact]
+    public void Given_Same_Assembly_Registered_Twice_In_One_Call_When_Registering_Request_Flow_Then_Handler_Is_Registered_Once()
+    {
+        var services = new ServiceCollection();
+
+        services.AddRequestFlow(o => o
+            .RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>()
+            .RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>());
+
+        services.Count(d => d.ServiceType == typeof(IRequestHandler<AddRequestFlowTests.Echo, string>))
+            .ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Given_Two_Providers_Built_From_One_Collection_When_Sending_Request_Then_Both_Providers_Dispatch()
     {
         var services = new ServiceCollection();

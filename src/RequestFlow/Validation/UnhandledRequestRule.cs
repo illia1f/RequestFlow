@@ -14,18 +14,15 @@ internal sealed class UnhandledRequestRule : IRequestFlowValidationRule
 {
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
     {
-        List<RequestFlowValidationProblem> problems = [];
         foreach (var request in context.Model.Requests)
         {
             if (request.Handlers.Count == 0)
             {
-                problems.Add(new RequestFlowValidationProblem(
+                yield return new RequestFlowValidationProblem(
                     ProblemCodes.UnhandledRequest,
                     $"Request '{request.RequestType.FullName}' has no handler.",
-                    request.RequestType));
+                    request.RequestType);
             }
         }
-
-        return problems;
     }
 }

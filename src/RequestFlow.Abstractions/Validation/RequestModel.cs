@@ -8,10 +8,10 @@ namespace RequestFlow;
 /// One request type, the handlers covering it, and the stage chain it would run.
 /// </summary>
 /// <remarks>
-/// Building the chain needs the response type, and only a handler supplies it, so a request no
-/// handler covers always has an empty <see cref="Stages"/>. Read that empty list as "no handler to
-/// build a chain against", not as "no stage applies". A request several handlers cover, which the
-/// built-in rules report on, holds what every one of them closes.
+/// Building the chain needs the response or item type, and only a handler supplies it, so a
+/// request no handler covers always has an empty <see cref="Stages"/>. Read that empty list as
+/// "no handler to build a chain against", not as "no stage applies". A request several handlers
+/// cover, which the built-in rules report on, holds what every one of them closes.
 /// </remarks>
 public sealed class RequestModel
 {

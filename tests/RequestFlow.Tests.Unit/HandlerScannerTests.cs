@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
@@ -74,6 +75,53 @@ public sealed class HandlerScannerTests
         result.RequestTypes.ShouldContain(typeof(ScanPing));
     }
 
+    [Fact]
+    public void Given_A_Typed_Handler_When_Discovering_Then_Records_The_Closed_Core_Contract()
+    {
+        HandlerDiscovery discovery = HandlerScanner.Discover(typeof(ScanPingHandler)).ShouldHaveSingleItem();
+
+        discovery.Contract.ShouldBe(typeof(IRequestHandler<ScanPing, int>));
+        discovery.ContractDefinition.ShouldBe(typeof(IRequestHandler<,>));
+    }
+
+    [Fact]
+    public void Given_A_Void_Handler_When_Discovering_Then_Records_The_Void_Contract()
+    {
+        HandlerDiscovery discovery = HandlerScanner.Discover(typeof(ScanVoidHandler)).ShouldHaveSingleItem();
+
+        discovery.Contract.ShouldBe(typeof(IRequestHandler<ScanVoid>));
+        discovery.ContractDefinition.ShouldBe(typeof(IRequestHandler<>));
+    }
+
+    [Fact]
+    public void Given_A_Stream_Handler_When_Discovering_Then_Records_The_Item_Type_As_The_Response()
+    {
+        HandlerDiscovery discovery = HandlerScanner.Discover(typeof(TailHandler)).ShouldHaveSingleItem();
+
+        discovery.RequestType.ShouldBe(typeof(Tail));
+        discovery.ResponseType.ShouldBe(typeof(int));
+        discovery.IsVoid.ShouldBeFalse();
+        discovery.ContractDefinition.ShouldBe(typeof(IStreamRequestHandler<,>));
+    }
+
+    [Fact]
+    public void Given_A_Stream_Request_When_Scanning_Then_It_Is_Reported_As_A_Request_Type()
+    {
+        ScanResult result = HandlerScanner.Scan([typeof(HandlerScannerTests).Assembly]);
+
+        result.RequestTypes.ShouldContain(typeof(Tail));
+    }
+
+    [Fact]
+    public void Given_A_Scanned_Stream_Handler_When_Registering_Then_It_Resolves_Through_Its_Contract()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<HandlerScannerTests>());
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        provider.GetService<IStreamRequestHandler<Tail, int>>().ShouldBeOfType<TailHandler>();
+    }
+
     #region Helpers
 
     private static ScanResult ScanSelf()
@@ -98,6 +146,21 @@ public sealed class HandlerScannerTests
     public abstract class AbstractHandler : IRequestHandler<ScanPing, int>
     {
         public abstract Task<int> HandleAsync(ScanPing request, CancellationToken cancellationToken);
+    }
+
+    public sealed record Tail(int Count) : IStreamRequest<int>;
+
+    public sealed class TailHandler : IStreamRequestHandler<Tail, int>
+    {
+        public async IAsyncEnumerable<int> Handle(
+            Tail request, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            for (int i = 0; i < request.Count; i++)
+            {
+                await Task.Yield();
+                yield return i;
+            }
+        }
     }
 
     // Castle cannot proxy Assembly on .NET Framework (ISerializable without a deserialization constructor),

@@ -19,4 +19,40 @@ public sealed class ProblemCodesTests
     {
         typeof(ProblemCodes).Assembly.ShouldBe(typeof(RequestFlowValidationProblem).Assembly);
     }
+
+    [Fact]
+    public void Given_The_Multi_Contract_Stream_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.MultiContractStreamRequest.ShouldBe("RF0108");
+    }
+
+    [Fact]
+    public void Given_The_Request_And_Stream_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.RequestAndStreamRequest.ShouldBe("RF0109");
+    }
+
+    [Fact]
+    public void Given_The_Stream_Item_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.StreamItemMismatch.ShouldBe("RF0110");
+    }
+
+    [Fact]
+    public void Given_The_Stream_Stage_Item_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.StreamStageItemMismatch.ShouldBe("RF0111");
+    }
+
+    [Fact]
+    public void Given_The_Handler_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.HandlerResponseMismatch.ShouldBe("RF0112");
+    }
+
+    [Fact]
+    public void Given_The_Stage_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.StageResponseMismatch.ShouldBe("RF0113");
+    }
 }

@@ -162,6 +162,8 @@ public sealed class ErrorTranslationStage<TRequest> : IRequestStage<TRequest, Re
 
 It wraps every request that returns `Result` and nothing else.
 
+Stream requests are a chain of their own. `IRequestStage` constrains `TRequest` to `IRequest<TResponse>`, so no stage registered with `AddStage` reaches a stream handler. Those stages implement `IStreamRequestStage<TRequest, TItem>` and register with `AddStreamStage` (see [streaming.md](streaming.md)).
+
 ### Filtering on a handler contract
 
 `WhereHandlerImplements` narrows a stage to requests whose handler implements a contract:

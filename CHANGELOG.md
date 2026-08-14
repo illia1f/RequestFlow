@@ -6,6 +6,25 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
+## [Unreleased]
+
+### Added
+
+- Streaming requests: `IStreamRequest<TItem>`, `IStreamRequestHandler<TRequest, TItem>`, and `IStreamDispatcher.Stream`, which hands back an `IAsyncEnumerable<TItem>`. `AddRequestFlow` registers the stream dispatcher beside the request one, on the same lifetime and over the same frozen map, so there is no separate call to make. The stream methods carry no `Async` suffix, because each returns its sequence synchronously and there is nothing to await; [streaming.md](docs/streaming.md) covers the whole feature.
+- `IStreamRequestStage<TRequest, TItem>`, registered with `AddStreamStage`, under the same rules as `AddStage` for constraints, filters, lifetimes, and ordering. A stream stage receives a `StreamContinuation<TItem>` whose `Invoke` returns a sequence, so it can filter, project, inject items, or stop the walk early. The two chains never mix: a stream stage never wraps a task handler and a task stage never wraps a stream handler.
+- Every streaming contract lives in `RequestFlow.Abstractions`, so a project that declares stream requests or writes stream handlers and stages references that one package. On `netstandard2.0` and `net462` the package now carries `Microsoft.Bcl.AsyncInterfaces`, which supplies `IAsyncEnumerable<T>` there; on `net8.0` and `net10.0` it keeps zero dependencies.
+- `HandlerNullStreamException` and `StageNullStreamException` for a null sequence out of `Handle`, sharing an abstract `NullStreamException` base the way the null-task pair shares `NullTaskException`. Both surface from enumeration rather than from the `Stream` call, since that is when the chain runs.
+- Four startup validation codes. `RF0108` rejects a request implementing more than one `IStreamRequest<TItem>` contract, and `RF0109` rejects one implementing `IRequest<TResponse>` and `IStreamRequest<TItem>` at once, where the map would otherwise keep one plan and drop the other. `RF0110` rejects a stream handler whose item type is wider than the one its request declares: covariance lets the pair compile, and every `Stream` call that infers the item type would then throw. `RF0111` rejects a stream stage caught in the same trap; it would close for nothing and the chain would run without it.
+- Two more startup validation codes, both on the task path. `RF0112` rejects a handler whose response type is not the one its request declares, and `RF0113` rejects a stage caught in the same trap: covariance on `IRequest<TResponse>` lets both compile, and the handler used to fail every `SendAsync` with `ResponseTypeMismatchException` while the stage quietly closed for nothing. A call site that widens the response itself, `SendAsync<object>` on an `IRequest<Order>`, belongs to the call rather than the registration and still throws at dispatch.
+- Cancellation on a stream reads both the token passed to `Stream` and the one passed to `WithCancellation`, and either cancels the levels running under them. RequestFlow joins them once when the walk starts, and joins nothing when only one of them can be cancelled. A stage passing its own token to `Invoke` replaces the join for the levels below it.
+- A stream stage written as an async iterator allocates its state machine and its enumerator once per enumeration, per level. A stage that returns `next.Invoke(...)` directly is not an iterator and allocates nothing over a chain without it, and neither cost grows with the number of items. A request stage still costs nothing per level.
+
+### Changed
+
+- The contract check on the validation model no longer tests family membership. `RequestFlowModelBuilder` and `RequestModelBuilder` now accept any open generic interface as a `ContractType` and record it as given, where they used to require one built on `IRequestHandler` or `IRequestStage`. A class or a closed interface is still rejected.
+- `RF0004`'s message now reads `does not implement IRequestHandler or IStreamRequestHandler`, so anything matching on the old text breaks.
+- `ResponseTypeMismatchException`'s message now says `but the call site used response type` where it named `SendAsync`, because `IStreamDispatcher.Stream` throws it too. Anything matching on the old text breaks.
+
 ## [1.0.0-preview.6] - 2026-08-09
 
 ### Added

@@ -210,6 +210,23 @@ public sealed class RegisterGenericHandlerTests
         exception.Problems.Count(p => p.Message.Contains("System.String")).ShouldBe(1);
     }
 
+    [Fact]
+    public async Task Given_A_Generic_Stream_Handler_Closed_Over_A_Request_When_Enumerating_Then_It_Handles_It()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o =>
+        {
+            o.RegisterGenericHandler(typeof(GenericStreamHandler<>), typeof(Counted));
+            o.AllowUnhandledRequests();
+        });
+        IStreamDispatcher dispatcher = services.BuildServiceProvider().CreateScope().ServiceProvider
+            .GetRequiredService<IStreamDispatcher>();
+
+        List<int> items = await dispatcher.Stream(new Counted()).CollectAsync();
+
+        items.ShouldBe([1]);
+    }
+
     #region Initialization
 
     private readonly RequestFlowOptions _options;

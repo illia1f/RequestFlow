@@ -199,30 +199,85 @@ public sealed class RequestFlowModelTests
         closing.ContractType.ShouldBe(typeof(IAuditedStage<,>));
     }
 
+    // A contract from a family this package cannot name, such as a stream or event contract, is
+    // kept as given. The check that survives is the shape of the type.
     [Fact]
-    public void Given_An_Unrelated_Open_Interface_When_Creating_Handler_Model_Then_Throws_Naming_The_Contract()
+    public void Given_An_Unrelated_Open_Interface_When_Creating_Handler_Model_Then_It_Is_Kept_Unchanged()
+    {
+        var handler = new HandlerModel(typeof(object), typeof(int), typeof(IEnumerable<>));
+
+        handler.ContractType.ShouldBe(typeof(IEnumerable<>));
+    }
+
+    [Fact]
+    public void Given_An_Unrelated_Open_Interface_When_Creating_Stage_Declaration_Model_Then_It_Is_Kept_Unchanged()
+    {
+        var declaration = new StageDeclarationModel(
+            typeof(object), RequestFlowLifetime.Transient, [], typeof(IEnumerable<>));
+
+        declaration.ContractType.ShouldBe(typeof(IEnumerable<>));
+    }
+
+    [Fact]
+    public void Given_An_Unrelated_Open_Interface_When_Creating_Closed_Stage_Model_Then_It_Is_Kept_Unchanged()
+    {
+        var closing = new ClosedStageModel(typeof(object), typeof(string), typeof(IEnumerable<>));
+
+        closing.ContractType.ShouldBe(typeof(IEnumerable<>));
+    }
+
+    [Fact]
+    public void Given_A_Closed_Interface_When_Creating_Handler_Model_Then_Throws_Naming_The_Contract()
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new HandlerModel(typeof(object), typeof(int), typeof(IEnumerable<>)));
+            () => new HandlerModel(typeof(object), typeof(int), typeof(IEquatable<int>)));
 
         exception.ParamName.ShouldBe("contractType");
     }
 
     [Fact]
-    public void Given_An_Unrelated_Open_Interface_When_Creating_Stage_Declaration_Model_Then_Throws_Naming_The_Contract()
+    public void Given_A_Class_When_Creating_Handler_Model_Then_Throws_Naming_The_Contract()
+    {
+        ArgumentException exception = Should.Throw<ArgumentException>(
+            () => new HandlerModel(typeof(object), typeof(int), typeof(string)));
+
+        exception.ParamName.ShouldBe("contractType");
+    }
+
+    [Fact]
+    public void Given_A_Closed_Interface_When_Creating_Stage_Declaration_Model_Then_Throws_Naming_The_Contract()
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
             () => new StageDeclarationModel(
-                typeof(object), RequestFlowLifetime.Transient, [], typeof(IEnumerable<>)));
+                typeof(object), RequestFlowLifetime.Transient, [], typeof(IEquatable<int>)));
 
         exception.ParamName.ShouldBe("contractType");
     }
 
     [Fact]
-    public void Given_An_Unrelated_Open_Interface_When_Creating_Closed_Stage_Model_Then_Throws_Naming_The_Contract()
+    public void Given_A_Class_When_Creating_Stage_Declaration_Model_Then_Throws_Naming_The_Contract()
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new ClosedStageModel(typeof(object), typeof(string), typeof(IEnumerable<>)));
+            () => new StageDeclarationModel(
+                typeof(object), RequestFlowLifetime.Transient, [], typeof(string)));
+
+        exception.ParamName.ShouldBe("contractType");
+    }
+
+    [Fact]
+    public void Given_A_Closed_Interface_When_Creating_Closed_Stage_Model_Then_Throws_Naming_The_Contract()
+    {
+        ArgumentException exception = Should.Throw<ArgumentException>(
+            () => new ClosedStageModel(typeof(object), typeof(string), typeof(IEquatable<int>)));
+
+        exception.ParamName.ShouldBe("contractType");
+    }
+
+    [Fact]
+    public void Given_A_Class_When_Creating_Closed_Stage_Model_Then_Throws_Naming_The_Contract()
+    {
+        ArgumentException exception = Should.Throw<ArgumentException>(
+            () => new ClosedStageModel(typeof(object), typeof(string), typeof(string)));
 
         exception.ParamName.ShouldBe("contractType");
     }

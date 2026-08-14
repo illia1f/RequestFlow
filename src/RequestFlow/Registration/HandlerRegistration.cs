@@ -33,6 +33,17 @@ internal sealed class HandlerRegistration(HandlerDiscovery discovery, ServiceLif
     public bool IsVoid { get; } = discovery.IsVoid;
 
     /// <summary>
+    /// The closed core contract the scan matched this handler through.
+    /// </summary>
+    public Type Contract { get; } = discovery.Contract;
+
+    /// <summary>
+    /// The open definition of <see cref="Contract"/>, which is what tells one handler family from
+    /// another.
+    /// </summary>
+    public Type ContractDefinition { get; } = discovery.ContractDefinition;
+
+    /// <summary>
     /// The lifetime the <c>AddRequestFlow</c> call that found this handler registers it with.
     /// </summary>
     public ServiceLifetime Lifetime { get; } = lifetime;

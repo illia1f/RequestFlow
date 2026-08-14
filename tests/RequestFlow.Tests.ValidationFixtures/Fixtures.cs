@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using RequestFlow;
 using RequestFlow.Cqrs;
 
@@ -44,6 +45,18 @@ public sealed class ForkedIntHandler : IRequestHandler<Forked, int>
         => Task.FromResult(1);
 }
 
+/// <summary>
+/// A request whose handler declares a wider response type than the contract; startup validation
+/// must report it under RF0112. Covariance on <c>IRequest&lt;TResponse&gt;</c> is what lets the pair
+/// compile.
+/// </summary>
+public sealed record Wide : IRequest<string>;
+
+public sealed class WideHandler : IRequestHandler<Wide, object>
+{
+    public Task<object> HandleAsync(Wide request, CancellationToken cancellationToken)
+        => Task.FromResult<object>("wide");
+}
 
 /// <summary>
 /// Base request with a handler of its own; <see cref="Orphaned"/> inherits its contract.
@@ -79,3 +92,79 @@ public sealed class ConfusedHandler : IRequestHandler<Confused, int>
 /// Unhandled, like <see cref="Lonely"/>.
 /// </summary>
 public sealed record VoidConfused : ICommand, IQuery<int>;
+
+/// <summary>
+/// A stream request with no handler anywhere in this assembly; startup validation must report it.
+/// </summary>
+public sealed record LonelyStream : IStreamRequest<int>;
+
+/// <summary>
+/// A stream request carrying two item types; startup validation must report it under RF0108.
+/// Handled so it adds no unhandled-request noise.
+/// </summary>
+public sealed record ForkedStream : IStreamRequest<string>, IStreamRequest<int>;
+
+public sealed class ForkedStreamHandler : IStreamRequestHandler<ForkedStream, int>
+{
+    public async IAsyncEnumerable<int> Handle(
+        ForkedStream request, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        yield return 1;
+    }
+}
+
+/// <summary>
+/// A type carrying a request contract and a stream contract at once; startup validation must report
+/// it under RF0109. Handled on the request side so it adds no unhandled-request noise.
+/// </summary>
+public sealed record MixedFamilies : IRequest<string>, IStreamRequest<int>;
+
+public sealed class MixedFamiliesHandler : IRequestHandler<MixedFamilies, string>
+{
+    public Task<string> HandleAsync(MixedFamilies request, CancellationToken cancellationToken)
+        => Task.FromResult("mixed");
+}
+
+/// <summary>
+/// A stream request whose handler declares a wider item type than the contract; startup validation
+/// must report it under RF0110. Covariance on <c>IStreamRequest&lt;TItem&gt;</c> is what lets the
+/// pair compile.
+/// </summary>
+public sealed record WideStream : IStreamRequest<string>;
+
+public sealed class WideStreamHandler : IStreamRequestHandler<WideStream, object>
+{
+    public async IAsyncEnumerable<object> Handle(
+        WideStream request, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        yield return "wide";
+    }
+}
+
+/// <summary>
+/// A stream request handled by an open generic handler closed through RegisterGenericHandler.
+/// </summary>
+public sealed record Counted : IStreamRequest<int>;
+
+public sealed class GenericStreamHandler<TRequest> : IStreamRequestHandler<TRequest, int>
+    where TRequest : IStreamRequest<int>
+{
+    public async IAsyncEnumerable<int> Handle(
+        TRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        yield return 1;
+    }
+}
+
+/// <summary>
+/// A stream stage that reaches no request in this assembly; DisallowUnusedStages must report it.
+/// </summary>
+public sealed class UnreachedStreamStage : IStreamRequestStage<LonelyStream, int>
+{
+    public IAsyncEnumerable<int> Handle(
+        LonelyStream request, StreamContinuation<int> next, CancellationToken cancellationToken)
+        => next.Invoke(cancellationToken);
+}

@@ -12,22 +12,9 @@ internal static class RegistrationValidator
     /// <summary>
     /// Shape checks per declaration, stopping at that declaration's first failure.
     /// </summary>
-    public static DeclarationResult ValidateDeclarations(IReadOnlyList<GenericHandlerDeclaration> declarations)
-    {
-        List<GenericHandlerDeclaration> validDeclarations = [];
-        List<RequestFlowValidationProblem> problems = [];
-
-        foreach (var declaration in declarations)
-        {
-            RequestFlowValidationProblem? problem = ValidateDeclaration(declaration);
-            if (problem is null)
-                validDeclarations.Add(declaration);
-            else
-                problems.Add(problem);
-        }
-
-        return new DeclarationResult(validDeclarations, problems);
-    }
+    public static Validated<GenericHandlerDeclaration> ValidateDeclarations(
+        IReadOnlyList<GenericHandlerDeclaration> declarations)
+        => Partition(declarations, ValidateDeclaration);
 
     private static RequestFlowValidationProblem? ValidateDeclaration(GenericHandlerDeclaration declaration)
     {
@@ -54,7 +41,7 @@ internal static class RegistrationValidator
         if (!ImplementsHandlerContract(handlerType))
             return new RequestFlowValidationProblem(
                 ProblemCodes.HandlerMissingContract,
-                $"'{handlerType.FullName}' does not implement IRequestHandler.",
+                $"'{handlerType.FullName}' does not implement IRequestHandler or IStreamRequestHandler.",
                 handlerType);
 
         if (declaration.ClosingTypes.Length == 0)
@@ -83,7 +70,9 @@ internal static class RegistrationValidator
                 continue;
 
             Type definition = iface.GetGenericTypeDefinition();
-            if (definition == typeof(IRequestHandler<,>) || definition == typeof(IRequestHandler<>))
+            if (definition == typeof(IRequestHandler<,>)
+                || definition == typeof(IRequestHandler<>)
+                || definition == typeof(IStreamRequestHandler<,>))
                 return true;
         }
 
@@ -94,7 +83,7 @@ internal static class RegistrationValidator
     /// Closes each handler over its declared type; closings that violate the handler's
     /// generic constraints are reported as problems.
     /// </summary>
-    public static ClosingResult ValidateClosings(IReadOnlyList<GenericHandlerClosing> closings)
+    public static Validated<Type> ValidateClosings(IReadOnlyList<GenericHandlerClosing> closings)
     {
         List<Type> closedTypes = [];
         List<RequestFlowValidationProblem> problems = [];
@@ -115,28 +104,14 @@ internal static class RegistrationValidator
             }
         }
 
-        return new ClosingResult(closedTypes, problems);
+        return new Validated<Type>(closedTypes, problems);
     }
 
     /// <summary>
     /// Checks each stage declaration's shape, stopping at that declaration's first failure.
     /// </summary>
-    public static StageDeclarationResult ValidateStageDeclarations(IReadOnlyList<StageDeclaration> declarations)
-    {
-        List<StageDeclaration> validDeclarations = [];
-        List<RequestFlowValidationProblem> problems = [];
-
-        foreach (var declaration in declarations)
-        {
-            RequestFlowValidationProblem? problem = ValidateStageDeclaration(declaration);
-            if (problem is null)
-                validDeclarations.Add(declaration);
-            else
-                problems.Add(problem);
-        }
-
-        return new StageDeclarationResult(validDeclarations, problems);
-    }
+    public static Validated<StageDeclaration> ValidateStageDeclarations(IReadOnlyList<StageDeclaration> declarations)
+        => Partition(declarations, ValidateStageDeclaration);
 
     private static RequestFlowValidationProblem? ValidateStageDeclaration(StageDeclaration declaration)
     {
@@ -161,39 +136,34 @@ internal static class RegistrationValidator
                 "or a fully closed stage type.",
                 stageType);
 
-        if (!ImplementsStageContract(stageType))
+        if (!ImplementsStageContract(stageType, declaration.Family))
             return new RequestFlowValidationProblem(
                 ProblemCodes.StageMissingContract,
-                $"'{stageType.FullName}' does not implement IRequestStage<TRequest, TResponse> or " +
-                "IRequestStage<TRequest>; implement one of them or remove the AddStage call.",
+                declaration.Family.MissingContractMessage(stageType),
                 stageType);
 
-        if (stageType.IsGenericTypeDefinition && !ClosesOverItsOwnParameters(stageType))
+        if (stageType.IsGenericTypeDefinition && !ClosesOverItsOwnParameters(stageType, declaration.Family))
         {
-            string parameterNames = string.Join(", ", GetParameterNames(stageType));
+            string parameterNames = string.Join(
+                ", ", Array.ConvertAll(stageType.GetGenericArguments(), static p => p.Name));
 
             return new RequestFlowValidationProblem(
                 ProblemCodes.StageParametersMisused,
-                $"'{stageType.FullName}' declares generic parameters <{parameterNames}> that its " +
-                "IRequestStage implementation does not use as its request. An open generic stage " +
-                "implements IRequestStage<TRequest, TResponse> with its own two parameters in that " +
-                "order, or declares one parameter and uses it as the request: IRequestStage<TRequest> " +
-                "for void requests, or IRequestStage<TRequest, TResponse> with a fixed response type.",
+                declaration.Family.ParametersMisusedMessage(stageType, parameterNames),
                 stageType);
         }
 
         return null;
     }
 
-    private static bool ImplementsStageContract(Type stageType)
+    private static bool ImplementsStageContract(Type stageType, StageFamily family)
     {
         foreach (var iface in stageType.GetInterfaces())
         {
             if (!iface.IsGenericType)
                 continue;
 
-            Type definition = iface.GetGenericTypeDefinition();
-            if (definition == typeof(IRequestStage<,>) || definition == typeof(IRequestStage<>))
+            if (IsFamilyContract(iface.GetGenericTypeDefinition(), family))
                 return true;
         }
 
@@ -204,7 +174,7 @@ internal static class RegistrationValidator
     // definition over the request alone, so the interface's request argument has to be the
     // stage's own parameter for the closed type to name the dispatched request. A stage that
     // breaks this closes into a type no request can match.
-    private static bool ClosesOverItsOwnParameters(Type stageType)
+    private static bool ClosesOverItsOwnParameters(Type stageType, StageFamily family)
     {
         Type[] parameters = stageType.GetGenericArguments();
 
@@ -213,20 +183,16 @@ internal static class RegistrationValidator
             if (!iface.IsGenericType)
                 continue;
 
-            Type definition = iface.GetGenericTypeDefinition();
-            if (definition != typeof(IRequestStage<,>) && definition != typeof(IRequestStage<>))
+            if (!IsFamilyContract(iface.GetGenericTypeDefinition(), family))
                 continue;
 
             Type[] arguments = iface.GetGenericArguments();
 
-            if (definition == typeof(IRequestStage<,>)
-                && parameters.Length == 2
-                && arguments[0] == parameters[0]
-                && arguments[1] == parameters[1])
+            if (parameters.Length == arguments.Length && SubstitutePositionally(parameters, arguments))
                 return true;
 
-            // One parameter naming the request: the void form, or the general form with the
-            // response fixed by the class, as in Stage<TRequest> : IRequestStage<TRequest, Result>.
+            // One parameter naming the request: the void form, or the general form with the second
+            // argument fixed by the class, as in Stage<TRequest> : IRequestStage<TRequest, Result>.
             if (parameters.Length == 1 && arguments[0] == parameters[0])
                 return true;
         }
@@ -234,48 +200,53 @@ internal static class RegistrationValidator
         return false;
     }
 
-    private static string[] GetParameterNames(Type stageType)
+    private static bool IsFamilyContract(Type definition, StageFamily family)
     {
-        Type[] parameters = stageType.GetGenericArguments();
-        string[] names = new string[parameters.Length];
-        for (int i = 0; i < parameters.Length; i++)
-            names[i] = parameters[i].Name;
+        foreach (var contract in family.Contracts)
+        {
+            if (definition == contract)
+                return true;
+        }
 
-        return names;
+        return false;
+    }
+
+    private static bool SubstitutePositionally(Type[] parameters, Type[] arguments)
+    {
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (arguments[i] != parameters[i])
+                return false;
+        }
+
+        return true;
+    }
+
+    private static Validated<T> Partition<T>(
+        IReadOnlyList<T> items, Func<T, RequestFlowValidationProblem?> validate)
+    {
+        List<T> valid = [];
+        List<RequestFlowValidationProblem> problems = [];
+
+        foreach (var item in items)
+        {
+            RequestFlowValidationProblem? problem = validate(item);
+            if (problem is null)
+                valid.Add(item);
+            else
+                problems.Add(problem);
+        }
+
+        return new Validated<T>(valid, problems);
     }
 }
 
 /// <summary>
-/// Shape-valid declarations and shape problems produced by validating the recorded
-/// declarations.
+/// The items a validation pass produced, plus one problem for each item it rejected.
 /// </summary>
-internal sealed class DeclarationResult(
-    IReadOnlyList<GenericHandlerDeclaration> validDeclarations, IReadOnlyList<RequestFlowValidationProblem> problems)
+internal sealed class Validated<T>(IReadOnlyList<T> valid, IReadOnlyList<RequestFlowValidationProblem> problems)
 {
-    public IReadOnlyList<GenericHandlerDeclaration> ValidDeclarations { get; } = validDeclarations;
-
-    public IReadOnlyList<RequestFlowValidationProblem> Problems { get; } = problems;
-}
-
-/// <summary>
-/// Closed handler types and constraint problems produced by validating the declared
-/// closings.
-/// </summary>
-internal sealed class ClosingResult(IReadOnlyList<Type> closedTypes, IReadOnlyList<RequestFlowValidationProblem> problems)
-{
-    public IReadOnlyList<Type> ClosedTypes { get; } = closedTypes;
-
-    public IReadOnlyList<RequestFlowValidationProblem> Problems { get; } = problems;
-}
-
-/// <summary>
-/// The stage declarations that passed the shape check, plus one problem for each declaration
-/// that failed.
-/// </summary>
-internal sealed class StageDeclarationResult(
-    IReadOnlyList<StageDeclaration> validDeclarations, IReadOnlyList<RequestFlowValidationProblem> problems)
-{
-    public IReadOnlyList<StageDeclaration> ValidDeclarations { get; } = validDeclarations;
+    public IReadOnlyList<T> Valid { get; } = valid;
 
     public IReadOnlyList<RequestFlowValidationProblem> Problems { get; } = problems;
 }
