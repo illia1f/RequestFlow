@@ -5,10 +5,4 @@
     <ProjectReference Include="..\RequestFlow.Tests.ValidationFixtures\RequestFlow.Tests.ValidationFixtures.csproj" />
   </ItemGroup>
 
-  <!-- GC.GetAllocatedBytesForCurrentThread does not exist on .NET Framework, so the fixture is left
-       out of that build and the other two targets cover it. -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <Compile Remove="Stages\StreamChainAllocationTests.cs" />
-  </ItemGroup>
-
 </Project>

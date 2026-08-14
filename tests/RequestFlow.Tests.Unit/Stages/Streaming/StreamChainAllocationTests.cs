@@ -1,3 +1,6 @@
+// .NET Framework has no GC.GetAllocatedBytesForCurrentThread, so the whole fixture is compiled out
+// there and the other two targets cover it.
+#if NET8_0_OR_GREATER
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
@@ -105,8 +108,7 @@ public sealed class StreamChainAllocationTests
     private static async Task DrainAsync(IStreamDispatcher dispatcher, int items)
     {
         await foreach (int item in dispatcher.Stream(new Ticks(items)))
-        {
-        }
+        { }
     }
 
     public sealed record Ticks(int Count) : IStreamRequest<int>;
@@ -166,3 +168,4 @@ public sealed class StreamChainAllocationTests
 
     #endregion
 }
+#endif
