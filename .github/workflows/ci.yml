@@ -10,11 +10,6 @@ on:
       - '.editorconfig'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'LICENSE'
-      - '.gitignore'
-      - '.editorconfig'
 
 permissions:
   contents: read
@@ -29,7 +24,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  build:
+  ci-validation:
     # net462 tests only run on Windows.
     runs-on: windows-latest
     timeout-minutes: 20
