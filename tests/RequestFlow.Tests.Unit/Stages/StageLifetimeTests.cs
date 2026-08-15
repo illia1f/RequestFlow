@@ -301,7 +301,7 @@ public sealed class StageLifetimeTests
     {
         ServiceCollection services = Collect(o => o.AddStage(typeof(ProbeStage<,>), s => s.AsSingleton()));
 
-        AddFlow(services,_ => { });
+        AddFlow(services, _ => { });
 
         DescriptorsFor(services).Count.ShouldBe(1);
     }
