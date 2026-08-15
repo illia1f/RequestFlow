@@ -95,8 +95,7 @@ public sealed class LevelTests
             () => sut(new Log(), Provider(new RecordingStage()), CancellationToken.None));
     }
 
-    // A whole chain, not one level: which level a position gets depends on the position and the
-    // stage shape.
+    // A whole chain, not one level: which level a position gets depends on the position and the stage shape.
     [Fact]
     public async Task Given_A_Two_Stage_Chain_When_Entering_It_Then_The_First_Stage_Is_Outermost()
     {
@@ -237,8 +236,7 @@ public sealed class LevelTests
 
     public sealed record Reset : Command;
 
-    // The assembly scan demands one handler per request type, even for requests nothing here
-    // dispatches.
+    // The assembly scan demands one handler per request type, even for requests nothing here dispatches.
     private sealed class PingHandler : IRequestHandler<Ping, string>
     {
         public Task<string> HandleAsync(Ping request, CancellationToken cancellationToken)

@@ -17,8 +17,7 @@ public sealed class FetchOrderDetailsHandler : IQueryHandler<FetchOrderDetails, 
 }
 
 /// <summary>
-/// Trips ORDERS0002: the handler leaves off IOrdersCommandHandler, so the chain runs without the
-/// validation stage.
+/// Trips ORDERS0002: the handler leaves off IOrdersCommandHandler, so the chain runs without the validation stage.
 /// </summary>
 public sealed record ArchiveOrderCommand(Guid Id) : ICommand<Guid>;
 

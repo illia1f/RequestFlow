@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 namespace RequestFlow;
 
 /// <summary>
-/// Non-generic value for the <see cref="Type"/>-keyed dispatch map; the dispatcher
-/// downcasts to <see cref="RequestPlan{TResponse}"/>.
+/// Non-generic value for the <see cref="Type"/>-keyed dispatch map; the
+/// dispatcher downcasts to <see cref="RequestPlan{TResponse}"/>.
 /// </summary>
 internal abstract class RequestPlanBase
 {

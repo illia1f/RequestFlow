@@ -112,24 +112,24 @@ public sealed class AddStageTests
     {
         StageDeclaration[] declarations =
         [
-            new StageDeclaration(typeof(LoggingStage<,>), null),
-            new StageDeclaration(typeof(PingAuditStage), null),
+            new StageDeclaration(typeof(LoggingStage<,>), null, StageFamily.Request),
+            new StageDeclaration(typeof(PingAuditStage), null, StageFamily.Request),
         ];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.Count.ShouldBe(2);
+        result.Valid.Count.ShouldBe(2);
         result.Problems.ShouldBeEmpty();
     }
 
     [Fact]
     public void Given_Stage_Whose_Parameter_Is_Not_The_Request_When_Validating_Then_Reports_The_Parameter()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(OneParameterStage<>), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(OneParameterStage<>), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.ShouldBeEmpty();
+        result.Valid.ShouldBeEmpty();
         result.Problems.Count.ShouldBe(1);
         result.Problems[0].Code.ShouldBe("RF0012");
         result.Problems[0].Subject.ShouldBe(typeof(OneParameterStage<>));
@@ -139,11 +139,11 @@ public sealed class AddStageTests
     [Fact]
     public void Given_Type_That_Is_Not_A_Stage_When_Validating_Then_Reports_Missing_Contract()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(NotAStage), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(NotAStage), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.ShouldBeEmpty();
+        result.Valid.ShouldBeEmpty();
         result.Problems[0].Code.ShouldBe("RF0011");
         result.Problems[0].Subject.ShouldBe(typeof(NotAStage));
         result.Problems[0].Message.ShouldContain("does not implement IRequestStage");
@@ -152,11 +152,11 @@ public sealed class AddStageTests
     [Fact]
     public void Given_Abstract_Stage_When_Validating_Then_Reports_Abstract()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(AbstractStage), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(AbstractStage), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.ShouldBeEmpty();
+        result.Valid.ShouldBeEmpty();
         result.Problems[0].Code.ShouldBe("RF0009");
         result.Problems[0].Subject.ShouldBe(typeof(AbstractStage));
         result.Problems[0].Message.ShouldContain("is abstract");
@@ -177,11 +177,11 @@ public sealed class AddStageTests
     [Fact]
     public void Given_Stage_With_Swapped_Generic_Parameters_When_Validating_Then_Reports_The_Parameter_Order()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(SwappedStage<,>), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(SwappedStage<,>), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.ShouldBeEmpty();
+        result.Valid.ShouldBeEmpty();
         result.Problems[0].Code.ShouldBe("RF0012");
         result.Problems[0].Subject.ShouldBe(typeof(SwappedStage<,>));
         result.Problems[0].Message.ShouldContain("in that order");
@@ -190,33 +190,33 @@ public sealed class AddStageTests
     [Fact]
     public void Given_Open_Void_Form_Stage_When_Validating_Then_Declaration_Is_Valid()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(VoidOnlyStage<>), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(VoidOnlyStage<>), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.Count.ShouldBe(1);
+        result.Valid.Count.ShouldBe(1);
         result.Problems.ShouldBeEmpty();
     }
 
     [Fact]
     public void Given_Closed_Void_Form_Stage_When_Validating_Then_Declaration_Is_Valid()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(WipeAuditStage), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(WipeAuditStage), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.Count.ShouldBe(1);
+        result.Valid.Count.ShouldBe(1);
         result.Problems.ShouldBeEmpty();
     }
 
     [Fact]
     public void Given_Open_Response_Bound_Stage_When_Validating_Then_Declaration_Is_Valid()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(ResponseBoundStage<>), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(ResponseBoundStage<>), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.Count.ShouldBe(1);
+        result.Valid.Count.ShouldBe(1);
         result.Problems.ShouldBeEmpty();
     }
 
@@ -224,22 +224,22 @@ public sealed class AddStageTests
     public void Given_Single_Parameter_Stage_Closed_Over_Its_Request_When_Validating_Then_Declaration_Is_Valid()
     {
         Type closed = typeof(ResponseBoundStage<>).MakeGenericType(typeof(Ping));
-        StageDeclaration[] declarations = [new StageDeclaration(closed, null)];
+        StageDeclaration[] declarations = [new StageDeclaration(closed, null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.Count.ShouldBe(1);
+        result.Valid.Count.ShouldBe(1);
         result.Problems.ShouldBeEmpty();
     }
 
     [Fact]
     public void Given_Interface_Stage_When_Validating_Then_Reports_Interface()
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(IRequestStage<Ping, string>), null)];
+        StageDeclaration[] declarations = [new StageDeclaration(typeof(IRequestStage<Ping, string>), null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.ShouldBeEmpty();
+        result.Valid.ShouldBeEmpty();
         result.Problems[0].Code.ShouldBe("RF0008");
         result.Problems[0].Subject.ShouldBe(typeof(IRequestStage<Ping, string>));
         result.Problems[0].Message.ShouldContain("is an interface");
@@ -250,11 +250,11 @@ public sealed class AddStageTests
     {
         Type openParameter = typeof(List<>).GetGenericArguments()[0];
         Type partiallyClosed = typeof(OneParameterStage<>).MakeGenericType(openParameter);
-        StageDeclaration[] declarations = [new StageDeclaration(partiallyClosed, null)];
+        StageDeclaration[] declarations = [new StageDeclaration(partiallyClosed, null, StageFamily.Request)];
 
-        StageDeclarationResult result = RegistrationValidator.ValidateStageDeclarations(declarations);
+        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.ValidDeclarations.ShouldBeEmpty();
+        result.Valid.ShouldBeEmpty();
         result.Problems[0].Code.ShouldBe("RF0010");
         result.Problems[0].Subject.ShouldBe(partiallyClosed);
         result.Problems[0].Message.ShouldContain("is partially closed");

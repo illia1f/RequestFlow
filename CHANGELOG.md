@@ -6,6 +6,25 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
+## [Unreleased]
+
+### Added
+
+- Streaming requests: `IStreamRequest<TItem>`, `IStreamRequestHandler<TRequest, TItem>`, and `IStreamDispatcher.Stream`, which returns an `IAsyncEnumerable<TItem>`. `AddRequestFlow` registers the stream dispatcher beside the request one, so there is no separate call to make. [streaming.md](docs/streaming.md) covers the feature, including why `Stream` and `Handle` carry no `Async` suffix.
+- Stream stages: `IStreamRequestStage<TRequest, TItem>`, registered with `AddStreamStage` under the same rules as `AddStage`. A stage receives a `StreamContinuation<TItem>` and can filter, project, inject items, or stop the walk early. Stream stages and task stages never wrap each other.
+- Every streaming contract ships in `RequestFlow.Abstractions`. On `netstandard2.0` and `net462` the package now carries `Microsoft.Bcl.AsyncInterfaces`; `net8.0` and `net10.0` keep zero dependencies.
+- `HandlerNullStreamException` and `StageNullStreamException` for a null sequence out of `Handle`, sharing a `NullStreamException` base. Both surface from enumeration, not from the `Stream` call.
+- Streaming validation codes: `RF0108` (a request with more than one `IStreamRequest<TItem>` contract), `RF0109` (a request that is both `IRequest<TResponse>` and `IStreamRequest<TItem>`), and `RF0110`/`RF0111` (a stream handler or stage whose item type is wider than its request declares).
+- Task-path validation codes: `RF0112` (a handler whose response type is not the one its request declares) and `RF0113` (a stage with the same mismatch). Both compile through covariance and used to fail only at dispatch.
+- Cancellation on a stream reads the token passed to `Stream` and the one passed to `WithCancellation`; either cancels the chain. A stage passing its own token to `Invoke` replaces both for the levels below it.
+- A stream stage written as an async iterator allocates its state machine and enumerator once per enumeration, per level; one that returns `next.Invoke(...)` directly allocates nothing. Neither cost grows with the number of items.
+
+### Changed
+
+- `RequestFlowModelBuilder` and `RequestModelBuilder` accept any open generic interface as a `ContractType`, not only ones built on `IRequestHandler` or `IRequestStage`. A class or a closed interface is still rejected.
+- `RF0004`'s message now reads `does not implement IRequestHandler or IStreamRequestHandler`; anything matching on the old text breaks.
+- `ResponseTypeMismatchException`'s message now says `but the call site used response type` instead of naming `SendAsync`, because `IStreamDispatcher.Stream` throws it too. Anything matching on the old text breaks.
+
 ## [1.0.0-preview.6] - 2026-08-09
 
 ### Added

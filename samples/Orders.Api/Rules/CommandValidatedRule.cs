@@ -33,8 +33,8 @@ public sealed class CommandValidatedRule : IRequestFlowValidationRule
         return problems;
     }
 
-    // Stages is the chain as the freeze closed it, so this reads what will actually run. ClosedType
-    // is the same either way, while DeclaredType is whatever shape AddStage was handed.
+    // Stages is the chain as the freeze closed it, so this reads what will actually run.
+    // ClosedType is the same either way, while DeclaredType is whatever shape AddStage was handed.
     private static bool Validates(RequestModel request)
     {
         foreach (ClosedStageModel stage in request.Stages)

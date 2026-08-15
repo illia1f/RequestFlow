@@ -9,8 +9,7 @@ namespace RequestFlow;
 /// </summary>
 /// <remarks>
 /// A partial model is allowed on purpose. A rule that never reads handlers is tested against
-/// requests that have none, so the builder does not require shapes the freeze would always
-/// produce.
+/// requests that have none, so the builder does not require shapes the freeze would always produce.
 /// </remarks>
 public sealed class RequestFlowModelBuilder
 {
@@ -44,8 +43,7 @@ public sealed class RequestFlowModelBuilder
     /// Adds one stage declaration, as a single <c>AddStage</c> call would.
     /// </summary>
     /// <remarks>
-    /// Leaving <paramref name="contractType"/> null records
-    /// <c>IRequestStage&lt;TRequest, TResponse&gt;</c>, matching
+    /// Leaving <paramref name="contractType"/> null records <c>IRequestStage&lt;TRequest, TResponse&gt;</c>, matching
     /// <see cref="RequestModelBuilder.AddStage"/>. Naming one takes an open generic interface,
     /// since that is what a rule compares against.
     /// </remarks>

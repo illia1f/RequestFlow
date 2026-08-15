@@ -3,8 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// What a validation rule reads: the frozen registration, plus the registration choices that
-/// shape a finding.
+/// What a validation rule reads: the frozen registration, plus the registration choices that shape a finding.
 /// </summary>
 /// <remarks>
 /// Built once per freeze and handed to every rule, so a rule added with <c>AddValidationRule</c>
@@ -31,14 +30,12 @@ public sealed class RequestFlowValidationContext
     public RequestFlowModel Model { get; }
 
     /// <summary>
-    /// True when <c>AllowUnhandledRequests</c> was called, so a request with no handler is
-    /// permitted.
+    /// True when <c>AllowUnhandledRequests</c> was called, so a request with no handler is permitted.
     /// </summary>
     public bool UnhandledRequestsAllowed { get; }
 
     /// <summary>
-    /// True when <c>DisallowUnusedStages</c> was called, so a stage that reached no request is a
-    /// problem.
+    /// True when <c>DisallowUnusedStages</c> was called, so a stage that reached no request is a problem.
     /// </summary>
     public bool UnusedStagesDisallowed { get; }
 }

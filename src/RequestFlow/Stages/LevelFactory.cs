@@ -7,8 +7,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// Builds one level of a stage chain: a stage, or the handler beneath the last one. A level is built
-/// when the dispatch map freezes and closes over its position, reaching its stage or handler through
-/// the contract.
+/// when the dispatch map freezes and closes over its position, reaching its stage or handler through the contract.
 /// </summary>
 /// <remarks>
 /// Every level of every plan runs one shared body, so the call inside it sees every stage type in

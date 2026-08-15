@@ -5,8 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// Reshapes the registry's raw accumulations into the frozen snapshot every validation rule
-/// reads.
+/// Reshapes the registry's raw accumulations into the frozen snapshot every validation rule reads.
 /// </summary>
 internal static class RegistrationSnapshot
 {
@@ -43,9 +42,12 @@ internal static class RegistrationSnapshot
             covering.Add(handler);
         }
 
-        Dictionary<Type, Type> memoStageContracts = [];
+        Dictionary<Type, Type> memoRequestContracts = [];
+        Dictionary<Type, Type> memoStreamContracts = [];
+        Dictionary<Type, Dictionary<Type, Type>> memoClosingContracts = [];
 
-        // Reused across declarations: one declaration reaching two handlers as the same closed type is one chain slot, not two.
+        // Reused across declarations: one declaration reaching two handlers as the same closed type
+        // is one chain slot, not two.
         HashSet<Type> closedPerDeclaration = [];
 
         List<RequestModel> requests = [];
@@ -64,7 +66,7 @@ internal static class RegistrationSnapshot
                     requestHandlers.Add(new HandlerModel(
                         handler.ImplementationType,
                         responseType,
-                        HandlerContract.Of(handler.ImplementationType, handler.RequestType, responseType),
+                        HandlerContract.Of(handler.ImplementationType, handler.Contract),
                         ModelLifetime.Of(handler.Lifetime)));
                 }
 
@@ -80,7 +82,13 @@ internal static class RegistrationSnapshot
                             chain.Add(new ClosedStageModel(
                                 declaration.StageType,
                                 closedStageType,
-                                StageContract.Of(closedStageType, memoStageContracts)));
+                                StageContract.OfClosing(
+                                    closedStageType,
+                                    declaration.Family,
+                                    handler.RequestType,
+                                    handler.ResponseType,
+                                    handler.IsVoid,
+                                    memoClosingContracts)));
                         }
                     }
                 }
@@ -101,9 +109,16 @@ internal static class RegistrationSnapshot
                 declaration.StageType,
                 ModelLifetime.Of(declaration.Lifetime),
                 StageReach.Of(capturedRequests, declaration.StageType),
-                StageContract.Of(declaration.StageType, memoStageContracts));
+                StageContract.Of(
+                    declaration.StageType,
+                    declaration.Family,
+                    MemoFor(declaration.Family, memoRequestContracts, memoStreamContracts)));
         }
 
         return new RequestFlowModel(capturedRequests, declaredStages);
     }
+
+    private static Dictionary<Type, Type> MemoFor(
+        StageFamily family, Dictionary<Type, Type> request, Dictionary<Type, Type> stream)
+        => family == StageFamily.Stream ? stream : request;
 }

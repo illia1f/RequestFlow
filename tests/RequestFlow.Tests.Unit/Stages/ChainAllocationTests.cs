@@ -8,8 +8,7 @@ namespace RequestFlow.Tests.Unit;
 
 public sealed class ChainAllocationTests
 {
-    // A staged dispatch allocates nothing of RequestFlow's own, so the only bytes left are the
-    // handler's task.
+    // A staged dispatch allocates nothing of RequestFlow's own, so the only bytes left are the handler's task.
     [Fact]
     public async Task Given_A_Two_Stage_Chain_When_Dispatching_Then_It_Allocates_No_More_Than_A_Plain_Dispatch()
     {
@@ -95,9 +94,9 @@ public sealed class ChainAllocationTests
     }
 
     // The cost that survives the cast. An async stage returns its own builder's plain Task, so a
-    // suspended void level of that shape crosses the bridge on a Task<NoResult> of its own. Pinned
-    // against the typed chain, where the same stage costs its state machine and nothing more, rather
-    // than against a byte figure that differs per runtime.
+    // suspended void level of that shape crosses the bridge on a Task<NoResult> of its own.
+    // Pinned against the typed chain, where the same stage costs its state machine and nothing
+    // more, rather than against a byte figure that differs per runtime.
     [Fact]
     public async Task Given_A_Void_Chain_Of_Async_Stages_That_Suspends_When_Dispatching_Then_Every_Level_Costs_More_Than_A_Typed_One()
     {

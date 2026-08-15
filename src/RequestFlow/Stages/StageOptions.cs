@@ -4,8 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// One stage's settings: which requests it reaches, and the lifetime its closed types are
-/// registered with.
+/// One stage's settings: which requests it reaches, and the lifetime its closed types are registered with.
 /// </summary>
 public sealed class StageOptions
 {

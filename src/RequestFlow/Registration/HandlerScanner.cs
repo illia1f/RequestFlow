@@ -55,15 +55,16 @@ internal static class HandlerScanner
                 continue;
 
             Type definition = iface.GetGenericTypeDefinition();
-            if (definition == typeof(IRequestHandler<,>))
+            if (definition == typeof(IRequestHandler<,>)
+                || definition == typeof(IStreamRequestHandler<,>))
             {
                 Type[] args = iface.GetGenericArguments();
-                handlers.Add(new HandlerDiscovery(type, args[0], args[1], isVoid: false));
+                handlers.Add(new HandlerDiscovery(type, args[0], args[1], isVoid: false, iface));
             }
             else if (definition == typeof(IRequestHandler<>))
             {
                 Type[] args = iface.GetGenericArguments();
-                handlers.Add(new HandlerDiscovery(type, args[0], typeof(NoResult), isVoid: true));
+                handlers.Add(new HandlerDiscovery(type, args[0], typeof(NoResult), isVoid: true, iface));
             }
         }
 
@@ -74,7 +75,11 @@ internal static class HandlerScanner
     {
         foreach (var iface in type.GetInterfaces())
         {
-            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IRequest<>))
+            if (!iface.IsGenericType)
+                continue;
+
+            Type definition = iface.GetGenericTypeDefinition();
+            if (definition == typeof(IRequest<>) || definition == typeof(IStreamRequest<>))
                 return true;
         }
 
@@ -86,7 +91,7 @@ internal static class HandlerScanner
 /// One handler the scan found, before registration decides how it lives.
 /// </summary>
 internal sealed class HandlerDiscovery(
-    Type implementationType, Type requestType, Type responseType, bool isVoid)
+    Type implementationType, Type requestType, Type responseType, bool isVoid, Type contract)
 {
     /// <summary>
     /// The concrete handler class discovered by the scan.
@@ -107,6 +112,16 @@ internal sealed class HandlerDiscovery(
     /// True when the handler implements <see cref="IRequestHandler{TRequest}"/>.
     /// </summary>
     public bool IsVoid { get; } = isVoid;
+
+    /// <summary>
+    /// The closed core contract the scan matched this handler through.
+    /// </summary>
+    public Type Contract { get; } = contract;
+
+    /// <summary>
+    /// The open definition of <see cref="Contract"/>, which is what tells one handler family from another.
+    /// </summary>
+    public Type ContractDefinition { get; } = contract.GetGenericTypeDefinition();
 }
 
 /// <summary>

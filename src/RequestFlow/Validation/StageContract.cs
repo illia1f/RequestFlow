@@ -14,25 +14,87 @@ namespace RequestFlow;
 /// picking one. Declarations that implement neither never reach here: registration drops them
 /// before the registry records them.
 /// <para>
-/// One snapshot asks about the same closed stage type once per handler per declaration, so the
-/// caller passes a memo it owns for that snapshot. A shared static one would need a lock and would
-/// outlive the freeze.
+/// One snapshot asks about the same stage type once per handler per declaration, so the caller
+/// passes a memo it owns for that snapshot. <see cref="Of"/> takes one per family, since a type
+/// implementing a contract from each would otherwise get one family's answer for both.
+/// <see cref="OfClosing"/> keys its memo by the closed core contract as well, since one stage type
+/// can satisfy a different contract per request. A shared static memo would need a lock and would outlive the freeze.
 /// </para>
 /// </remarks>
 internal static class StageContract
 {
-    public static Type Of(Type stageType, Dictionary<Type, Type> memo)
+    public static Type Of(Type stageType, StageFamily family, Dictionary<Type, Type> memo)
     {
         if (memo.TryGetValue(stageType, out Type? cached))
             return cached;
 
-        Type contract = Resolve(stageType);
+        Type contract = Resolve(stageType, family);
         memo[stageType] = contract;
 
         return contract;
     }
 
-    private static Type Resolve(Type stageType)
+    /// <summary>
+    /// The contract one closing satisfies for its request and response pair, ignoring contracts
+    /// the stage implements only for other requests.
+    /// </summary>
+    // A nested dictionary rather than a tuple key, since net462 has no ValueTuple without a
+    // package the project must not take.
+    public static Type OfClosing(
+        Type closedStageType,
+        StageFamily family,
+        Type requestType,
+        Type responseType,
+        bool isVoid,
+        Dictionary<Type, Dictionary<Type, Type>> memo)
+    {
+        Type typedCore = family.TypedContract.MakeGenericType(requestType, responseType);
+
+        if (!memo.TryGetValue(closedStageType, out Dictionary<Type, Type>? perCore))
+        {
+            perCore = [];
+            memo[closedStageType] = perCore;
+        }
+
+        if (perCore.TryGetValue(typedCore, out Type? cached))
+            return cached;
+
+        Type? voidCore = isVoid && family.VoidContract is not null
+            ? family.VoidContract.MakeGenericType(requestType)
+            : null;
+
+        Type contract = ResolveClosing(closedStageType, family, typedCore, voidCore);
+        perCore[typedCore] = contract;
+
+        return contract;
+    }
+
+    // The closed cores honor the in TRequest variance, so a stage written against a base request
+    // still reports the contract that admits this one.
+    private static Type ResolveClosing(Type closedStageType, StageFamily family, Type typedCore, Type? voidCore)
+    {
+        List<Type> typed = [];
+        List<Type> untyped = [];
+        foreach (var iface in closedStageType.GetInterfaces())
+        {
+            if (!iface.IsGenericType)
+                continue;
+
+            if (typedCore.IsAssignableFrom(iface))
+                typed.Add(iface.GetGenericTypeDefinition());
+            else if (voidCore is not null && voidCore.IsAssignableFrom(iface))
+                untyped.Add(iface.GetGenericTypeDefinition());
+        }
+
+        if (typed.Count > 0)
+            return MostDerived(typed, family.TypedContract);
+
+        return untyped.Count > 0 && family.VoidContract is not null
+            ? MostDerived(untyped, family.VoidContract)
+            : family.TypedContract;
+    }
+
+    private static Type Resolve(Type stageType, StageFamily family)
     {
         List<Type> typed = [];
         List<Type> untyped = [];
@@ -42,19 +104,21 @@ internal static class StageContract
                 continue;
 
             Type definition = iface.GetGenericTypeDefinition();
-            if (Implements(definition, typeof(IRequestStage<,>)))
+            if (Implements(definition, family.TypedContract))
                 typed.Add(definition);
-            else if (Implements(definition, typeof(IRequestStage<>)))
+            else if (family.VoidContract is not null && Implements(definition, family.VoidContract))
                 untyped.Add(definition);
         }
 
         if (typed.Count > 0)
-            return MostDerived(typed, typeof(IRequestStage<,>));
+            return MostDerived(typed, family.TypedContract);
 
-        return untyped.Count > 0 ? MostDerived(untyped, typeof(IRequestStage<>)) : typeof(IRequestStage<,>);
+        return untyped.Count > 0 && family.VoidContract is not null
+            ? MostDerived(untyped, family.VoidContract)
+            : family.TypedContract;
     }
 
-    private static bool Implements(Type definition, Type contract)
+    internal static bool Implements(Type definition, Type contract)
     {
         if (definition == contract)
             return true;

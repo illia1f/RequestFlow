@@ -128,8 +128,7 @@ public sealed class ContinuationTests
         seen.ShouldBe(supplied.Token);
     }
 
-    // A repeated call runs the rest of the chain again, so a continuation built by Over has to
-    // allow that too.
+    // A repeated call runs the rest of the chain again, so a continuation built by Over has to allow that too.
     [Fact]
     public async Task Given_A_Continuation_Over_A_Delegate_When_A_Stage_Invokes_It_Twice_Then_The_Delegate_Runs_Twice()
     {

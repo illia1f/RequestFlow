@@ -26,4 +26,10 @@ public static class ProblemCodes
     public const string UnusedStage = "RF0105";
     public const string MultiContractRequest = "RF0106";
     public const string RuleFailed = "RF0107";
+    public const string MultiContractStreamRequest = "RF0108";
+    public const string RequestAndStreamRequest = "RF0109";
+    public const string StreamItemMismatch = "RF0110";
+    public const string StreamStageItemMismatch = "RF0111";
+    public const string HandlerResponseMismatch = "RF0112";
+    public const string StageResponseMismatch = "RF0113";
 }

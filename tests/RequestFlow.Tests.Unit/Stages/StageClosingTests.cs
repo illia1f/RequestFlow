@@ -9,7 +9,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Unconstrained_Open_Stage_When_Closing_Over_A_Request_Then_Applies_With_Closed_Type()
     {
-        var declaration = new StageDeclaration(typeof(LoggingStage<,>), null);
+        var declaration = new StageDeclaration(typeof(LoggingStage<,>), null, StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _pingHandler, out Type closedStageType, out string reason);
 
@@ -21,7 +21,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Constrained_Open_Stage_When_Request_Violates_The_Constraint_Then_Does_Not_Apply()
     {
-        var declaration = new StageDeclaration(typeof(TaggedOnlyStage<,>), null);
+        var declaration = new StageDeclaration(typeof(TaggedOnlyStage<,>), null, StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _pingHandler, out _, out _);
 
@@ -31,7 +31,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Constrained_Open_Stage_When_Request_Satisfies_The_Constraint_Then_Applies()
     {
-        var declaration = new StageDeclaration(typeof(TaggedOnlyStage<,>), null);
+        var declaration = new StageDeclaration(typeof(TaggedOnlyStage<,>), null, StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _taggedHandler, out Type closedStageType, out _);
 
@@ -42,7 +42,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Closed_Stage_When_Request_Matches_Its_Contract_Then_Applies_Without_Closing()
     {
-        var declaration = new StageDeclaration(typeof(PingAuditStage), null);
+        var declaration = new StageDeclaration(typeof(PingAuditStage), null, StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _pingHandler, out Type closedStageType, out string reason);
 
@@ -54,7 +54,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Closed_Stage_When_Request_Does_Not_Match_Its_Contract_Then_Does_Not_Apply()
     {
-        var declaration = new StageDeclaration(typeof(PingAuditStage), null);
+        var declaration = new StageDeclaration(typeof(PingAuditStage), null, StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _taggedHandler, out _, out _);
 
@@ -64,7 +64,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Handler_Filter_When_Handler_Implements_The_Contract_Then_Applies()
     {
-        var declaration = new StageDeclaration(typeof(LoggingStage<,>), typeof(IAuditable));
+        var declaration = new StageDeclaration(typeof(LoggingStage<,>), typeof(IAuditable), StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _taggedHandler, out Type closedStageType, out string reason);
 
@@ -76,7 +76,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Handler_Filter_When_Handler_Does_Not_Implement_The_Contract_Then_Does_Not_Apply()
     {
-        var declaration = new StageDeclaration(typeof(LoggingStage<,>), typeof(IAuditable));
+        var declaration = new StageDeclaration(typeof(LoggingStage<,>), typeof(IAuditable), StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _pingHandler, out _, out _);
 
@@ -86,7 +86,7 @@ public sealed class StageClosingTests
     [Fact]
     public void Given_Void_Request_When_Closing_An_Open_Stage_Then_Applies_Over_No_Result()
     {
-        var declaration = new StageDeclaration(typeof(LoggingStage<,>), null);
+        var declaration = new StageDeclaration(typeof(LoggingStage<,>), null, StageFamily.Request);
 
         bool applies = StageClosing.TryClose(declaration, _logHandler, out Type closedStageType, out _);
 
@@ -123,23 +123,41 @@ public sealed class StageClosingTests
         services.Count(d => d.ServiceType == typeof(LoggingStage<Ping, string>)).ShouldBe(1);
     }
 
+    [Fact]
+    public void Given_The_Stream_Family_When_Checking_Which_Handler_Contracts_It_Handles_Then_Only_The_Stream_Handler_Contract_Passes()
+    {
+        StageFamily.Stream.Handles(typeof(IRequestHandler<,>)).ShouldBeFalse();
+        StageFamily.Stream.Handles(typeof(IRequestHandler<>)).ShouldBeFalse();
+        StageFamily.Stream.Handles(typeof(IStreamRequestHandler<,>)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Given_The_Request_Family_When_Checking_Which_Handler_Contracts_It_Handles_Then_Only_The_Request_Handler_Contracts_Pass()
+    {
+        StageFamily.Request.Handles(typeof(IRequestHandler<,>)).ShouldBeTrue();
+        StageFamily.Request.Handles(typeof(IRequestHandler<>)).ShouldBeTrue();
+        StageFamily.Request.Handles(typeof(IStreamRequestHandler<,>)).ShouldBeFalse();
+    }
+
     #region Initialization
 
     private readonly HandlerRegistration _pingHandler =
-        new(new HandlerDiscovery(typeof(PingHandler), typeof(Ping), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        Handler(typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
     private readonly HandlerRegistration _taggedHandler =
-        new(new HandlerDiscovery(typeof(TaggedHandler), typeof(Tagged), typeof(string), isVoid: false),
-            ServiceLifetime.Transient);
+        Handler(typeof(TaggedHandler), typeof(Tagged), typeof(string), typeof(IRequestHandler<Tagged, string>));
 
     private readonly HandlerRegistration _logHandler =
-        new(new HandlerDiscovery(typeof(LogHandler), typeof(Log), typeof(NoResult), isVoid: true),
-            ServiceLifetime.Transient);
+        Handler(typeof(LogHandler), typeof(Log), typeof(NoResult), typeof(IRequestHandler<Log>), isVoid: true);
 
     #endregion
 
     #region Helpers
+
+    private static HandlerRegistration Handler(
+        Type handlerType, Type requestType, Type responseType, Type contractType, bool isVoid = false)
+        => new(new HandlerDiscovery(handlerType, requestType, responseType, isVoid, contractType),
+            ServiceLifetime.Transient);
 
     public interface ITag
     { }

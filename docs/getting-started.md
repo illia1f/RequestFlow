@@ -4,13 +4,13 @@ From an empty project to the first dispatched request.
 
 ## Install
 
-The packages are not on NuGet yet. Once they are, install the runtime package:
+The packages are on NuGet in preview, so installing the runtime package takes the `--prerelease` flag:
 
 ```
-dotnet add package RequestFlow
+dotnet add package RequestFlow --prerelease
 ```
 
-It pulls in `RequestFlow.Abstractions`, the contracts package with no dependencies of its own. Projects that only define requests and handlers, such as a domain layer, can reference `RequestFlow.Abstractions` alone.
+It pulls in `RequestFlow.Abstractions`, the contracts package. Projects that only define requests and handlers, such as a domain layer, reference `RequestFlow.Abstractions` alone, and that covers stream handlers too ([streaming.md](streaming.md#packages)). On `net8.0` and `net10.0` the contracts package has no dependencies; on `netstandard2.0` and `net462` it carries one Microsoft package, `Microsoft.Bcl.AsyncInterfaces`.
 
 All types live in the `RequestFlow` namespace, so one `using RequestFlow;` covers requests, handlers, and the dispatcher. The registration extensions live in `Microsoft.Extensions.DependencyInjection`, which a typical `Program.cs` already imports.
 

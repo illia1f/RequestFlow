@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 namespace RequestFlow;
 
 /// <summary>
-/// One <c>AddStage</c> call, holding the stage type the application wrote.
+/// One <c>AddStage</c> or <c>AddStreamStage</c> call, holding the stage type the application wrote.
 /// </summary>
 /// <remarks>
 /// Read <see cref="ReachedRequests"/> for the requests the call landed on, and read the rest of the
@@ -27,7 +27,7 @@ public sealed class StageDeclarationModel
     }
 
     /// <summary>
-    /// The type <c>AddStage</c> was given: an open generic definition or a closed class.
+    /// The type the registering call was given: an open generic definition or a closed class.
     /// </summary>
     public Type StageType { get; }
 
@@ -41,9 +41,9 @@ public sealed class StageDeclarationModel
     /// </summary>
     /// <remarks>
     /// Derived from the chains the model holds, so it lists every request whose
-    /// <see cref="RequestModel.Stages"/> contains a closing of this <see cref="StageType"/>. Two
-    /// calls registering one stage type report the same requests, whatever each call filtered on.
-    /// That registration already fails under <c>RF0103</c>.
+    /// <see cref="RequestModel.Stages"/> contains a closing of this <see cref="StageType"/>.
+    /// Two calls registering one stage type report the same requests, whatever each call
+    /// filtered on. That registration already fails under <c>RF0103</c>.
     /// </remarks>
     public IReadOnlyList<Type> ReachedRequests { get; }
 
@@ -52,7 +52,8 @@ public sealed class StageDeclarationModel
     /// </summary>
     /// <remarks>
     /// A void stage carries <c>IRequestStage&lt;TRequest&gt;</c> and has to say so, since nothing
-    /// in the declared type separates it from the typed form without reflection.
+    /// in the declared type separates it from the typed form without reflection. A stage from
+    /// another family, such as a stream stage, carries that family's contract.
     /// </remarks>
     public Type ContractType { get; }
 }

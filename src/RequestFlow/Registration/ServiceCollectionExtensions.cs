@@ -34,18 +34,19 @@ public static class ServiceCollectionExtensions
         if (options.UnhandledRequestsAllowed)
             registry.AllowUnhandledRequests();
 
-        DeclarationResult declarations = RegistrationValidator.ValidateDeclarations(options.Declarations);
+        Validated<GenericHandlerDeclaration> declarations = RegistrationValidator.ValidateDeclarations(options.Declarations);
 
-        IReadOnlyList<GenericHandlerClosing> newClosings = registry.AddNewClosings(Expand(declarations.ValidDeclarations));
-        ClosingResult closed = RegistrationValidator.ValidateClosings(newClosings);
+        IReadOnlyList<GenericHandlerClosing> newClosings = registry.AddNewClosings(
+            GenericHandlerClosing.Expand(declarations.Valid));
+        Validated<Type> closed = RegistrationValidator.ValidateClosings(newClosings);
 
         IReadOnlyList<Assembly> newAssemblies = registry.AddNewAssemblies(options.Assemblies);
         ScanResult scan = HandlerScanner.Scan(newAssemblies);
 
         List<HandlerRegistration> handlers = scan.Registrations(closed, options.HandlerLifetime);
 
-        StageDeclarationResult stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
-        registry.AddStageDeclarations(stages.ValidDeclarations);
+        Validated<StageDeclaration> stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
+        registry.AddStageDeclarations(stages.Valid);
         if (options.UnusedStagesDisallowed)
             registry.DisallowUnusedStages();
 
@@ -58,29 +59,20 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(sp => registry.BuildDispatchMap(sp));
         services.TryAdd(new ServiceDescriptor(
             typeof(IRequestDispatcher), typeof(RequestDispatcher), options.DispatcherLifetime));
+        services.TryAdd(new ServiceDescriptor(
+            typeof(IStreamDispatcher), typeof(StreamDispatcher), options.DispatcherLifetime));
 
         return new RequestFlowBuilder(services);
     }
 
-    private static List<GenericHandlerClosing> Expand(IReadOnlyList<GenericHandlerDeclaration> declarations)
-    {
-        List<GenericHandlerClosing> expanded = [];
-        foreach (var declaration in declarations)
-        {
-            expanded.AddRange(GenericHandlerClosing.Expand(declaration));
-        }
-
-        return expanded;
-    }
-
     private static List<HandlerRegistration> Registrations(
-        this ScanResult scan, ClosingResult closed, ServiceLifetime lifetime)
+        this ScanResult scan, Validated<Type> closed, ServiceLifetime lifetime)
     {
         List<HandlerRegistration> handlers = [];
         foreach (var discovery in scan.Handlers)
             handlers.Add(new HandlerRegistration(discovery, lifetime));
 
-        foreach (var closedType in closed.ClosedTypes)
+        foreach (var closedType in closed.Valid)
         {
             foreach (var discovery in HandlerScanner.Discover(closedType))
                 handlers.Add(new HandlerRegistration(discovery, lifetime));
@@ -106,16 +98,11 @@ public static class ServiceCollectionExtensions
     {
         foreach (var handler in handlers)
         {
-            Type service = handler.IsVoid
-                ? typeof(IRequestHandler<>).MakeGenericType(handler.RequestType)
-                : typeof(IRequestHandler<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
-            services.Add(new ServiceDescriptor(service, handler.ImplementationType, handler.Lifetime));
+            services.Add(new ServiceDescriptor(
+                handler.Contract, handler.ImplementationType, handler.Lifetime));
         }
     }
 
-    // Walks every declaration against every handler on each call, not just the new ones, so a
-    // stage declared earlier still reaches requests scanned later. Stages register the way
-    // handlers do, with Add, so a registration made after AddRequestFlow wins.
     private static void RegisterStages(IServiceCollection services, RequestFlowRegistry registry)
     {
         foreach (var declaration in registry.StageDeclarations)

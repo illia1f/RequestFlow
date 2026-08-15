@@ -60,8 +60,7 @@ public sealed class CommandQuerySplitRuleTests
         problems.ShouldHaveSingleItem().Subject.ShouldBe(typeof(Confused));
     }
 
-    // The rule reads the model off the context and nothing else, so the registration opt-ins leave
-    // its finding alone.
+    // The rule reads the model off the context and nothing else, so the registration opt-ins leave its finding alone.
     [Fact]
     public void Given_Both_Registration_Opt_Ins_When_Validating_Then_The_Split_Is_Still_Reported()
     {

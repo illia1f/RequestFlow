@@ -291,8 +291,7 @@ public sealed class StagePipelineTests
 
     #region Initialization
 
-    // The container instantiates stages, so the trace has to be static; the constructor clears
-    // it per test.
+    // The container instantiates stages, so the trace has to be static; the constructor clears it per test.
     private static readonly List<string> Trace = [];
 
     public StagePipelineTests()
@@ -365,8 +364,7 @@ public sealed class StagePipelineTests
         }
     }
 
-    // Declared closed over Forked's int contract, so it reaches ForkedIntHandler and not
-    // ForkedStringHandler.
+    // Declared closed over Forked's int contract, so it reaches ForkedIntHandler and not ForkedStringHandler.
     public sealed class ForkedIntStage : IRequestStage<Forked, int>
     {
         public Task<int> HandleAsync(
@@ -458,8 +456,7 @@ public sealed class StagePipelineTests
         }
     }
 
-    // Declared for the base request, so contravariance on TRequest is the only thing that can
-    // reach EmailNotification.
+    // Declared for the base request, so contravariance on TRequest is the only thing that can reach EmailNotification.
     public sealed class NotificationStage : IRequestStage<Notification, string>
     {
         public async Task<string> HandleAsync(

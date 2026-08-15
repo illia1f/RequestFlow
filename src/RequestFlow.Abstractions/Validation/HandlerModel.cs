@@ -29,7 +29,7 @@ public sealed class HandlerModel
     public Type HandlerType { get; }
 
     /// <summary>
-    /// What the handler returns, or null when it handles a void request.
+    /// The response the handler produces, the item type for a stream handler, or null when it handles a void request.
     /// </summary>
     public Type? ResponseType { get; }
 
@@ -53,8 +53,9 @@ public sealed class HandlerModel
     /// </summary>
     /// <remarks>
     /// A <see cref="Type"/> rather than an enum, so a package the core knows nothing about can
-    /// record its own contract here and its own rule can match on it. It has to be
-    /// <c>IRequestHandler</c> or an interface built on one.
+    /// record its own contract here and its own rule can match on it. Any open generic interface is
+    /// allowed, which is what lets a handler family the core does not name, such as the streaming
+    /// one, be reported honestly.
     /// </remarks>
     public Type ContractType { get; }
 }

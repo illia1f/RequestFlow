@@ -7,8 +7,8 @@ namespace RequestFlow;
 /// Runs one freeze's validation rules and collects what they report.
 /// </summary>
 /// <remarks>
-/// A built-in rule runs unguarded, so a bug in RequestFlow surfaces as the exception it threw. A
-/// registered rule runs guarded, so its failure becomes one more problem and the pass keeps going.
+/// A built-in rule runs unguarded, so a bug in RequestFlow surfaces as the exception it threw.
+/// A registered rule runs guarded, so its failure becomes one more problem and the pass keeps going.
 /// </remarks>
 internal static class ValidationRuleRunner
 {
@@ -22,7 +22,8 @@ internal static class ValidationRuleRunner
         IEnumerable<IRequestFlowValidationRule> registeredRules,
         IReadOnlyList<RequestFlowValidationProblem> seeded)
     {
-        // Copied, not appended to: the registry keeps its scan-time problems for the next provider built from the same service collection.
+        // Copied, not appended to: the registry keeps its scan-time problems for the next provider
+        // built from the same service collection.
         List<RequestFlowValidationProblem> problems = [.. seeded];
 
         foreach (var rule in builtInRules)
@@ -42,8 +43,7 @@ internal static class ValidationRuleRunner
         RequestFlowValidationContext context,
         List<RequestFlowValidationProblem> problems)
     {
-        // Findings reach the report only once the rule finishes, so a rule that throws halfway
-        // leaves none behind.
+        // Findings reach the report only once the rule finishes, so a rule that throws halfway leaves none behind.
         List<RequestFlowValidationProblem> reported = [];
         try
         {

@@ -26,16 +26,15 @@ internal sealed record GenericHandlerClosing
     public Type ClosingType { get; }
 
     /// <summary>
-    /// Expands a shape-valid declaration into one closing per declared closing type.
+    /// Expands shape-valid declarations into one closing per declared closing type.
     /// </summary>
-    public static List<GenericHandlerClosing> Expand(GenericHandlerDeclaration declaration)
+    public static IEnumerable<GenericHandlerClosing> Expand(
+        IReadOnlyList<GenericHandlerDeclaration> declarations)
     {
-        List<GenericHandlerClosing> closings = [];
-        foreach (var closingType in declaration.ClosingTypes)
+        foreach (var declaration in declarations)
         {
-            closings.Add(new GenericHandlerClosing(declaration.HandlerType, closingType));
+            foreach (var closingType in declaration.ClosingTypes)
+                yield return new GenericHandlerClosing(declaration.HandlerType, closingType);
         }
-
-        return closings;
     }
 }

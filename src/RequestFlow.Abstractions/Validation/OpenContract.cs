@@ -3,7 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Checks the contract type a model entry was given against the family it belongs to.
+/// Checks the shape of the contract type a model entry was given.
 /// </summary>
 internal static class OpenContract
 {
@@ -13,31 +13,13 @@ internal static class OpenContract
         if (contractType is null)
             return fallback;
 
-        if (contractType.IsInterface && contractType.IsGenericTypeDefinition &&
-            (BuiltOn(contractType, fallback) || BuiltOn(contractType, alternate)))
-        {
+        if (contractType.IsInterface && contractType.IsGenericTypeDefinition)
             return contractType;
-        }
 
         throw new ArgumentException(
-            $"'{contractType}' is neither {Describe(fallback)} nor {Describe(alternate)}, nor built on " +
-            $"either. Pass {Describe(fallback)}, or an open generic interface deriving from it.",
+            $"'{contractType}' is not an open generic interface. Pass {Describe(fallback)}, " +
+            $"{Describe(alternate)}, or another open generic contract interface.",
             nameof(contractType));
-    }
-
-    // An open definition lists the contract closed over its own parameters, so compare definitions.
-    private static bool BuiltOn(Type definition, Type contract)
-    {
-        if (definition == contract)
-            return true;
-
-        foreach (var iface in definition.GetInterfaces())
-        {
-            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == contract)
-                return true;
-        }
-
-        return false;
     }
 
     private static string Describe(Type definition)

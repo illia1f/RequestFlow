@@ -6,8 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// Everything user-configurable about RequestFlow, passed to the <c>AddRequestFlow</c>
-/// configure delegate.
+/// Everything user-configurable about RequestFlow, passed to the <c>AddRequestFlow</c> configure delegate.
 /// </summary>
 public sealed class RequestFlowOptions
 {
@@ -51,8 +50,7 @@ public sealed class RequestFlowOptions
     /// <summary>
     /// Skips the missing-handler check when the dispatch map freezes. Intended for
     /// contracts assemblies whose requests are handled elsewhere. Applies to all
-    /// registered assemblies once any call opts in; duplicate-handler validation is
-    /// unaffected.
+    /// registered assemblies once any call opts in; duplicate-handler validation is unaffected.
     /// </summary>
     public RequestFlowOptions AllowUnhandledRequests()
     {
@@ -62,8 +60,7 @@ public sealed class RequestFlowOptions
 
     /// <summary>
     /// Registers the dispatcher with a transient lifetime instead of the default scoped.
-    /// The first <c>AddRequestFlow</c> call fixes the dispatcher lifetime; later calls
-    /// cannot change it.
+    /// The first <c>AddRequestFlow</c> call fixes the dispatcher lifetime; later calls cannot change it.
     /// </summary>
     public RequestFlowOptions WithTransientDispatcher()
     {
@@ -86,8 +83,7 @@ public sealed class RequestFlowOptions
         if (assembly is null)
             throw new ArgumentNullException(nameof(assembly));
 
-        if (!Assemblies.Contains(assembly))
-            Assemblies.Add(assembly);
+        Assemblies.Add(assembly);
 
         return this;
     }
@@ -129,25 +125,15 @@ public sealed class RequestFlowOptions
     /// target one request contract. A closed stage is not restricted to the request type it
     /// names: <c>TRequest</c> is contravariant, so it also wraps every request deriving from
     /// that one, and <paramref name="configure"/> narrows the set further. A stage type belongs
-    /// to a chain once, so a second call naming it is a duplicate whatever it filters on. Each
-    /// stage carries its own lifetime, transient unless <paramref name="configure"/> says
+    /// to a chain once, so a second call naming it is a duplicate whatever it filters on.
+    /// Each stage carries its own lifetime, transient unless <paramref name="configure"/> says
     /// otherwise. An invalid stage surfaces as a <see cref="RequestFlowValidationException"/>
     /// problem when the dispatch map is built.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="InvalidOperationException"/>
     public RequestFlowOptions AddStage(Type stageType, Action<StageOptions>? configure = null)
-    {
-        if (stageType is null)
-            throw new ArgumentNullException(nameof(stageType));
-
-        var stage = new StageOptions();
-        configure?.Invoke(stage);
-
-        StageDeclarations.Add(new StageDeclaration(stageType, stage.HandlerFilter, stage.Lifetime));
-
-        return this;
-    }
+        => DeclareStage(stageType, configure, StageFamily.Request);
 
     /// <summary>
     /// Registers <typeparamref name="TStage"/> under the same rules as <see cref="AddStage(Type, Action{StageOptions})"/>.
@@ -155,6 +141,47 @@ public sealed class RequestFlowOptions
     public RequestFlowOptions AddStage<TStage>(Action<StageOptions>? configure = null)
         where TStage : class
         => AddStage(typeof(TStage), configure);
+
+    /// <summary>
+    /// Registers <paramref name="stageType"/> to run around the handler of every stream request it
+    /// applies to. Registration order is execution order, outermost first.
+    /// </summary>
+    /// <remarks>
+    /// The stream counterpart of <see cref="AddStage(Type, Action{StageOptions})"/>, under the same
+    /// rules for open generics, contravariance, handler filters, and lifetimes. A stream stage never
+    /// reaches a task handler and a task stage never reaches a stream handler. A type implementing
+    /// both contracts and declared through both calls is one stage type registered twice, which
+    /// <c>RF0103</c> reports as a duplicate, so there is no way to register a type meant for both families.
+    /// Unlike a request stage, a stream stage written as an async iterator costs once per
+    /// enumeration and once per level: its own state machine and its own enumerator. A stage that
+    /// returns the sequence from <c>next</c> without iterating it costs nothing, and neither cost
+    /// grows with the number of items.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="InvalidOperationException"/>
+    public RequestFlowOptions AddStreamStage(Type stageType, Action<StageOptions>? configure = null)
+        => DeclareStage(stageType, configure, StageFamily.Stream);
+
+    /// <summary>
+    /// Registers <typeparamref name="TStage"/> under the same rules as <see cref="AddStreamStage(Type, Action{StageOptions})"/>.
+    /// </summary>
+    public RequestFlowOptions AddStreamStage<TStage>(Action<StageOptions>? configure = null)
+        where TStage : class
+        => AddStreamStage(typeof(TStage), configure);
+
+    // Registration order is execution order, so a declaration is appended where the call was made.
+    private RequestFlowOptions DeclareStage(Type stageType, Action<StageOptions>? configure, StageFamily family)
+    {
+        if (stageType is null)
+            throw new ArgumentNullException(nameof(stageType));
+
+        var stage = new StageOptions();
+        configure?.Invoke(stage);
+
+        StageDeclarations.Add(new StageDeclaration(stageType, stage.HandlerFilter, family, stage.Lifetime));
+
+        return this;
+    }
 
     /// <summary>
     /// Reports a stage that reaches no registered request as a validation problem instead of

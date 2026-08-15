@@ -7,8 +7,7 @@ namespace RequestFlow;
 /// Collects the handlers and stage closings for one request type while a model is being built.
 /// </summary>
 /// <remarks>
-/// Reached through <see cref="RequestFlowModelBuilder.AddRequest"/> and never constructed
-/// directly.
+/// Reached through <see cref="RequestFlowModelBuilder.AddRequest"/> and never constructed directly.
 /// </remarks>
 public sealed class RequestModelBuilder
 {
@@ -69,8 +68,7 @@ public sealed class RequestModelBuilder
     /// <paramref name="declaredType"/> is the type its
     /// <see cref="RequestFlowModelBuilder.AddStageDeclaration(Type, Type)"/> call names, which is
     /// what ties the declaration to this request in
-    /// <see cref="StageDeclarationModel.ReachedRequests"/>. Naming the closed type instead leaves
-    /// that list empty.
+    /// <see cref="StageDeclarationModel.ReachedRequests"/>. Naming the closed type instead leaves that list empty.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
