@@ -1,6 +1,6 @@
 # Validation rules
 
-A validation rule is a check of your own that runs inside RequestFlow's startup validation. An application adds one to enforce a convention across its requests. A package adds one to check its own contracts, which is how `AddCqrs` rejects a request classified as both a command and a query.
+A validation rule is a check of your own that runs inside RequestFlow's startup validation. An application adds one to enforce a convention across its requests. A package adds one to check its own contracts, which is how `AddCqrs` rejects a request that lands on both sides of the command and query split.
 
 Rules run once, when the dispatch map freezes: at the first dispatcher resolution, or at startup under `ValidateRequestFlow` (see [lifetimes.md](lifetimes.md) for the timing). Their problems land in the same `RequestFlowValidationException` as the built-in ones, so one failed start reports everything at once.
 
@@ -69,7 +69,7 @@ services.TryAddEnumerable(
 
 That trades one problem for another when the rule is or owns an `IDisposable`. The rule resolves from the root provider, which tracks every transient disposable it creates and releases none of them until the provider is disposed, so a start that keeps failing leaves one instance behind per dispatcher resolution. A rule that clears its state at the top of `Validate` stays a singleton and avoids both.
 
-Do not take `IRequestDispatcher`, `ICommandDispatcher`, or `IQueryDispatcher` in a rule. Resolving one needs the dispatch map the freeze is still building, so the container waits on a result only that freeze can produce. Nothing throws and the stack never overflows. The process never finishes starting.
+Do not take a dispatcher in a rule, whether `IRequestDispatcher`, `IStreamDispatcher`, `ICommandDispatcher`, `IQueryDispatcher`, or `IStreamQueryDispatcher`. Resolving one needs the dispatch map the freeze is still building, so the container waits on a result only that freeze can produce. Nothing throws and the stack never overflows. The process never finishes starting.
 
 Most providers reject the rule before it gets that far. The dispatcher is scoped by default and a rule is a singleton, so a provider that validates scopes fails first:
 
@@ -78,7 +78,7 @@ Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton
 'RequestFlow.IRequestFlowValidationRule'.
 ```
 
-That is what ASP.NET Core shows in Development, and `ValidateOnBuild` reports it at `BuildServiceProvider`. The hang is what you get on a provider that does not validate scopes, or after `WithTransientDispatcher` makes the dispatcher resolvable from the root. If startup produces no output and no error while the process stays alive, this is why. The fix either way is to drop the dependency.
+That is what ASP.NET Core shows in Development, and `ValidateOnBuild` reports it at `BuildServiceProvider`. The message names `IRequestDispatcher` or `IStreamDispatcher` even when the rule took a CQRS dispatcher, because the typed dispatchers are transient wrappers over those two. The hang is what you get on a provider that does not validate scopes, or after `WithTransientDispatcher` makes the dispatcher resolvable from the root. If startup produces no output and no error while the process stays alive, this is why. The fix either way is to drop the dependency.
 
 Handlers and stages are a different case. They resolve without touching the map, so a rule taking one starts fine. The cost is quieter: the rule is a singleton resolved from the root provider, so it pins a transient handler for as long as the provider lives, and once the application calls `WithScopedHandlers` the same rule stops resolving on any provider that validates scopes. Read the model instead; it already names every handler and stage type.
 
@@ -208,7 +208,7 @@ Codes are stable and never renumbered. `RF0001` to `RF0012` are shape checks on 
 | `RF0111` | A stream stage's item type is not the one its request declares; reported only when the stage wrapped no handler |
 | `RF0112` | A handler's response type is not the one its request declares |
 | `RF0113` | A stage's response type is not the one its request declares; reported only when the stage wrapped no handler |
-| `CQRS0001` | A request is classified as both a command and a query; contributed by `AddCqrs` |
+| `CQRS0001` | A request is classified as both a command and a query, or as both a command and a stream query; contributed by `AddCqrs` |
 
 Problems come out in a fixed order: the shape problems first, then the built-in checks `RF0101` to `RF0106` in the order above, then the stream codes `RF0108` to `RF0111`, then `RF0112` and `RF0113`, then the rules the container holds, in registration order. `RF0108` to `RF0110` come from one rule that walks the requests in scan order and reports each request's problems together, so they group by request rather than by code. The remaining three come from a rule each: `RF0112` walks the requests in scan order, `RF0111` and `RF0113` walk the stage declarations in registration order. An `RF0107` takes the place of whatever the rule that threw would have reported, so it lands in that rule's position in the list.
 

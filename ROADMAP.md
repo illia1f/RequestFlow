@@ -9,7 +9,7 @@ Request/response dispatch, the stage pipeline, the CQRS layer, events, and strea
 - [x] Core abstractions: `IRequest`, `IRequestHandler<,>`, `NoResult`
 - [x] `IRequestDispatcher` and the dispatcher over a frozen dispatch map
 - [x] `IRequestStage` with open, constrained, and closed generic registration
-- [x] CQRS layer: `ICommand`/`IQuery` and handler contracts in `RequestFlow.Cqrs.Abstractions`, typed dispatchers and `AddCqrs` registration in `RequestFlow.Cqrs`
+- [x] CQRS layer: `ICommand`/`IQuery`/`IStreamQuery` and handler contracts in `RequestFlow.Cqrs.Abstractions`, typed dispatchers (`IStreamQueryDispatcher` included) and `AddCqrs` registration in `RequestFlow.Cqrs`
 - [x] `AddRequestFlow` registration with assembly scanning and generic handler closings
 - [x] Exceptions and startup validation (`ValidateRequestFlow`)
 - [x] Validation as pluggable rules: `IRequestFlowValidationRule`, `AddValidationRule<T>()`, and stable problem codes on `RequestFlowValidationException`

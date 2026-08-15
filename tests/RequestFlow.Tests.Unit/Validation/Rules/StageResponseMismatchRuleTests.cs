@@ -77,6 +77,22 @@ public sealed class StageResponseMismatchRuleTests
     }
 
     [Fact]
+    public void Given_Two_Wide_Response_Stages_Over_One_Request_When_Validating_Then_Reports_Both()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(typeof(StringAsk))
+            .AddStageDeclaration(typeof(WideResponseStage))
+            .AddStageDeclaration(typeof(OpenWideResponseStage<>))
+            .BuildContext();
+
+        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
+
+        problems.Count.ShouldBe(2);
+        problems.ShouldContain(p => p.Subject == typeof(WideResponseStage));
+        problems.ShouldContain(p => p.Subject == typeof(OpenWideResponseStage<>));
+    }
+
+    [Fact]
     public void Given_An_Open_One_Parameter_Stage_With_The_Declared_Response_Type_When_Validating_Then_Reports_Nothing()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()

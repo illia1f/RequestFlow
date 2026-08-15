@@ -37,6 +37,8 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
         // A stage type declared twice is one mismatch, not two; RF0103 reports the duplicate.
         HashSet<Type> checkedStages = [];
 
+        Dictionary<Type, Type?> declaredResponses = [];
+
         foreach (var declaration in context.Model.StageDeclarations)
         {
             Type stageType = declaration.StageType;
@@ -59,7 +61,8 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
                     continue;
 
                 // No sole contract, no response type to hold the stage to; RF0106 reports the ambiguity.
-                Type? declaredResponse = RequestContracts.SoleDeclaredResponse(request.RequestType);
+                Type? declaredResponse =
+                    RequestContracts.SoleDeclaredResponse(request.RequestType, declaredResponses);
                 if (declaredResponse is null)
                     continue;
 
@@ -84,7 +87,6 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
 
                     if (arguments[1] == declaredResponse)
                     {
-                        // One matching contract is enough for the stage to close and run.
                         mismatchedResponse = null;
                         break;
                     }

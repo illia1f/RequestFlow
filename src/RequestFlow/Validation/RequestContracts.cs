@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RequestFlow;
 
@@ -34,6 +35,26 @@ internal static class RequestContracts
 
             declared = iface.GetGenericArguments()[0];
         }
+
+        return declared;
+    }
+
+    /// <summary>
+    /// <see cref="SoleDeclaredResponse(Type)"/> with the answer kept per request type; null records
+    /// "no sole contract".
+    /// </summary>
+    /// <remarks>
+    /// A rule that asks once per stage per request walks the same interfaces again for every stage,
+    /// so the caller passes a memo it owns for that pass. A shared static memo would need a lock and
+    /// would outlive the freeze.
+    /// </remarks>
+    public static Type? SoleDeclaredResponse(Type requestType, Dictionary<Type, Type?> memo)
+    {
+        if (memo.TryGetValue(requestType, out Type? cached))
+            return cached;
+
+        Type? declared = SoleDeclaredResponse(requestType);
+        memo[requestType] = declared;
 
         return declared;
     }

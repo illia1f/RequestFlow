@@ -93,6 +93,19 @@ public sealed class ConfusedHandler : IRequestHandler<Confused, int>
 public sealed record VoidConfused : ICommand, IQuery<int>;
 
 /// <summary>
+/// A command also classified as a stream query; the AddCqrs rule reports it as CQRS0001, and the
+/// base contracts collide too, so core validation reports the same type as RF0109.
+/// Handled on the command side so it adds no unhandled-request noise.
+/// </summary>
+public sealed record StreamConfused : ICommand<int>, IStreamQuery<string>;
+
+public sealed class StreamConfusedHandler : IRequestHandler<StreamConfused, int>
+{
+    public Task<int> HandleAsync(StreamConfused request, CancellationToken cancellationToken)
+        => Task.FromResult(0);
+}
+
+/// <summary>
 /// A stream request with no handler anywhere in this assembly; startup validation must report it.
 /// </summary>
 public sealed record LonelyStream : IStreamRequest<int>;
@@ -122,6 +135,18 @@ public sealed record MixedFamilies : IRequest<string>, IStreamRequest<int>;
 public sealed class MixedFamiliesHandler : IRequestHandler<MixedFamilies, string>
 {
     public Task<string> HandleAsync(MixedFamilies request, CancellationToken cancellationToken)
+        => Task.FromResult("mixed");
+}
+
+/// <summary>
+/// Carries both families through the CQRS contracts alone; startup validation must still report
+/// it under RF0109. Handled on the query side so it adds no unhandled-request noise.
+/// </summary>
+public sealed record MixedCqrsFamilies : IQuery<string>, IStreamQuery<int>;
+
+public sealed class MixedCqrsFamiliesHandler : IQueryHandler<MixedCqrsFamilies, string>
+{
+    public Task<string> HandleAsync(MixedCqrsFamilies request, CancellationToken cancellationToken)
         => Task.FromResult("mixed");
 }
 

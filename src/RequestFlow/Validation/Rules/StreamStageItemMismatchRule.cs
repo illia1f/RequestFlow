@@ -33,6 +33,8 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
         // A stage type declared twice is one mismatch, not two; RF0103 reports the duplicate.
         HashSet<Type> checkedStages = [];
 
+        Dictionary<Type, Type?> declaredItems = [];
+
         foreach (var declaration in context.Model.StageDeclarations)
         {
             Type stageType = declaration.StageType;
@@ -55,7 +57,7 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
                     continue;
 
                 // No sole contract, no item type to hold the stage to; RF0108 reports the ambiguity.
-                Type? declaredItem = SoleDeclaredItem(request.RequestType);
+                Type? declaredItem = SoleDeclaredItem(request.RequestType, declaredItems);
                 if (declaredItem is null)
                     continue;
 
@@ -80,7 +82,6 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
 
                     if (arguments[1] == declaredItem)
                     {
-                        // One matching contract is enough for the stage to close and run.
                         mismatchedItem = null;
                         break;
                     }
@@ -128,6 +129,19 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
         {
             return null;
         }
+    }
+
+    // The answer kept per request type, since every stage asks about the same requests; null
+    // records "no sole contract". The memo belongs to one pass, so it needs no lock.
+    private static Type? SoleDeclaredItem(Type requestType, Dictionary<Type, Type?> memo)
+    {
+        if (memo.TryGetValue(requestType, out Type? cached))
+            return cached;
+
+        Type? declared = SoleDeclaredItem(requestType);
+        memo[requestType] = declared;
+
+        return declared;
     }
 
     private static Type? SoleDeclaredItem(Type requestType)
