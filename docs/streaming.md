@@ -5,7 +5,8 @@ A stream request is dispatched to exactly one handler, like any other request, b
 ## Packages
 
 - The composition root installs `RequestFlow`, as it already does.
-- An assembly that declares stream requests, writes stream handlers, or writes stream stages, but does no registration, references `RequestFlow.Abstractions` alone. Everything streaming lives there: `IStreamRequest<TItem>`, `IStreamRequestHandler`, `IStreamRequestStage`, `StreamContinuation<TItem>`, and `IStreamDispatcher`.
+- An assembly that declares stream requests, writes stream handlers, or writes stream stages, but does no registration, references `RequestFlow.Abstractions` alone. The core streaming contracts live there: `IStreamRequest<TItem>`, `IStreamRequestHandler`, `IStreamRequestStage`, `StreamContinuation<TItem>`, and `IStreamDispatcher`.
+- An assembly on the CQRS split references `RequestFlow.Cqrs.Abstractions` instead and declares `IStreamQuery<TItem>` with `IStreamQueryHandler<TQuery, TItem>`. Both derive from the core contracts, so everything on this page applies to them unchanged. `AddCqrs` registers `IStreamQueryDispatcher`, the read-side entry point.
 
 `RequestFlow.Abstractions` carries `Microsoft.Bcl.AsyncInterfaces` on `netstandard2.0` and `net462`, which is where `IAsyncEnumerable<T>` is not in the framework. On `net8.0` and `net10.0` it has no dependencies.
 

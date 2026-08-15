@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>CQRS contracts for RequestFlow: ICommand, IQuery, handler and dispatcher interfaces. No runtime dependency, safe to reference from domain and application layers.</Description>
+    <Description>CQRS contracts for RequestFlow: ICommand, IQuery, IStreamQuery, handler and dispatcher interfaces. No runtime dependency, safe to reference from domain and application layers.</Description>
   </PropertyGroup>
 
   <ItemGroup>

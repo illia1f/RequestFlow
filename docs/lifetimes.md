@@ -9,6 +9,7 @@ What RequestFlow registers, with which lifetime, and what you can change.
 | Handlers (`IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, `IStreamRequestHandler<TRequest, TItem>`) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
 | Stages (`IRequestStage<TRequest, TResponse>`, `IRequestStage<TRequest>`, `IStreamRequestStage<TRequest, TItem>`)       | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage` or `AddStreamStage` call |
 | `IRequestDispatcher`, `IStreamDispatcher`                                      | Scoped                                                     | Yes, `WithTransientDispatcher`, which moves both |
+| Typed CQRS dispatchers (`ICommandDispatcher`, `IQueryDispatcher`, `IStreamQueryDispatcher`) | Transient, added by `AddCqrs`; each forwards to a dispatcher above, so a singleton injecting one still fails with `Cannot consume scoped service`, naming the core dispatcher inside | Not through `AddCqrs`; a descriptor of your own registered before it wins |
 | Validation rules (`IRequestFlowValidationRule`)                                | Singleton, added by `AddValidationRule` and by `AddCqrs`    | Not through those calls; register your own descriptor for another lifetime |
 | Dispatch map (internal handler lookup)                                         | Singleton, built the first time the dispatcher is resolved | No                             |
 

@@ -30,15 +30,14 @@ dotnet build -c Release -p:CI=true
 
 - No code from MediatR (commercially licensed since 2025). Shared vocabulary is fine, shared code is not. Use MIT or Apache licensed references.
 - No reflection, LINQ, or locking on the dispatch path. Reflection is fine at registration and startup validation.
-- Public API returns `Task`/`Task<T>`, never `ValueTask`. Methods are `SendAsync`/`HandleAsync`. Handler interfaces take a `CancellationToken`. `NoResult` never appears in a user-written handler signature. Streaming is the exception: `IStreamDispatcher.Stream`, `IStreamRequestHandler.Handle`, `IStreamRequestStage.Handle`, and `StreamContinuation.Invoke` return an `IAsyncEnumerable<TItem>` synchronously, so they carry no `Async` suffix.
 - Target frameworks and dependencies are fixed. All four `src/` projects target `netstandard2.0;net462;net8.0;net10.0`.
 
-| Project                         | Depends on                                                                          |
-| ------------------------------- | ----------------------------------------------------------------------------------- |
+| Project                         | Depends on                                                                                      |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `RequestFlow.Abstractions`      | nothing on `net8.0`/`net10.0`; `Microsoft.Bcl.AsyncInterfaces` on `netstandard2.0` and `net462` |
-| `RequestFlow.Cqrs.Abstractions` | `RequestFlow.Abstractions`                                                          |
-| `RequestFlow`                   | `RequestFlow.Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions` |
-| `RequestFlow.Cqrs`              | `RequestFlow.Cqrs.Abstractions`, `RequestFlow`                                      |
+| `RequestFlow.Cqrs.Abstractions` | `RequestFlow.Abstractions`                                                                      |
+| `RequestFlow`                   | `RequestFlow.Abstractions`, `Microsoft.Extensions.DependencyInjection.Abstractions`             |
+| `RequestFlow.Cqrs`              | `RequestFlow.Cqrs.Abstractions`, `RequestFlow`                                                  |
 
 ## Tests
 

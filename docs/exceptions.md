@@ -58,8 +58,7 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0111`](#stages) | Stages | Stream stage item type does not match the request |
 | [`RF0112`](#requests-and-handlers) | Requests and handlers | Handler response type does not match the request |
 | [`RF0113`](#stages) | Stages | Stage response type does not match the request |
-| [`RF0112`](#requests-and-handlers) | Requests and handlers | Handler response type does not match the request |
-| [`CQRS0001`](#cqrs) | CQRS | Request is both a command and a query |
+| [`CQRS0001`](#cqrs) | CQRS | Request is a command and a query, or a command and a stream query |
 
 ### Codes by area
 
@@ -97,8 +96,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0108` | `Stream request '...' implements more than one stream request contract...` | The type implements two `IStreamRequest<TItem>` contracts, directly or through interfaces | Keep one contract; split the type if both sequences are needed |
 | `RF0109` | `Request '...' implements both IRequest and IStreamRequest...` | One type carries a request contract and a stream contract. The map holds one plan per request type, so one would overwrite the other | Keep one contract; split the type if both are needed |
 | `RF0110` | `Stream handler '...' produces '...' items for request '...'` | The handler's item type is wider than the one the request declares. `IStreamRequest<TItem>` is covariant, so the pair compiles, but `Stream` infers the declared item type and the plan holds the handler's, so dispatching the request throws | Give the handler the item type the request declares |
-| `RF0112` | `Handler '...' produces '...' for request '...'` | The handler's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the pair compiles, but `SendAsync` infers the declared response type and the plan holds the handler's, so dispatching the request throws | Give the handler the response type the request declares |
-| `RF0112` | `Handler '...' produces '...' for request '...', which declares IRequest<...>...` | The handler's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the pair compiles, but `SendAsync` infers the declared response type and cannot reach the handler's plan | Give the handler the response type the request declares |
+| `RF0112` | `Handler '...' produces '...' for request '...', which declares IRequest<...>...` | The handler's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the pair compiles, but `SendAsync` infers the declared response type and the plan holds the handler's, so dispatching the request throws | Give the handler the response type the request declares |
 
 #### Stages
 
@@ -122,7 +120,8 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 
 | Code | Problem message starts with | Cause | Fix |
 | --- | --- | --- | --- |
-| `CQRS0001` | `Request '...' is classified as both a command and a query...` | The request type implements both `ICommand<TResponse>` and `IQuery<TResponse>` contracts | Keep one contract; split the type if it must represent both operations |
+| `CQRS0001` | `Request '...' is classified as both a command and a query...` | The request type implements `ICommand<TResponse>` next to `IQuery<TOther>`. The check reads the two contracts, not their response types, so the pair reports even when the responses differ | Keep one side of the split; split the type if it must represent both operations |
+| `CQRS0001` | `Request '...' is classified as both a command and a stream query...` | The request type implements `ICommand<TResponse>` next to `IStreamQuery<TItem>`. The base contracts collide too, so the same freeze also reports the type as `RF0109`, with or without `AddCqrs` | Keep one side of the split; split the type if it must represent both operations |
 
 Example: a contracts assembly scanned without its handlers fails at startup, not per request.
 
@@ -146,7 +145,7 @@ services.AddRequestFlow(o => o
 
 ## HandlerNotFoundException
 
-Thrown by `SendAsync`, and by `IStreamDispatcher.Stream`, when the request's runtime type has no registered handler. The `RequestType` property holds the request type that had no handler. `Stream` throws it from the call rather than from the first enumeration, because the lookup is not part of the sequence it hands back.
+Thrown by `SendAsync`, and by `IStreamDispatcher.Stream` or `IStreamQueryDispatcher.Stream`, when the request's runtime type has no registered handler. The `RequestType` property holds the request type that had no handler. Both `Stream` methods throw it from the call rather than from the first enumeration, because the lookup is not part of the sequence they hand back.
 
 With default validation a scanned request without a handler already fails startup validation, so only three paths lead here:
 
@@ -172,7 +171,7 @@ The second call compiles because `ExpressCreateOrder` is an `IRequest<OrderId>`,
 
 ## ResponseTypeMismatchException
 
-Thrown by `SendAsync` when the request type has a registered handler, but its response type differs from the call site's `TResponse` argument. `RequestType`, `ExpectedResponseType`, and `ActualResponseType` identify the three types involved. `Stream` throws the same exception, from the call, when the call site's `TItem` differs from the registered item type; the covariant upcast below is the way to reach it there too.
+Thrown by `SendAsync` when the request type has a registered handler, but its response type differs from the call site's `TResponse` argument. `RequestType`, `ExpectedResponseType`, and `ActualResponseType` identify the three types involved. The two `Stream` methods throw the same exception, from the call, when the call site's `TItem` differs from the registered item type; the covariant upcast below is the way to reach it there too.
 
 The compiler normally infers `TResponse` from the request's `IRequest<TResponse>` interface, so plain call sites never hit this. Two things make it reachable.
 
@@ -260,7 +259,7 @@ Two cases are left with no type of their own. Adding a second `WhereHandlerImple
 
 The second comes from a broken validation rule: a rule that returns null instead of an empty sequence, or a sequence with a null problem in it, throws at the freeze with a message naming the rule. Those two are the only rule failures that come out this way. An exception the rule throws from its own code is reported as `RF0107` in the validation exception instead, and the rules after it still run (see [validation-rules.md](validation-rules.md)).
 
-One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher needs the map the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, rejects the rule earlier with `Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton 'RequestFlow.IRequestFlowValidationRule'`, since the dispatcher is scoped and a rule is a singleton. Both point at the same fix: take `IRequestDispatcher`, `ICommandDispatcher`, and `IQueryDispatcher` out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
+One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher needs the map the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, rejects the rule earlier with `Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton 'RequestFlow.IRequestFlowValidationRule'`, since the dispatcher is scoped and a rule is a singleton. A rule taking a CQRS dispatcher gets the same message naming `IRequestDispatcher` or `IStreamDispatcher`, because the typed dispatchers are transient wrappers over those two. Both point at the same fix: take the dispatchers (`IRequestDispatcher`, `IStreamDispatcher`, `ICommandDispatcher`, `IQueryDispatcher`, `IStreamQueryDispatcher`) out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
 
 ## Argument validation
 
@@ -270,6 +269,9 @@ Argument checks at the public surface throw immediately at the call site:
 | ------------------------------------- | ----------------------- | --------------------------------------- |
 | `IRequestDispatcher.SendAsync` (both) | `ArgumentNullException` | `request` is null                       |
 | `IStreamDispatcher.Stream`            | `ArgumentNullException` | `request` is null                       |
+| `ICommandDispatcher.SendAsync` (both) | `ArgumentNullException` | `command` is null                       |
+| `IQueryDispatcher.SendAsync`          | `ArgumentNullException` | `query` is null                         |
+| `IStreamQueryDispatcher.Stream`       | `ArgumentNullException` | `query` is null                         |
 | `Continuation<T>.Over`, `Continuation.Over`, `StreamContinuation<T>.Over` | `ArgumentNullException` | `rest` is null      |
 | `AddRequestFlow`                      | `ArgumentNullException` | `services` or `configure` is null       |
 | `RegisterHandlersFromAssembly`        | `ArgumentNullException` | `assembly` is null                      |

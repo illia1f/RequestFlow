@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using RequestFlow.Tests.ValidationFixtures;
 
 namespace RequestFlow.Cqrs.Tests.Unit;
@@ -26,6 +27,31 @@ public sealed class CommandQuerySplitRuleTests
         RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
         problem.Code.ShouldBe("CQRS0001");
         problem.Subject.ShouldBe(typeof(VoidConfused));
+    }
+
+    [Fact]
+    public void Given_A_Command_That_Is_Also_A_Stream_Query_When_Validating_Then_Reports_The_Type()
+    {
+        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(Context(typeof(StreamConfused)))];
+
+        RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
+        problem.Code.ShouldBe("CQRS0001");
+        problem.Subject.ShouldBe(typeof(StreamConfused));
+        problem.Message.ShouldContain("both a command and a stream query");
+        problem.Message.ShouldContain("pick one side of the split");
+    }
+
+    // Both contracts sit on the query side, so mixing them is RF0109's business, not this rule's.
+    [Fact]
+    public void Given_A_Query_That_Is_Also_A_Stream_Query_When_Validating_Then_Reports_Nothing()
+    {
+        _sut.Validate(Context(typeof(MixedCqrsFamilies))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Given_A_Plain_Stream_Query_When_Validating_Then_Reports_Nothing()
+    {
+        _sut.Validate(Context(typeof(PlainStreamQuery))).ShouldBeEmpty();
     }
 
     [Fact]
@@ -90,6 +116,8 @@ public sealed class CommandQuerySplitRuleTests
 
     private sealed record PlainQuery : IQuery<int>;
 
+    private sealed record PlainStreamQuery : IStreamQuery<int>;
+
     private sealed record PlainRequest : IRequest<int>;
 
     // Handled because AddCqrsTests freezes this assembly without AllowUnhandledRequests.
@@ -103,6 +131,16 @@ public sealed class CommandQuerySplitRuleTests
     {
         public Task<int> HandleAsync(PlainQuery request, CancellationToken cancellationToken)
             => Task.FromResult(0);
+    }
+
+    private sealed class PlainStreamQueryHandler : IStreamQueryHandler<PlainStreamQuery, int>
+    {
+        public async IAsyncEnumerable<int> Handle(
+            PlainStreamQuery request, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            yield return 1;
+        }
     }
 
     private sealed class PlainRequestHandler : IRequestHandler<PlainRequest, int>

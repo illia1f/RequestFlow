@@ -78,6 +78,22 @@ public sealed class StreamStageItemMismatchRuleTests
     }
 
     [Fact]
+    public void Given_Two_Wide_Item_Stages_Over_One_Request_When_Validating_Then_Reports_Both()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(typeof(StringStream))
+            .AddStageDeclaration(typeof(WideItemStage), typeof(IStreamRequestStage<,>))
+            .AddStageDeclaration(typeof(OpenWideItemStage<>), typeof(IStreamRequestStage<,>))
+            .BuildContext();
+
+        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
+
+        problems.Count.ShouldBe(2);
+        problems.ShouldContain(p => p.Subject == typeof(WideItemStage));
+        problems.ShouldContain(p => p.Subject == typeof(OpenWideItemStage<>));
+    }
+
+    [Fact]
     public void Given_An_Open_One_Parameter_Stage_With_The_Declared_Item_Type_When_Validating_Then_Reports_Nothing()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
