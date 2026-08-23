@@ -241,6 +241,11 @@ public sealed class EventAllocationTests
 
     private const int WarmupIterations = 256;
 
+    // A contended run can add stray bytes to a sample (a blocking wait when a continuation loses
+    // the inline race, a tier transition), but never remove any, so the smallest of several
+    // samples is the publish's own cost.
+    private const int MeasurementSamples = 16;
+
     private static MeasurementContext Build(bool parallel, bool customStrategy = false)
     {
         var first = new AlphaAllocationHandler();
@@ -303,14 +308,20 @@ public sealed class EventAllocationTests
             warmup.GetAwaiter().GetResult();
         }
 
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        Task task = operation();
-        bool completedSynchronously = task.IsCompletedSuccessfully;
-        task.GetAwaiter().GetResult();
-        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        long best = long.MaxValue;
+        for (int i = 0; i < MeasurementSamples; i++)
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            Task task = operation();
+            bool completedSynchronously = task.IsCompletedSuccessfully;
+            task.GetAwaiter().GetResult();
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
-        completedSynchronously.ShouldBeTrue();
-        return allocated;
+            completedSynchronously.ShouldBeTrue();
+            best = Math.Min(best, allocated);
+        }
+
+        return best;
     }
 
     // The gate and delegates are built before the first reading. SetResult runs the publisher's
@@ -329,16 +340,22 @@ public sealed class EventAllocationTests
             warmup.GetAwaiter().GetResult();
         }
 
-        var gate = new TaskCompletionSource<object?>();
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        Task task = start(gate);
-        bool suspended = !task.IsCompleted;
-        gate.SetResult(null);
-        task.GetAwaiter().GetResult();
-        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        long best = long.MaxValue;
+        for (int i = 0; i < MeasurementSamples; i++)
+        {
+            var gate = new TaskCompletionSource<object?>();
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            Task task = start(gate);
+            bool suspended = !task.IsCompleted;
+            gate.SetResult(null);
+            task.GetAwaiter().GetResult();
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
-        suspended.ShouldBeTrue();
-        return allocated;
+            suspended.ShouldBeTrue();
+            best = Math.Min(best, allocated);
+        }
+
+        return best;
     }
 
     // The second gate is still incomplete when the first continuation reaches it. The same async
@@ -362,20 +379,26 @@ public sealed class EventAllocationTests
             warmup.GetAwaiter().GetResult();
         }
 
-        var firstGate = new TaskCompletionSource<object?>();
-        var secondGate = new TaskCompletionSource<object?>();
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        Task task = start(firstGate, secondGate);
-        bool firstSuspended = !task.IsCompleted;
-        firstGate.SetResult(null);
-        bool secondSuspended = !task.IsCompleted;
-        secondGate.SetResult(null);
-        task.GetAwaiter().GetResult();
-        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        long best = long.MaxValue;
+        for (int i = 0; i < MeasurementSamples; i++)
+        {
+            var firstGate = new TaskCompletionSource<object?>();
+            var secondGate = new TaskCompletionSource<object?>();
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            Task task = start(firstGate, secondGate);
+            bool firstSuspended = !task.IsCompleted;
+            firstGate.SetResult(null);
+            bool secondSuspended = !task.IsCompleted;
+            secondGate.SetResult(null);
+            task.GetAwaiter().GetResult();
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
-        firstSuspended.ShouldBeTrue();
-        secondSuspended.ShouldBeTrue();
-        return allocated;
+            firstSuspended.ShouldBeTrue();
+            secondSuspended.ShouldBeTrue();
+            best = Math.Min(best, allocated);
+        }
+
+        return best;
     }
 
     private static Task PublishWithOneSuspension<TEvent>(
