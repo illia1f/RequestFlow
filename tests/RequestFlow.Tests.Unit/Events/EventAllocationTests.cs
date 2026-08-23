@@ -189,8 +189,17 @@ public sealed class EventAllocationTests
             customStructBytes,
             specializedClassBytes,
             specializedStructBytes);
-        (customClassBytes - specializedClassBytes).ShouldBe(24);
-        (customStructBytes - specializedStructBytes).ShouldBe(24);
+        // In Debug the compiler turns each async publish walk into a heap-allocated state machine
+        // object, and the custom path's machine also carries the EventDelivery struct, which makes
+        // it 24 bytes bigger than the specialized plan's. In Release both machines are structs that
+        // stay on the stack when the publish completes synchronously, so neither path allocates and the difference is zero.
+#if DEBUG
+        const long strategyOverhead = 24;
+#else
+        const long strategyOverhead = 0;
+#endif
+        (customClassBytes - specializedClassBytes).ShouldBe(strategyOverhead);
+        (customStructBytes - specializedStructBytes).ShouldBe(strategyOverhead);
         (customStructBytes - customClassBytes)
             .ShouldBe(specializedStructBytes - specializedClassBytes);
     }
