@@ -19,6 +19,7 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 - Event strategy validation codes: `RF0013`, `RF0014`, and `RF0119` through `RF0123` cover invalid strategy shapes, conflicting or ambiguous selection, lifetime conflicts, unused declarations, and shared-role lifetime collisions.
 - The validation model carries events: `RequestFlowModel.Events`, `EventSubscriptions`, and `EventStrategies`, the `EventModel`, `EventHandlerModel`, `EventSubscriptionModel`, and `EventStrategyModel` types, and the `UnhandledEventsAllowed` and `UnusedEventHandlersDisallowed` flags on the context. `RequestFlowModelBuilder` gains `AddEvent`, `AddEventHandler`, `PublishEventsWith`, and a four-flag `BuildContext` overload beside the unchanged two-flag one; `AddEvent` takes a concrete closed event type and rejects anything the model could not hold.
 - `IEventPublisher` follows the dispatchers' lifetime: scoped by default, transient under `WithTransientDispatcher`.
+- `AddEventHandler<THandler>()` registers one event handler without scanning its assembly, and `ExcludeEventHandler<THandler>()` keeps one handler out of the same call's scan, so MediatR's conditional `AddTransient<INotificationHandler<X>, H>()` and scan-filter patterns port directly. A handler both scanned and added manually delivers once, and a type that is not a concrete event handler class is a startup problem (`RF0015` to `RF0017`).
 
 ### Changed
 

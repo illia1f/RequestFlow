@@ -76,6 +76,9 @@ internal static class HandlerScanner
     internal static List<HandlerDiscovery> Discover(Type type)
         => Discover(type, type.GetInterfaces());
 
+    internal static List<EventHandlerDiscovery> DiscoverEventHandlers(Type type)
+        => DiscoverEventHandlers(type, type.GetInterfaces());
+
     private static List<HandlerDiscovery> Discover(Type type, Type[] interfaces)
     {
         List<HandlerDiscovery> handlers = [];
@@ -208,4 +211,13 @@ internal sealed class ScanResult(
     public IReadOnlyList<EventHandlerDiscovery> EventHandlers { get; } = eventHandlers;
 
     public IReadOnlyList<Type> EventTypes { get; } = eventTypes;
+
+    public IEnumerable<EventHandlerDiscovery> EventHandlersExcept(HashSet<Type> excludedHandlerTypes)
+    {
+        foreach (var discovery in EventHandlers)
+        {
+            if (!excludedHandlerTypes.Contains(discovery.HandlerType))
+                yield return discovery;
+        }
+    }
 }

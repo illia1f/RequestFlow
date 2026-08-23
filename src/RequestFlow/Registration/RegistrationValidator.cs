@@ -107,6 +107,46 @@ internal static class RegistrationValidator
     }
 
     /// <summary>
+    /// Checks each manually added event handler's shape, stopping at that type's first failure.
+    /// </summary>
+    public static Validated<Type> ValidateEventHandlerDeclarations(IReadOnlyList<Type> handlerTypes)
+        => Partition(handlerTypes, ValidateEventHandlerDeclaration);
+
+    private static RequestFlowValidationProblem? ValidateEventHandlerDeclaration(Type handlerType)
+    {
+        if (handlerType.IsInterface)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.EventHandlerIsInterface,
+                $"'{handlerType.FullName}' is an interface; only concrete event handler classes can be registered.",
+                handlerType);
+
+        if (handlerType.IsAbstract)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.EventHandlerAbstract,
+                $"'{handlerType.FullName}' is abstract; only concrete event handler classes can be registered.",
+                handlerType);
+
+        if (!ImplementsEventHandlerContract(handlerType))
+            return new RequestFlowValidationProblem(
+                ProblemCodes.EventHandlerMissingContract,
+                $"'{handlerType.FullName}' does not implement IEventHandler.",
+                handlerType);
+
+        return null;
+    }
+
+    private static bool ImplementsEventHandlerContract(Type handlerType)
+    {
+        foreach (var iface in handlerType.GetInterfaces())
+        {
+            if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IEventHandler<>))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Checks each stage declaration's shape, stopping at that declaration's first failure.
     /// </summary>
     public static Validated<StageDeclaration> ValidateStageDeclarations(IReadOnlyList<StageDeclaration> declarations)

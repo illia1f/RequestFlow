@@ -13,7 +13,7 @@ The built-in checks below are fixed. A rule adds checks to the pass and cannot r
 Each row says what the check stops you doing. [exceptions.md](exceptions.md) has the cause and the fix behind each one.
 
 - Codes are stable and never renumbered. Numbering is allocation order, not run order.
-- `RF0001` to `RF0014` are shape checks on a single declaration. The `RF01xx` codes look at the whole registration at the freeze.
+- `RF0001` to `RF0017` are shape checks on a single declaration. The `RF01xx` codes look at the whole registration at the freeze.
 - `RF0107` is the odd one out: the pass reports it about a rule that threw, not about a registration.
 - The `RF` constants live on `ProblemCodes` in `RequestFlow.Abstractions`, and the CQRS one on `CqrsProblemCodes` in `RequestFlow.Cqrs.Abstractions`, so a caller matches `ProblemCodes.UnhandledRequest` rather than a literal without referencing the runtime packages.
 
@@ -33,6 +33,9 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0012` | write an open generic stage whose contract does not use its own type parameters as the request |
 | `RF0013` | register an interface as an event publish strategy |
 | `RF0014` | register an abstract class as an event publish strategy |
+| `RF0015` | pass an interface to `AddEventHandler` |
+| `RF0016` | pass an abstract class to `AddEventHandler` |
+| `RF0017` | pass a type without an `IEventHandler<TEvent>` contract to `AddEventHandler` |
 | `RF0101` | cover one request with two handlers |
 | `RF0102` | leave a request unhandled, unless you call `AllowUnhandledRequests` |
 | `RF0103` | register one stage type twice |
@@ -194,7 +197,7 @@ Two problems are equal when their code, message, and subject match, so a test ca
 
 ## The model
 
-`context.Model` is the registration as recorded, minus what the shape checks threw out. A declaration reported under `RF0001` to `RF0012` never reaches a rule, so a rule auditing every registered stage type sees only the ones that could run. Past that nothing is cleaned up: a request no handler covers is in the list with an empty `Handlers`, and a stage registered twice appears twice. Every rule reads the same snapshot, and every list on it is read-only, so one rule cannot change what the next one reads.
+`context.Model` is the registration as recorded, minus what the shape checks threw out. A declaration reported under `RF0001` to `RF0012` or `RF0015` to `RF0017` never reaches a rule, so a rule auditing every registered stage type sees only the ones that could run. Past that nothing is cleaned up: a request no handler covers is in the list with an empty `Handlers`, and a stage registered twice appears twice. Every rule reads the same snapshot, and every list on it is read-only, so one rule cannot change what the next one reads.
 
 | Type | Carries |
 | --- | --- |

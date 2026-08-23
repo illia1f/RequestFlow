@@ -63,6 +63,24 @@ public sealed class ProblemCodesTests
     }
 
     [Fact]
+    public void Given_The_Event_Handler_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.EventHandlerIsInterface.ShouldBe("RF0015");
+    }
+
+    [Fact]
+    public void Given_The_Event_Handler_Abstract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.EventHandlerAbstract.ShouldBe("RF0016");
+    }
+
+    [Fact]
+    public void Given_The_Event_Handler_Missing_Contract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.EventHandlerMissingContract.ShouldBe("RF0017");
+    }
+
+    [Fact]
     public void Given_The_Event_Strategy_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
     {
         ProblemCodes.EventStrategyIsInterface.ShouldBe("RF0013");

@@ -39,7 +39,25 @@ The publisher is scoped like the dispatchers. Publish inside a scope and finish 
 
 The scan skips abstract classes, interfaces, and open generic event handler definitions. It registers each event handler class under its concrete type rather than as an `IEventHandler<TEvent>` service, so `GetServices<IEventHandler<TEvent>>()` does not find RequestFlow's scanned handlers. Open generic event handlers are not supported; the closed catch-all is `IEventHandler<IEvent>`.
 
-There is no method for registering one event handler at runtime. `AddEventHandler` belongs to `RequestFlowModelBuilder` and exists for unit testing validation rules. There is no per-handler opt-in and no scan filter either: the assembly is the unit. A handler that runs only under some condition checks that condition inside `HandleAsync`, or lives in an assembly the host passes to `RegisterHandlersFromAssembly*` only when it should run.
+The assembly is not the only unit. `AddEventHandler<THandler>()` registers one handler without scanning its assembly, and `ExcludeEventHandler<THandler>()` keeps one scanned handler out:
+
+```csharp
+services.AddRequestFlow(options =>
+{
+    options.RegisterHandlersFromAssemblyContaining<OrderPlaced>();
+    options.ExcludeEventHandler<NoisyAuditHandler>();
+    if (darkLaunchEnabled)
+        options.AddEventHandler<DarkLaunchHandler>();
+});
+```
+
+- A manual add registers every `IEventHandler<TEvent>` contract the class implements, validated and frozen exactly like a scanned handler. Its exact event types count as known.
+- Duplicates collapse. A handler both scanned and added manually, or added twice, delivers once, and the first registration decides the lifetime. `WithScopedHandlers()` covers the same call's manual adds wherever it appears in the delegate.
+- A type that is not a concrete event handler class is a startup problem (`RF0015` to `RF0017`).
+- Exclusion filters the excluding call's own scan. Request and stream handler contracts on the same class still register, an `AddEventHandler` in the same call still wins, and excluding a type the scan does not find does nothing. A later call naming the same assembly does not re-scan it, so the excluded handler stays out until an `AddEventHandler` names it.
+- A closed generic such as `AddEventHandler<AuditHandler<OrderPlaced>>()` works like any concrete class.
+
+Bare `services.AddTransient<IEventHandler<X>, H>()` stays inert either way: resolution is concrete-keyed, so an interface-keyed container registration never joins delivery.
 
 ## Select a publish strategy
 
@@ -291,7 +309,9 @@ The behavior warnings below come from black-box probes against MediatR 12.5.0 an
 - Do not mistake RequestFlow's same-tier order for registration order or a compatibility guarantee. Review handlers whose side effects depend on the order of exact-type registrations.
 - RequestFlow runs every applicable handler unless a publisher cancellation check stops the walk, and aggregates handler failures. Code that catches a handler exception directly around `Publish` needs to inspect `EventPublishException.Failures` instead.
 - Where MediatR 12.5.0 permitted a notification without handlers, RequestFlow needs `AllowUnhandledEvents()` for that case.
-- Repeated `AddMediatR` registration delivered notification handlers more than once in the 12.5.0 probes; MediatR 14.1.0 stopped that duplicate delivery. RequestFlow deduplicates scanned assemblies across additive registration calls.
+- Repeated `AddMediatR` registration delivered notification handlers more than once in the 12.5.0 probes; MediatR 14.1.0 stopped that duplicate delivery. RequestFlow deduplicates scanned assemblies, and manual `AddEventHandler` entries, across additive registration calls.
+- Conditional registration ports directly: `if (flag) services.AddTransient<INotificationHandler<X>, H>()` becomes `if (flag) options.AddEventHandler<H>()` inside the configure delegate. Leave the bare container registration behind, because under RequestFlow it does nothing.
+- A `TypeEvaluator` scan filter maps to `ExcludeEventHandler<THandler>()` per handler kept out, and an open generic notification handler ports as manually added closings, `options.AddEventHandler<AuditHandler<OrderPlaced>>()` per event.
 - Map a MediatR notification publisher to `IEventPublishStrategy` ([the port recipe](#port-a-mediatr-notification-publisher)). Its callback throws on failure, while `EventDelivery.StartAsync` returns a failure. Use `RunAsync` or collect and call `ThrowIfAny`; discarding `StartAsync` results drops failures.
 - RequestFlow has no event stages in v1.
 

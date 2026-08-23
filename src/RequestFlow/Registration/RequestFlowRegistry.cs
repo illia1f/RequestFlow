@@ -14,6 +14,8 @@ internal sealed class RequestFlowRegistry
     private readonly List<HandlerRegistration> _handlers = [];
     private readonly List<Type> _requestTypes = [];
     private readonly List<EventHandlerRegistration> _eventHandlers = [];
+
+    private readonly HashSet<EventSubscriptionKey> _seenEventSubscriptions = [];
     private readonly List<Type> _eventTypes = [];
     private readonly List<EventStrategyDeclaration> _eventStrategyDeclarations = [];
 
@@ -134,22 +136,39 @@ internal sealed class RequestFlowRegistry
         return added;
     }
 
-    public void Add(
-        IReadOnlyList<HandlerRegistration> handlers,
-        IReadOnlyList<Type> requestTypes,
-        IReadOnlyList<RequestFlowValidationProblem> problems)
-        => Add(handlers, requestTypes, [], [], problems);
+    /// <summary>
+    /// Adds the subscriptions whose handler and declared event pair is not already present and returns the newly added ones.
+    /// </summary>
+    public IReadOnlyList<EventHandlerRegistration> AddNewEventHandlers(
+        IReadOnlyList<EventHandlerRegistration> handlers)
+    {
+        List<EventHandlerRegistration> added = [];
+        foreach (var handler in handlers)
+        {
+            if (_seenEventSubscriptions.Add(new EventSubscriptionKey(handler.HandlerType, handler.DeclaredEventType)))
+            {
+                _eventHandlers.Add(handler);
+                added.Add(handler);
+            }
+        }
+
+        return added;
+    }
 
     public void Add(
         IReadOnlyList<HandlerRegistration> handlers,
         IReadOnlyList<Type> requestTypes,
-        IReadOnlyList<EventHandlerRegistration> eventHandlers,
+        IReadOnlyList<RequestFlowValidationProblem> problems)
+        => Add(handlers, requestTypes, [], problems);
+
+    public void Add(
+        IReadOnlyList<HandlerRegistration> handlers,
+        IReadOnlyList<Type> requestTypes,
         IReadOnlyList<Type> eventTypes,
         IReadOnlyList<RequestFlowValidationProblem> problems)
     {
         _handlers.AddRange(handlers);
         _requestTypes.AddRange(requestTypes);
-        _eventHandlers.AddRange(eventHandlers);
         _eventTypes.AddRange(eventTypes);
 
         // A problem compares by value and is deterministic per declaration, so the same
@@ -306,6 +325,8 @@ internal sealed class RequestFlowRegistry
             ? typeof(StagedRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType)
             : typeof(RequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
     }
+
+    private readonly record struct EventSubscriptionKey(Type HandlerType, Type DeclaredEventType);
 }
 
 /// <summary>
