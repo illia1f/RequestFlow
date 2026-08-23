@@ -5,16 +5,14 @@ namespace RequestFlow;
 
 /// <summary>
 /// Reports a request type that carries more than one <c>IStreamRequest&lt;TItem&gt;</c> contract,
-/// one that carries a request contract and a stream contract at once, and a handler whose item
-/// type is not the one its request declares. The dispatch map holds one plan per request type,
-/// so each would only fail once somebody dispatched it.
+/// or a handler whose item type is not the one its request declares. The dispatch map holds one
+/// plan per request type, so either shape would only fail once somebody dispatched it.
 /// </summary>
 /// <remarks>
-/// The stream twin of <see cref="MultiContractRequestRule"/>. A type in the second shape is worse
-/// than a type in the first, because one plan would silently overwrite the other rather than
-/// failing the dispatch. The item check exists because <c>IStreamRequest&lt;TItem&gt;</c> is
-/// covariant: a handler declaring a wider item type satisfies its own constraint and compiles,
-/// but closes a plan no inferred <c>Stream</c> call can hit.
+/// The multi-contract check is the stream twin of <see cref="MultiContractRequestRule"/>. The item
+/// check exists because <c>IStreamRequest&lt;TItem&gt;</c> is covariant: a handler declaring a wider
+/// item type satisfies its own constraint and compiles, but closes a plan no inferred
+/// <c>Stream</c> call can hit.
 /// </remarks>
 internal sealed class StreamRequestContractRule : IRequestFlowValidationRule
 {
@@ -50,16 +48,6 @@ internal sealed class StreamRequestContractRule : IRequestFlowValidationRule
                     $"Stream request '{request.RequestType.FullName}' implements more than one stream request contract " +
                     $"({ContractFormatting.Format("IStreamRequest", streams)}); dispatch resolves one item type per request, so keep one contract " +
                     "and split the type if both sequences are needed.",
-                    request.RequestType);
-            }
-
-            if (isRequest)
-            {
-                yield return new RequestFlowValidationProblem(
-                    ProblemCodes.RequestAndStreamRequest,
-                    $"Request '{request.RequestType.FullName}' implements both IRequest and IStreamRequest; " +
-                    "the map holds one plan per request type, so one would overwrite the other. Keep one contract " +
-                    "and split the type if both are needed.",
                     request.RequestType);
             }
 

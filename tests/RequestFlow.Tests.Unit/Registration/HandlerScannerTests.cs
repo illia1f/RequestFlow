@@ -75,6 +75,21 @@ public sealed class HandlerScannerTests
         result.RequestTypes.ShouldContain(typeof(ScanPing));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Given_A_Type_Whose_Interfaces_Cannot_Load_When_Scanning_Then_The_Rest_Is_Still_Scanned(
+        int failureIndex)
+    {
+        ScanResult result = HandlerScanner.Scan(
+            [new UnloadableInterfaceAssembly(InterfaceFailureAt(failureIndex))]);
+
+        result.Handlers.ShouldContain(h => h.ImplementationType == typeof(ScanPingHandler));
+        result.RequestTypes.ShouldContain(typeof(ScanPing));
+    }
+
     [Fact]
     public void Given_A_Typed_Handler_When_Discovering_Then_Records_The_Closed_Core_Contract()
     {
@@ -113,6 +128,60 @@ public sealed class HandlerScannerTests
     }
 
     [Fact]
+    public void Given_Concrete_Event_When_Scanning_Then_Event_Is_Known()
+    {
+        ScanResult result = ScanSelf();
+
+        result.EventTypes.ShouldContain(typeof(ScanEvent));
+    }
+
+    [Fact]
+    public void Given_Closed_Generic_Event_Handler_When_Scanning_Then_Closed_Subscription_Is_Discovered()
+    {
+        ScanResult result = ScanSelf();
+
+        result.EventHandlers.ShouldContain(subscription =>
+            subscription.HandlerType == typeof(ClosedGenericEventHandler)
+            && subscription.DeclaredEventType == typeof(GenericScanEvent<int>));
+    }
+
+    [Fact]
+    public void Given_Two_Event_Contracts_When_Scanning_Then_Both_Subscriptions_Are_Discovered()
+    {
+        ScanResult result = ScanSelf();
+
+        EventHandlerDiscovery[] subscriptions = result.EventHandlers
+            .Where(subscription => subscription.HandlerType == typeof(TwoEventHandler))
+            .ToArray();
+
+        subscriptions.Select(subscription => subscription.DeclaredEventType).ShouldBe([
+            typeof(ScanEvent),
+            typeof(SecondScanEvent),
+        ], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Given_Nonconcrete_Event_Types_When_Scanning_Then_They_Are_Not_Known()
+    {
+        ScanResult result = ScanSelf();
+
+        result.EventTypes.ShouldNotContain(typeof(AbstractScanEvent));
+        result.EventTypes.ShouldNotContain(typeof(IScanEvent));
+        result.EventTypes.ShouldNotContain(typeof(GenericScanEvent<>));
+    }
+
+    [Fact]
+    public void Given_An_Open_Generic_Event_Handler_When_Scanning_Then_No_Subscription_Is_Discovered()
+    {
+        ScanResult result = ScanSelf();
+
+        // An open declared event type reaches MakeGenericMethod at the freeze, so the scan drops it here.
+        result.EventHandlers.ShouldNotContain(subscription =>
+            subscription.HandlerType == typeof(OpenGenericEventHandler<>)
+            || subscription.DeclaredEventType.ContainsGenericParameters);
+    }
+
+    [Fact]
     public void Given_A_Scanned_Stream_Handler_When_Registering_Then_It_Resolves_Through_Its_Contract()
     {
         var services = new ServiceCollection();
@@ -123,6 +192,15 @@ public sealed class HandlerScannerTests
     }
 
     #region Helpers
+
+    // One case per load failure GetInterfaces can raise for an interface that is not deployed.
+    private static Exception InterfaceFailureAt(int index) => index switch
+    {
+        0 => new TypeLoadException("Could not load type 'Broken' from assembly 'Missing'."),
+        1 => new FileNotFoundException("Could not load file or assembly 'Missing'."),
+        2 => new FileLoadException("Could not load file or assembly 'Missing'."),
+        _ => new BadImageFormatException("Bad IL format in assembly 'Missing'."),
+    };
 
     private static ScanResult ScanSelf()
         => HandlerScanner.Scan([typeof(HandlerScannerTests).Assembly]);
@@ -163,6 +241,39 @@ public sealed class HandlerScannerTests
         }
     }
 
+    public sealed record ScanEvent : IEvent;
+
+    public sealed record SecondScanEvent : IEvent;
+
+    public abstract record AbstractScanEvent : IEvent;
+
+    public interface IScanEvent : IEvent;
+
+    public sealed record GenericScanEvent<T> : IEvent;
+
+    public sealed class ClosedGenericEventHandler : IEventHandler<GenericScanEvent<int>>
+    {
+        public Task HandleAsync(GenericScanEvent<int> @event, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    public sealed class TwoEventHandler :
+        IEventHandler<ScanEvent>,
+        IEventHandler<SecondScanEvent>
+    {
+        public Task HandleAsync(ScanEvent @event, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public Task HandleAsync(SecondScanEvent @event, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    public sealed class OpenGenericEventHandler<T> : IEventHandler<GenericScanEvent<T>>
+    {
+        public Task HandleAsync(GenericScanEvent<T> @event, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
     // Castle cannot proxy Assembly on .NET Framework (ISerializable without a deserialization constructor),
     // so this is a real subclass instead of a substitute.
     private sealed class PartiallyLoadableAssembly : Assembly
@@ -171,6 +282,20 @@ public sealed class HandlerScannerTests
             => throw new ReflectionTypeLoadException(
                 [typeof(ScanPingHandler), typeof(ScanPing), null],
                 [new TypeLoadException("Could not load type 'Broken'.")]);
+    }
+
+    // A type that loaded while an interface it implements did not; GetTypes reports it, and asking
+    // it for that interface throws.
+    private sealed class UnloadableInterfaceAssembly(Exception failure) : Assembly
+    {
+        public override Type[] GetTypes()
+            => [new UnloadableInterfaceType(failure), typeof(ScanPingHandler), typeof(ScanPing)];
+    }
+
+    private sealed class UnloadableInterfaceType(Exception failure)
+        : TypeDelegator(typeof(ScanPingHandler))
+    {
+        public override Type[] GetInterfaces() => throw failure;
     }
 
     #endregion

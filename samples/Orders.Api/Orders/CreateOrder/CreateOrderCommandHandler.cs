@@ -1,14 +1,17 @@
+using RequestFlow;
 using RequestFlow.Cqrs;
 
 namespace Orders.Api.Orders;
 
-public sealed class CreateOrderCommandHandler(OrderStore store)
+public sealed class CreateOrderCommandHandler(OrderStore store, IEventPublisher events)
     : ICommandHandler<CreateOrderCommand, Guid>, IOrdersCommandHandler
 {
-    public Task<Guid> HandleAsync(CreateOrderCommand command, CancellationToken cancellationToken)
+    public async Task<Guid> HandleAsync(CreateOrderCommand command, CancellationToken cancellationToken)
     {
         Order order = new(Guid.NewGuid(), command.Customer, command.Total, Cancelled: false);
         store.Save(order);
-        return Task.FromResult(order.Id);
+
+        await events.PublishAsync(new OrderPlaced(order.Id, order.Customer, order.Total), cancellationToken);
+        return order.Id;
     }
 }

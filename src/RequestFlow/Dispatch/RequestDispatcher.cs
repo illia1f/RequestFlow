@@ -4,9 +4,6 @@ using System.Threading.Tasks;
 
 namespace RequestFlow;
 
-/// <summary>
-/// Default <see cref="IRequestDispatcher"/> over the frozen dispatch map.
-/// </summary>
 internal sealed class RequestDispatcher(DispatchMap map, IServiceProvider services) : IRequestDispatcher
 {
     private readonly DispatchMap _map = map ?? throw new ArgumentNullException(nameof(map));

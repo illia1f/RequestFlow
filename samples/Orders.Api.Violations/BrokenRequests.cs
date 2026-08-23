@@ -1,3 +1,4 @@
+using RequestFlow;
 using RequestFlow.Cqrs;
 
 namespace Orders.Api.Violations;
@@ -31,3 +32,8 @@ public sealed class ArchiveOrderCommandHandler : ICommandHandler<ArchiveOrderCom
 /// Trips CQRS0001, which AddCqrs contributes, and RF0102, since nothing handles it.
 /// </summary>
 public sealed record RefundOrderCommand(Guid Id) : ICommand<Guid>, IQuery<Guid>;
+
+/// <summary>
+/// Trips RF0114: the scan finds the event, but nothing subscribes to it.
+/// </summary>
+public sealed record OrderRefunded(Guid Id) : IEvent;

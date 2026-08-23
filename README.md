@@ -1,6 +1,6 @@
 # ![R](https://raw.githubusercontent.com/illia1f/RequestFlow/main/assets/RequestFlowIcon-89x52.png)equestFlow
 
-A small, fast request/handler library for .NET. You define a request and its handler, register them with one call, and dispatch through a single interface. All the wiring happens at runtime, once at startup, with no compiler plugin and no build-time code generation: if a project can reference a NuGet package, it can run RequestFlow.
+A small, fast request/handler and event-publishing library for .NET. You define messages and handlers, register them with one call, and dispatch through focused interfaces. All the wiring happens at runtime, once at startup, with no compiler plugin and no build-time code generation: if a project can reference a NuGet package, it can run RequestFlow.
 
 The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, install `RequestFlow.Cqrs` instead; it already contains the core package.
 
@@ -23,7 +23,7 @@ The core library stays unopinionated about how you name your requests. If you wa
 
 RequestFlow trades those requirements away and keeps everything at runtime.
 
-- Errors surface at startup, not in production. Discovery, validation, and the dispatch plan all finish before the first request, and a broken configuration fails the boot with one exception listing every problem. After that, dispatch is one dictionary lookup with no reflection, LINQ, or locking.
+- Errors surface at startup, not in production. Discovery, validation, and the request and event plans all finish before traffic, and a broken configuration fails the boot with one exception listing every problem. After that, dispatch and publication start with one dictionary lookup and use no reflection, LINQ, or locking.
 - No build step. Nothing runs inside your compiler, and there is no generated code to step through when something misbehaves. One package behaves the same from .NET 10 down to .NET Framework 4.6.2.
 - MIT, permanently. This library exists because a license changed underneath its users once. It takes no dependency whose license could do the same.
 - Migration is mostly renames. Requests and handlers keep their shape coming from MediatR; the mapping table below covers a typical codebase.
@@ -42,14 +42,18 @@ Fast is a claim to prove, not to assert. A BenchmarkDotNet suite against the oth
 | `IStreamRequest<TResponse>`                          | `IStreamRequest<TItem>`, `RequestFlow` namespace      |
 | `IStreamRequestHandler<,>` with `Handle`             | same interface and same method name                   |
 | `IMediator.CreateStream(...)`                        | `IStreamDispatcher.Stream(...)`                       |
+| `INotification`                                     | `IEvent`                                              |
+| `INotificationHandler<T>` with `Handle`              | `IEventHandler<T>` with `HandleAsync`                 |
+| `IPublisher.Publish(...)` / `IMediator.Publish(...)` | `IEventPublisher.PublishAsync(...)`                   |
+| `INotificationPublisher`                             | `IEventPublishStrategy`                               |
 | `services.AddMediatR(...)`                           | `services.AddRequestFlow(...)`                        |
 
-What doesn't move yet: notifications (`INotification` / `Publish`). They are on the [roadmap](ROADMAP.md) for v1.0 and return as events, an in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`). Nothing is built there today, so if your codebase leans on notifications, hold the migration until they land.
+Event migration needs more than renames. RequestFlow delivers derived events to applicable base and interface handlers. Its default strategy runs every handler after failures, and frozen same-tier entry order is not a compatibility promise. These differences are documented in [Events](docs/events.md#notes-for-mediatr-migrations).
 
 ## Packages
 
-- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds the contracts: `IRequest`, `IRequestHandler`, `IRequestDispatcher`, `IRequestStage`, `NoResult`, and the streaming set: `IStreamRequest`, `IStreamDispatcher`, `IStreamRequestHandler`, `IStreamRequestStage`. Depends on nothing on `net8.0` and `net10.0`; on `netstandard2.0` and `net462` it carries one Microsoft package, `Microsoft.Bcl.AsyncInterfaces`, which supplies `IAsyncEnumerable<T>` there.
-- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** is the runtime: both dispatchers, `AddRequestFlow` with assembly scanning, startup validation. Depends on `RequestFlow.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds the contracts: requests, handlers, dispatchers, stages, events and publish strategies, `NoResult`, and the streaming set. Depends on nothing on `net8.0` and `net10.0`; on `netstandard2.0` and `net462` it carries one Microsoft package, `Microsoft.Bcl.AsyncInterfaces`, which supplies `IAsyncEnumerable<T>` there.
+- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** is the runtime: request and stream dispatch, event publication, `AddRequestFlow` with assembly scanning, and startup validation. Depends on `RequestFlow.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
 - **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds the CQRS contracts: `ICommand`, `IQuery`, `IStreamQuery`, their handler interfaces, `ICommandDispatcher`, `IQueryDispatcher`, `IStreamQueryDispatcher`. Depends on `RequestFlow.Abstractions` only.
 - **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** is the CQRS runtime: typed dispatcher implementations, registered with `AddRequestFlow(...).AddCqrs()`. Depends on the contracts package and the core runtime.
 
@@ -61,6 +65,7 @@ Contracts live in their own packages so your domain layer, and any future add-on
 - [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
 - [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, which requests a stage reaches, filters
 - [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests over `IAsyncEnumerable`, stream stages, cancellation, and which package a stream handler needs
+- [Events](https://github.com/illia1f/RequestFlow/blob/main/docs/events.md): polymorphic entries, publish strategies, ordering, failures, and cancellation
 - [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
 - [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
 - [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): contributing custom checks to startup validation, the model rules see, built-in problem codes

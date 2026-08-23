@@ -15,9 +15,10 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers RequestFlow: scans the configured assemblies and registers the discovered
     /// handlers. Calls are additive; assemblies and closings already registered by an
-    /// earlier call are skipped. The dispatch map is validated and built once per provider,
-    /// on its first dispatcher resolution, throwing a
-    /// <see cref="RequestFlowValidationException"/> that lists every registration problem.
+    /// earlier call are skipped. The first dispatcher resolution or call to
+    /// <c>ValidateRequestFlow</c> validates and builds the request and event maps together once
+    /// per provider. Invalid registration throws a <see cref="RequestFlowValidationException"/>
+    /// that lists every problem.
     /// Returns a <see cref="RequestFlowBuilder"/> for chaining optional feature registrations.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
@@ -33,6 +34,13 @@ public static class ServiceCollectionExtensions
         RequestFlowRegistry registry = GetOrAddRegistry(services);
         if (options.UnhandledRequestsAllowed)
             registry.AllowUnhandledRequests();
+        registry.AddEventStrategyDeclarations(options.EventStrategyDeclarations);
+        if (options.UnhandledEventsAllowed)
+            registry.AllowUnhandledEvents();
+        if (options.UnusedEventHandlersDisallowed)
+            registry.DisallowUnusedEventHandlers();
+        if (options.UnusedStagesDisallowed)
+            registry.DisallowUnusedStages();
 
         Validated<GenericHandlerDeclaration> declarations = RegistrationValidator.ValidateDeclarations(options.Declarations);
 
@@ -44,23 +52,28 @@ public static class ServiceCollectionExtensions
         ScanResult scan = HandlerScanner.Scan(newAssemblies);
 
         List<HandlerRegistration> handlers = scan.Registrations(closed, options.HandlerLifetime);
+        List<EventHandlerRegistration> eventHandlers = scan.EventRegistrations(options.HandlerLifetime);
 
         Validated<StageDeclaration> stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
         registry.AddStageDeclarations(stages.Valid);
-        if (options.UnusedStagesDisallowed)
-            registry.DisallowUnusedStages();
 
         List<RequestFlowValidationProblem> problems = [.. declarations.Problems, .. closed.Problems, .. stages.Problems];
-        registry.Add(handlers, scan.RequestTypes, problems);
+        registry.Add(handlers, scan.RequestTypes, eventHandlers, scan.EventTypes, problems);
 
         RegisterHandlers(services, handlers);
+        RegisterEventHandlers(services, eventHandlers);
         RegisterStages(services, registry);
+        RegisterEventStrategies(services, registry);
 
-        services.TryAddSingleton(sp => registry.BuildDispatchMap(sp));
+        services.TryAddSingleton(sp => registry.Freeze(sp));
+        services.TryAddSingleton(sp => sp.GetRequiredService<FrozenPlans>().Dispatch);
+        services.TryAddSingleton(sp => sp.GetRequiredService<FrozenPlans>().Events);
         services.TryAdd(new ServiceDescriptor(
             typeof(IRequestDispatcher), typeof(RequestDispatcher), options.DispatcherLifetime));
         services.TryAdd(new ServiceDescriptor(
             typeof(IStreamDispatcher), typeof(StreamDispatcher), options.DispatcherLifetime));
+        services.TryAdd(new ServiceDescriptor(
+            typeof(IEventPublisher), typeof(EventPublisher), options.DispatcherLifetime));
 
         return new RequestFlowBuilder(services);
     }
@@ -77,6 +90,16 @@ public static class ServiceCollectionExtensions
             foreach (var discovery in HandlerScanner.Discover(closedType))
                 handlers.Add(new HandlerRegistration(discovery, lifetime));
         }
+
+        return handlers;
+    }
+
+    private static List<EventHandlerRegistration> EventRegistrations(
+        this ScanResult scan, ServiceLifetime lifetime)
+    {
+        List<EventHandlerRegistration> handlers = [];
+        foreach (var discovery in scan.EventHandlers)
+            handlers.Add(new EventHandlerRegistration(discovery, lifetime));
 
         return handlers;
     }
@@ -103,6 +126,20 @@ public static class ServiceCollectionExtensions
         }
     }
 
+    private static void RegisterEventHandlers(
+        IServiceCollection services, IReadOnlyList<EventHandlerRegistration> handlers)
+    {
+        HashSet<Type> registered = [];
+        foreach (var handler in handlers)
+        {
+            if (!registered.Add(handler.HandlerType))
+                continue;
+
+            services.Add(new ServiceDescriptor(
+                handler.HandlerType, handler.HandlerType, handler.Lifetime));
+        }
+    }
+
     private static void RegisterStages(IServiceCollection services, RequestFlowRegistry registry)
     {
         foreach (var declaration in registry.StageDeclarations)
@@ -117,6 +154,28 @@ public static class ServiceCollectionExtensions
 
                 services.Add(new ServiceDescriptor(closedStageType, closedStageType, declaration.Lifetime));
             }
+        }
+    }
+
+    private static void RegisterEventStrategies(
+        IServiceCollection services, RequestFlowRegistry registry)
+    {
+        var registered = new HashSet<Type>();
+        foreach (EventStrategyDeclaration declaration in registry.EventStrategyDeclarations)
+        {
+            Type strategyType = declaration.StrategyType;
+            if (EventStrategyTypes.IsBuiltIn(strategyType)
+                || strategyType.IsInterface
+                || strategyType.IsAbstract
+                || !registered.Add(strategyType))
+            {
+                continue;
+            }
+
+            services.TryAdd(new ServiceDescriptor(
+                strategyType,
+                strategyType,
+                declaration.Lifetime));
         }
     }
 }

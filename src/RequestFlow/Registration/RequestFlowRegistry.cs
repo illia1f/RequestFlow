@@ -7,12 +7,15 @@ namespace RequestFlow;
 
 /// <summary>
 /// Accumulates handler registrations across every <c>AddRequestFlow</c> call on one
-/// service collection and builds the validated dispatch map for each provider.
+/// service collection and builds the validated request and event maps for each provider.
 /// </summary>
 internal sealed class RequestFlowRegistry
 {
     private readonly List<HandlerRegistration> _handlers = [];
     private readonly List<Type> _requestTypes = [];
+    private readonly List<EventHandlerRegistration> _eventHandlers = [];
+    private readonly List<Type> _eventTypes = [];
+    private readonly List<EventStrategyDeclaration> _eventStrategyDeclarations = [];
 
     // _problems keeps the report in first-seen order; _seenProblems makes the dedup O(1).
     private readonly List<RequestFlowValidationProblem> _problems = [];
@@ -44,6 +47,16 @@ internal sealed class RequestFlowRegistry
     public void DisallowUnusedStages()
         => UnusedStagesDisallowed = true;
 
+    public bool UnhandledEventsAllowed { get; private set; }
+
+    public void AllowUnhandledEvents()
+        => UnhandledEventsAllowed = true;
+
+    public bool UnusedEventHandlersDisallowed { get; private set; }
+
+    public void DisallowUnusedEventHandlers()
+        => UnusedEventHandlersDisallowed = true;
+
     /// <summary>
     /// Every stage declaration accumulated so far, in registration order, which is execution order.
     /// </summary>
@@ -54,10 +67,12 @@ internal sealed class RequestFlowRegistry
     /// </summary>
     public StageClosingCache ClosingCache { get; } = new();
 
-    /// <summary>
-    /// Every handler accumulated so far.
-    /// </summary>
     public IReadOnlyList<HandlerRegistration> Handlers => _handlers;
+
+    public IReadOnlyList<EventHandlerRegistration> EventHandlers => _eventHandlers;
+
+    public IReadOnlyList<EventStrategyDeclaration> EventStrategyDeclarations
+        => _eventStrategyDeclarations;
 
     /// <summary>
     /// Appends one call's shape-valid stage declarations. A stage belongs to a chain once, so
@@ -65,6 +80,28 @@ internal sealed class RequestFlowRegistry
     /// </summary>
     public void AddStageDeclarations(IReadOnlyList<StageDeclaration> declarations)
         => _stageDeclarations.AddRange(declarations);
+
+    public void AddEventStrategyDeclarations(
+        IReadOnlyList<EventStrategyDeclaration> declarations)
+    {
+        foreach (EventStrategyDeclaration declaration in declarations)
+        {
+            bool duplicate = false;
+            foreach (EventStrategyDeclaration existing in _eventStrategyDeclarations)
+            {
+                if (existing.DeclaredEventType == declaration.DeclaredEventType
+                    && existing.StrategyType == declaration.StrategyType
+                    && existing.Lifetime == declaration.Lifetime)
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (!duplicate)
+                _eventStrategyDeclarations.Add(declaration);
+        }
+    }
 
     /// <summary>
     /// Records <paramref name="closedStageType"/> unless an earlier call already did, and returns
@@ -97,16 +134,23 @@ internal sealed class RequestFlowRegistry
         return added;
     }
 
-    /// <summary>
-    /// Records one call's scan and closing results.
-    /// </summary>
     public void Add(
         IReadOnlyList<HandlerRegistration> handlers,
         IReadOnlyList<Type> requestTypes,
         IReadOnlyList<RequestFlowValidationProblem> problems)
+        => Add(handlers, requestTypes, [], [], problems);
+
+    public void Add(
+        IReadOnlyList<HandlerRegistration> handlers,
+        IReadOnlyList<Type> requestTypes,
+        IReadOnlyList<EventHandlerRegistration> eventHandlers,
+        IReadOnlyList<Type> eventTypes,
+        IReadOnlyList<RequestFlowValidationProblem> problems)
     {
         _handlers.AddRange(handlers);
         _requestTypes.AddRange(requestTypes);
+        _eventHandlers.AddRange(eventHandlers);
+        _eventTypes.AddRange(eventTypes);
 
         // A problem compares by value and is deterministic per declaration, so the same
         // declaration repeated across calls dedups to one entry.
@@ -120,20 +164,30 @@ internal sealed class RequestFlowRegistry
     /// <summary>
     /// Validates everything accumulated, including any rule registered with
     /// <c>AddValidationRule</c> and resolved from <paramref name="provider"/>, and builds the
-    /// dispatch map for the resolving provider.
+    /// request and event maps for the resolving provider.
     /// </summary>
     /// <exception cref="RequestFlowValidationException"/>
     /// <exception cref="InvalidOperationException"/>
-    public DispatchMap BuildDispatchMap(IServiceProvider provider)
+    public FrozenPlans Freeze(IServiceProvider provider)
     {
+        EventClosureResult eventClosure = EventClosure.Build(
+            _eventTypes, EventSubscriptions(), EventStrategies());
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            _handlers, _requestTypes, _stageDeclarations, ClosingCache);
+            _handlers, _requestTypes, _stageDeclarations, ClosingCache, eventClosure);
 
         // One context for the whole pass, so a built-in rule and a registered one read the same facts.
-        RequestFlowValidationContext context = new(model, UnhandledRequestsAllowed, UnusedStagesDisallowed);
+        RequestFlowValidationContext context = new(
+            model,
+            UnhandledRequestsAllowed,
+            UnusedStagesDisallowed,
+            UnhandledEventsAllowed,
+            UnusedEventHandlersDisallowed);
 
         List<RequestFlowValidationProblem> problems = ValidationRuleRunner.Run(
-            context, BuiltInRules(), provider.GetServices<IRequestFlowValidationRule>(), _problems);
+            context,
+            BuiltInRules.For(context, _stageDeclarations, eventClosure.StrategyResolution),
+            provider.GetServices<IRequestFlowValidationRule>(),
+            _problems);
 
         if (problems.Count > 0)
             throw new RequestFlowValidationException(problems);
@@ -147,32 +201,42 @@ internal sealed class RequestFlowRegistry
             plans[handler.RequestType] = CreatePlan(handler, chainsByRequest[handler.RequestType]);
         }
 
-        return new DispatchMap(plans);
+        var dispatch = new DispatchMap(plans);
+        EventMap events = EventPlanFactory.Build(
+            eventClosure.Events,
+            eventClosure.StrategyResolution);
+
+        return new FrozenPlans(dispatch, events);
     }
 
-    private IEnumerable<IRequestFlowValidationRule> BuiltInRules()
+    private EventStrategyInput[] EventStrategies()
     {
-        // Built once, since three rules read it.
-        StageDeclarationFacts facts = new(_stageDeclarations);
+        var strategies = new EventStrategyInput[_eventStrategyDeclarations.Count];
+        for (int i = 0; i < strategies.Length; i++)
+        {
+            EventStrategyDeclaration declaration = _eventStrategyDeclarations[i];
+            strategies[i] = new EventStrategyInput(
+                declaration.DeclaredEventType,
+                declaration.StrategyType,
+                ModelLifetime.Of(declaration.Lifetime));
+        }
 
-        yield return new DuplicateHandlerRule();
+        return strategies;
+    }
 
-        if (!UnhandledRequestsAllowed)
-            yield return new UnhandledRequestRule();
+    private EventSubscriptionInput[] EventSubscriptions()
+    {
+        var subscriptions = new EventSubscriptionInput[_eventHandlers.Count];
+        for (int i = 0; i < subscriptions.Length; i++)
+        {
+            EventHandlerRegistration handler = _eventHandlers[i];
+            subscriptions[i] = new EventSubscriptionInput(
+                handler.HandlerType,
+                handler.DeclaredEventType,
+                ModelLifetime.Of(handler.Lifetime));
+        }
 
-        yield return new DuplicateStageRule(facts);
-        yield return new AliasedStageRule();
-
-        if (UnusedStagesDisallowed)
-            yield return new UnusedStageRule();
-
-        yield return new MultiContractRequestRule();
-        yield return new StreamRequestContractRule();
-        yield return new StreamStageItemMismatchRule(facts);
-
-        // Last, so the problems a freeze reports stay in ascending code order.
-        yield return new HandlerResponseMismatchRule();
-        yield return new StageResponseMismatchRule(facts);
+        return subscriptions;
     }
 
     private Dictionary<Type, StageChain> BuildStagePlans()

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using RequestFlow;
 using RequestFlow.Tests.ValidationFixtures;
 
@@ -34,6 +35,17 @@ public sealed class ValidateRequestFlowTests
         var services = new ServiceCollection();
         services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>());
         using ServiceProvider provider = services.BuildServiceProvider(validateScopes: true);
+
+        Should.NotThrow(() => provider.ValidateRequestFlow());
+    }
+
+    [Fact]
+    public void Given_No_Request_Dispatcher_When_Validating_Request_Flow_Then_Frozen_Plans_Are_Validated()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<AddRequestFlowTests>());
+        services.RemoveAll<IRequestDispatcher>();
+        using ServiceProvider provider = services.BuildServiceProvider();
 
         Should.NotThrow(() => provider.ValidateRequestFlow());
     }

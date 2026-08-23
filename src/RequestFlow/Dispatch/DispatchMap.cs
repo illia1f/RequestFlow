@@ -7,10 +7,6 @@ using System.Collections.Frozen;
 
 namespace RequestFlow;
 
-/// <summary>
-/// The frozen request-type-to-plan map, built once when the dispatcher is first resolved.
-/// Read-only after construction, so lookups are lock-free on every target framework.
-/// </summary>
 internal sealed class DispatchMap(Dictionary<Type, RequestPlanBase> plans)
 {
 #if NET8_0_OR_GREATER

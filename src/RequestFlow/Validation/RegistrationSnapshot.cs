@@ -14,6 +14,19 @@ internal static class RegistrationSnapshot
         IReadOnlyList<Type> requestTypes,
         IReadOnlyList<StageDeclaration> stageDeclarations,
         StageClosingCache closings)
+        => Capture(
+            handlers,
+            requestTypes,
+            stageDeclarations,
+            closings,
+            EventClosure.Build([], []));
+
+    public static RequestFlowModel Capture(
+        IReadOnlyList<HandlerRegistration> handlers,
+        IReadOnlyList<Type> requestTypes,
+        IReadOnlyList<StageDeclaration> stageDeclarations,
+        StageClosingCache closings,
+        EventClosureResult eventClosure)
     {
         // Scanned requests first in scan order, then requests only a handler covers.
         List<Type> orderedRequests = [];
@@ -115,7 +128,12 @@ internal static class RegistrationSnapshot
                     MemoFor(declaration.Family, memoRequestContracts, memoStreamContracts)));
         }
 
-        return new RequestFlowModel(capturedRequests, declaredStages);
+        return new RequestFlowModel(
+            capturedRequests,
+            declaredStages,
+            eventClosure.Events,
+            eventClosure.EventSubscriptions,
+            eventClosure.EventStrategies);
     }
 
     private static Dictionary<Type, Type> MemoFor(

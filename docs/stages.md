@@ -32,7 +32,7 @@ A stage has four ways to use `next`:
 
 `next` is a value, not an object, so a fan-out stage can copy it freely: into a local, into a closure per walk, into an array of walks to start. Every copy enters the same level. That level is built when the dispatch map freezes and holds nothing belonging to a single walk, which is what makes the copies interchangeable. The value does carry the request, the provider, and the token of the dispatch it was handed to, so do not hold on to it past that call.
 
-A stage that fans out owns every call it started. None of this applies to a stage that awaits each call to completion before starting the next. Hold two live calls and there are two ways to lose one. Both end the same way: the abandoned walk keeps going, and its own failure surfaces later as an `UnobservedTaskException`.
+A stage that fans out owns every call it started. A stage that awaits each call to completion before starting the next never holds two at once. Hold two live calls and there are two ways to lose one. Both end the same way: the abandoned walk keeps going, and its own failure surfaces later as an `UnobservedTaskException`.
 
 - The second `next.InvokeAsync` throws instead of handing back a task. It resolves the level below and checks what that level returned before there is any task to hand back, so it can fail outright while the first walk is already running.
 - The first walk faults. `await first` throws, and the code never reaches `await second`.
@@ -95,7 +95,7 @@ The substituted token holds for every level below the stage, the handler include
 
 `CancellationToken.None` is not a substitution. Passing it reads as omitting the token, and so do `default` and an empty variable, so the rest of the chain continues under the token the stage received. To put the levels below on no cancellation at all, pass the token of a source nobody cancels.
 
-Awaiting the cancelled call is the part to get right. A timeout that starts the chain and walks away leaves the handler running with its connection open. An outer retry then sets a second walk going beside the first rather than replacing it. Cancel the call, wait for it to end, then throw. Written that way, retry around timeout composes.
+Awaiting the canceled call is the part to get right. A timeout that starts the chain and walks away leaves the handler running with its connection open. An outer retry then sets a second walk going beside the first rather than replacing it. Cancel the call, wait for it to end, then throw. Written that way, retry around timeout composes.
 
 A handler that never looks at its token cannot be stopped by any of this. Cancellation is cooperative here as it is everywhere else in .NET.
 
@@ -139,7 +139,7 @@ public sealed class AuditStage<TRequest, TResponse> : IRequestStage<TRequest, TR
 
 A closed stage targets the request contract it names. `TRequest` is contravariant, so a stage closed over a base request type also wraps the requests that derive from it.
 
-A stage can also declare one type parameter and fix the response, the shape codebases with a shared result type use:
+A stage can also declare one type parameter and fix the response, the shape a codebase with a shared result type uses:
 
 ```csharp
 public sealed class ErrorTranslationStage<TRequest> : IRequestStage<TRequest, Result>
@@ -257,14 +257,14 @@ The two lifetime methods sit on the same delegate as `WhereHandlerImplements`, a
     .AsScoped())
 ```
 
-Singleton is worth a moment's thought. The instance outlives every scope, so the stage must be thread safe, and anything it injects is pinned for the life of the process. A singleton stage holding a scoped `DbContext` is a captive dependency.
+A singleton instance outlives every scope, so the stage must be thread safe, and anything it injects is pinned for the life of the process. A singleton stage holding a scoped `DbContext` is a captive dependency.
 
 Every closed stage type is a registered service, so the container can catch that at startup. Whether it does depends on the options:
 
 - `ValidateOnBuild` and `ValidateScopes` both on: the captive dependency is reported. ASP.NET Core turns this pair on in Development.
 - `ValidateOnBuild` alone: it builds the constructor graph without comparing lifetimes, and says nothing.
 
-Scoped stages have the mirror-image problem, and it is quieter still. A root-resolved dispatcher resolves the stage from the root provider. With scope validation off, one instance sits there for the life of the process. [lifetimes.md](lifetimes.md) covers both.
+Scoped stages have the mirror-image problem, and it is quieter. A root-resolved dispatcher resolves the stage from the root provider. With scope validation off, one instance sits there for the life of the process. [lifetimes.md](lifetimes.md) covers both.
 
 Thread safety is not only a question of separate dispatches. A stage above that overlaps its `next` calls runs the levels below it side by side. So inside one dispatch, a scoped or singleton stage under it is entered twice at once. Only transient stays clear of that, because every call resolves an instance of its own.
 

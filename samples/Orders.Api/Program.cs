@@ -8,6 +8,8 @@ using Orders.Api.Violations;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<OrderStore>();
+builder.Services.AddSingleton<OrderMetrics>();
+builder.Services.AddSingleton<OrderAuditTrail>();
 builder.Services.AddOpenApi();
 
 builder.Services.AddProblemDetails();
@@ -20,6 +22,12 @@ builder.Services
         options.AddStage(typeof(LoggingStage<,>));
         options.AddStage(
             typeof(ValidationStage<,>), stage => stage.WhereHandlerImplements<IOrdersCommandHandler>());
+
+        // OrderPlaced has three subscribers; start them together.
+        options.PublishEventsInParallel<OrderPlaced>();
+
+        // A cancellation side effect that fails stops the ones after it. Other order events keep the sequential default.
+        options.PublishEventsFailFast<OrderCancelled>();
 
         // The scan finds request types as well as handlers, so the types that break conventions
         // only stay out of a normal start by sitting in an assembly of their own.
