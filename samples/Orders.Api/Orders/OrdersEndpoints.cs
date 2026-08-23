@@ -7,5 +7,6 @@ public static class OrdersEndpoints
         routes.MapCreateOrder();
         routes.MapCancelOrder();
         routes.MapGetOrder();
+        routes.MapGetOrderActivity();
     }
 }
