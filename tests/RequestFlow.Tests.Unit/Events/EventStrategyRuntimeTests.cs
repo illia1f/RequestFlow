@@ -128,7 +128,7 @@ public sealed class EventStrategyRuntimeTests
         services.AddSingleton(strategy);
         using ServiceProvider provider = services.BuildServiceProvider();
         var registry = new RequestFlowRegistry();
-        registry.Add([], [], [], [typeof(EmptyPlanEvent)], []);
+        registry.Add([], [], [typeof(EmptyPlanEvent)], []);
         registry.AllowUnhandledEvents();
         registry.AddEventStrategyDeclarations([
             new EventStrategyDeclaration(

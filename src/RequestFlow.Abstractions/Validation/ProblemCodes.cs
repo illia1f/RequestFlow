@@ -21,6 +21,9 @@ public static class ProblemCodes
     public const string StageParametersMisused = "RF0012";
     public const string EventStrategyIsInterface = "RF0013";
     public const string EventStrategyAbstract = "RF0014";
+    public const string EventHandlerIsInterface = "RF0015";
+    public const string EventHandlerAbstract = "RF0016";
+    public const string EventHandlerMissingContract = "RF0017";
     public const string DuplicateHandler = "RF0101";
     public const string UnhandledRequest = "RF0102";
     public const string DuplicateStage = "RF0103";

@@ -26,6 +26,8 @@ services.AddRequestFlow(o => o
 | `PublishEventsInParallel()`, `PublishEventsSequentially()`, `PublishEventsFailFast()` | Select a built-in strategy globally; each has a `<TEvent>` overload for an assignable event target (see [events.md](events.md)) |
 | `AllowUnhandledEvents()`                      | Permits a known event to have no applicable handler                            |
 | `DisallowUnusedEventHandlers()`               | Fails validation when an event subscription or typed strategy reaches no known event |
+| `AddEventHandler<THandler>()`                 | Registers one event handler without scanning its assembly (see [events.md](events.md)) |
+| `ExcludeEventHandler<THandler>()`             | Keeps one handler's event contracts out of this call's scan (see [events.md](events.md)) |
 | `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |
 | `WithTransientDispatcher()`                   | Registers the dispatcher transient instead of scoped (see [lifetimes.md](lifetimes.md))    |
 

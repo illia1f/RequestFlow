@@ -36,4 +36,8 @@
     <None Include="$(RepoRoot)assets\RequestFlowIcon-256x256.png" Pack="true" PackagePath="icon.png" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net462'">
+    <Compile Include="$(MSBuildThisFileDirectory)Compat\*.cs" LinkBase="Compat" />
+  </ItemGroup>
+
 </Project>

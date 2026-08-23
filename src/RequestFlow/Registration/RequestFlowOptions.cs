@@ -18,6 +18,10 @@ public sealed class RequestFlowOptions
 
     internal List<EventStrategyDeclaration> EventStrategyDeclarations { get; } = [];
 
+    internal List<Type> ManualEventHandlers { get; } = [];
+
+    internal HashSet<Type> ExcludedEventHandlers { get; } = [];
+
     internal bool UnusedStagesDisallowed { get; private set; }
 
     internal bool UnhandledEventsAllowed { get; private set; }
@@ -149,6 +153,30 @@ public sealed class RequestFlowOptions
     public RequestFlowOptions DisallowUnusedEventHandlers()
     {
         UnusedEventHandlersDisallowed = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Registers <typeparamref name="THandler"/> as an event handler without scanning its
+    /// assembly. Every <see cref="IEventHandler{TEvent}"/> contract the class implements becomes
+    /// a subscription, validated and frozen exactly like a scanned one.
+    /// </summary>
+    public RequestFlowOptions AddEventHandler<THandler>()
+        where THandler : class
+    {
+        ManualEventHandlers.Add(typeof(THandler));
+        return this;
+    }
+
+    /// <summary>
+    /// Keeps <typeparamref name="THandler"/>'s event handler contracts out of this call's scan.
+    /// A later call naming the same assembly does not re-scan it, so the exclusion holds until
+    /// <see cref="AddEventHandler{THandler}"/> names the handler.
+    /// </summary>
+    public RequestFlowOptions ExcludeEventHandler<THandler>()
+        where THandler : class
+    {
+        ExcludedEventHandlers.Add(typeof(THandler));
         return this;
     }
 

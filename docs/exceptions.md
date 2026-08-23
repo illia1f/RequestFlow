@@ -52,6 +52,9 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0012`](#stage-registration) | Stage registration | Stage type uses its generic parameters incorrectly |
 | [`RF0013`](#events) | Events | Event publish strategy type is an interface |
 | [`RF0014`](#events) | Events | Event publish strategy type is abstract |
+| [`RF0015`](#events) | Events | Manually added event handler type is an interface |
+| [`RF0016`](#events) | Events | Manually added event handler type is abstract |
+| [`RF0017`](#events) | Events | Manually added type does not implement the event handler contract |
 | [`RF0101`](#requests-and-handlers) | Requests and handlers | Request has more than one handler |
 | [`RF0102`](#requests-and-handlers) | Requests and handlers | Request has no handler |
 | [`RF0103`](#stages) | Stages | Stage type is registered more than once |
@@ -137,6 +140,9 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | --- | --- | --- | --- |
 | `RF0013` | `Event publish strategy '...' is an interface...` | A strategy declaration names an interface, which the container cannot construct | Name a concrete strategy class |
 | `RF0014` | `Event publish strategy '...' is abstract...` | A strategy declaration names an abstract class | Name a concrete strategy class |
+| `RF0015` | `'...' is an interface; only concrete event handler classes...` | An interface passed to `AddEventHandler` | Register the implementing class |
+| `RF0016` | `'...' is abstract; only concrete event handler classes...` | An abstract class passed to `AddEventHandler` | Register a concrete subclass |
+| `RF0017` | `'...' does not implement IEventHandler.` | The type passed to `AddEventHandler` is not an event handler | Implement `IEventHandler<TEvent>` |
 | `RF0114` | `Event '...' has no handler.` | A known concrete event has no applicable exact, base, interface, or `IEvent` handler | Add or scan a handler, or call `AllowUnhandledEvents` when a known empty plan is intentional |
 | `RF0115` | `Event subscription '...' declared for '...' reaches no known event...` | `DisallowUnusedEventHandlers` is on and one handler contract reaches no known concrete event | Scan the targeted event assembly, remove the dead contract, or drop the opt-in |
 | `RF0116` | `Type '...' implements both IRequest and IEvent...` | One concrete type belongs to the request and event contract families | Keep one role; split the type when both messages are needed |

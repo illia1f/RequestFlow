@@ -257,15 +257,11 @@ public sealed class EventAllocationTests
         services.AddSingleton(strategy);
         ServiceProvider provider = services.BuildServiceProvider();
         var registry = new RequestFlowRegistry();
-        registry.Add(
-            [],
-            [],
-            [
-                RegistrationFor<AlphaAllocationHandler>(),
-                RegistrationFor<ZuluAllocationHandler>(),
-            ],
-            [typeof(ClassAllocationEvent), typeof(StructAllocationEvent)],
-            []);
+        registry.AddNewEventHandlers([
+            RegistrationFor<AlphaAllocationHandler>(),
+            RegistrationFor<ZuluAllocationHandler>(),
+        ]);
+        registry.Add([], [], [typeof(ClassAllocationEvent), typeof(StructAllocationEvent)], []);
         if (customStrategy)
         {
             registry.AddEventStrategyDeclarations([
