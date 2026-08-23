@@ -6,7 +6,7 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
-## [Unreleased]
+## [1.0.0-preview.8] - 2026-08-24
 
 ### Added
 
