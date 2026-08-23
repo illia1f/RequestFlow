@@ -9,7 +9,7 @@ namespace RequestFlow;
 /// Built once per freeze and handed to every rule, so a rule added with <c>AddValidationRule</c>
 /// sees the facts a built-in one sees.
 /// <para>
-/// A rule test builds one with <see cref="RequestFlowModelBuilder.BuildContext(bool, bool)"/>
+/// A rule test builds one with <see cref="RequestFlowModelBuilder.BuildContext(bool, bool, bool, bool)"/>
 /// instead of standing up a container.
 /// </para>
 /// </remarks>
@@ -17,15 +17,21 @@ public sealed class RequestFlowValidationContext
 {
     /// <exception cref="ArgumentNullException"/>
     internal RequestFlowValidationContext(
-        RequestFlowModel model, bool unhandledRequestsAllowed, bool unusedStagesDisallowed)
+        RequestFlowModel model,
+        bool unhandledRequestsAllowed,
+        bool unusedStagesDisallowed,
+        bool unhandledEventsAllowed,
+        bool unusedEventHandlersDisallowed)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         UnhandledRequestsAllowed = unhandledRequestsAllowed;
         UnusedStagesDisallowed = unusedStagesDisallowed;
+        UnhandledEventsAllowed = unhandledEventsAllowed;
+        UnusedEventHandlersDisallowed = unusedEventHandlersDisallowed;
     }
 
     /// <summary>
-    /// The frozen registration: every request, its handlers, and the stages that reached it.
+    /// The frozen request, stage, and event registration.
     /// </summary>
     public RequestFlowModel Model { get; }
 
@@ -38,4 +44,14 @@ public sealed class RequestFlowValidationContext
     /// True when <c>DisallowUnusedStages</c> was called, so a stage that reached no request is a problem.
     /// </summary>
     public bool UnusedStagesDisallowed { get; }
+
+    /// <summary>
+    /// True when an event with no applicable handler is permitted.
+    /// </summary>
+    public bool UnhandledEventsAllowed { get; }
+
+    /// <summary>
+    /// True when an event subscription that reaches no known event is a problem.
+    /// </summary>
+    public bool UnusedEventHandlersDisallowed { get; }
 }

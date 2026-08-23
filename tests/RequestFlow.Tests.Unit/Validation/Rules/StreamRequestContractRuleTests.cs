@@ -25,7 +25,7 @@ public sealed class StreamRequestContractRuleTests
     {
         RequestFlowValidationContext context = Context(typeof(BothFamilies));
 
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
+        List<RequestFlowValidationProblem> problems = [.. _requestAndStreamRule.Validate(context)];
 
         RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
         problem.Code.ShouldBe("RF0109");
@@ -111,6 +111,11 @@ public sealed class StreamRequestContractRuleTests
     #region Initialization
 
     private readonly StreamRequestContractRule _sut = new();
+
+    private readonly ContractConflictRule _requestAndStreamRule = new(
+        MessageContract.Request,
+        MessageContract.StreamRequest,
+        ProblemCodes.RequestAndStreamRequest);
 
     #endregion
 

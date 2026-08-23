@@ -8,7 +8,7 @@ A stream request is dispatched to exactly one handler, like any other request, b
 - An assembly that declares stream requests, writes stream handlers, or writes stream stages, but does no registration, references `RequestFlow.Abstractions` alone. The core streaming contracts live there: `IStreamRequest<TItem>`, `IStreamRequestHandler`, `IStreamRequestStage`, `StreamContinuation<TItem>`, and `IStreamDispatcher`.
 - An assembly on the CQRS split references `RequestFlow.Cqrs.Abstractions` instead and declares `IStreamQuery<TItem>` with `IStreamQueryHandler<TQuery, TItem>`. Both derive from the core contracts, so everything on this page applies to them unchanged. `AddCqrs` registers `IStreamQueryDispatcher`, the read-side entry point.
 
-`RequestFlow.Abstractions` carries `Microsoft.Bcl.AsyncInterfaces` on `netstandard2.0` and `net462`, which is where `IAsyncEnumerable<T>` is not in the framework. On `net8.0` and `net10.0` it has no dependencies.
+`RequestFlow.Abstractions` carries `Microsoft.Bcl.AsyncInterfaces` on `netstandard2.0` and `net462`, the two targets where `IAsyncEnumerable<T>` is not in the framework. On `net8.0` and `net10.0` it has no dependencies.
 
 ## A stream request and its handler
 
@@ -83,7 +83,7 @@ From enumeration:
 - The container's own exception when a level fails to resolve, a handler with a missing constructor dependency for example. Levels resolve when the chain runs, not on the `Stream` call ([exceptions.md](exceptions.md#what-requestflow-never-wraps)).
 - Anything the handler or a stage throws while producing items.
 
-So a `Stream` call that returns without throwing says the request has a handler registered. Whether that handler resolves, and what it does, waits for the first enumeration. Resolving from the dispatching scope that late also means the enumeration has to finish before that scope is disposed; [lifetimes.md](lifetimes.md#why-the-dispatcher-is-scoped) covers the worker pattern.
+A `Stream` call that returns without throwing means the request has a registered handler. Whether that handler resolves, and what it does, waits for the first enumeration. Resolving from the dispatching scope that late also means the enumeration has to finish before that scope is disposed; [lifetimes.md](lifetimes.md#why-the-dispatcher-is-scoped) covers the worker pattern.
 
 ## Cancellation
 
@@ -117,8 +117,7 @@ A handler written without the attribute loses nothing. The token it receives as 
 
 A stream stage implements `IStreamRequestStage<TRequest, TItem>` and registers with `AddStreamStage`. It receives a `StreamContinuation<TItem>`, and `next.Invoke()` hands back the sequence of the rest of the chain rather than a task. So a stage can observe items, drop them, replace them, add its own, or stop the walk early.
 
-An open generic stage applies to every stream request its constraints admit. `OrderRow` implements
-`IHasVisibility`, so this one reaches `ExportOrders` and every other stream request whose items do:
+An open generic stage applies to every stream request its constraints admit. `OrderRow` implements `IHasVisibility`, so this one reaches `ExportOrders` and every other stream request whose items do:
 
 ```csharp
 using System.Runtime.CompilerServices;
@@ -171,7 +170,7 @@ services.AddRequestFlow(o => o
 
 Everything [stages.md](stages.md) says about constraints, contravariance, `WhereHandlerImplements`, lifetimes, duplicate registrations, and `DisallowUnusedStages` holds here too. Four things differ:
 
-- The two chains never mix. A stream stage never wraps a task handler, and a stage added with `AddStage` never wraps a stream handler. Neither says so at startup; the stage is simply absent from the other chain. Passing a type to the wrong call is what fails, as `RF0011`, because it implements no contract of the family it was declared in.
+- The two chains never mix. A stream stage never wraps a task handler, and a stage added with `AddStage` never wraps a stream handler. Neither says so at startup; the stage is absent from the other chain. Passing a type to the wrong call is what fails, as `RF0011`, because it implements no contract of the family it was declared in.
 - There is no void form, so no `IStreamRequestStage<TRequest>` and no `NoResult`.
 - A stage's item type has to be the one its request declares, under the same covariance trap handlers fall into: `IStreamRequestStage<ExportOrders, object>` compiles, but closing matches the item type exactly, so the stage would wrap nothing. Startup validation reports a stage that wraps nothing anywhere as `RF0111`; a stage that wraps at least one request is read as scoped to those requests on purpose and is not reported.
 - Skipping `next` short-circuits into the stage's own sequence rather than into a single response. Nothing below is built, the handler included, so a cache stage that answers from memory never pays for the repository behind it. Yield nothing to end the stream there.

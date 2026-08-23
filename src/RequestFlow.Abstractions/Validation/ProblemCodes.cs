@@ -19,6 +19,8 @@ public static class ProblemCodes
     public const string StagePartiallyClosed = "RF0010";
     public const string StageMissingContract = "RF0011";
     public const string StageParametersMisused = "RF0012";
+    public const string EventStrategyIsInterface = "RF0013";
+    public const string EventStrategyAbstract = "RF0014";
     public const string DuplicateHandler = "RF0101";
     public const string UnhandledRequest = "RF0102";
     public const string DuplicateStage = "RF0103";
@@ -32,4 +34,14 @@ public static class ProblemCodes
     public const string StreamStageItemMismatch = "RF0111";
     public const string HandlerResponseMismatch = "RF0112";
     public const string StageResponseMismatch = "RF0113";
+    public const string UnhandledEvent = "RF0114";
+    public const string UnusedEventSubscription = "RF0115";
+    public const string RequestAndEvent = "RF0116";
+    public const string StreamRequestAndEvent = "RF0117";
+    public const string StageEventHandlerLifetime = "RF0118";
+    public const string ConflictingEventStrategies = "RF0119";
+    public const string AmbiguousEventStrategy = "RF0120";
+    public const string EventStrategyLifetime = "RF0121";
+    public const string UnusedEventStrategy = "RF0122";
+    public const string EventStrategyRoleLifetime = "RF0123";
 }

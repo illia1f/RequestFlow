@@ -6,6 +6,25 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
+## [Unreleased]
+
+### Added
+
+- Events: `IEvent`, `IEventHandler<TEvent>`, and `IEventPublisher.PublishAsync`. The same assembly scan that finds request handlers finds event handlers, and `AddRequestFlow` registers the publisher beside the dispatchers, so there is no separate call to make. [events.md](docs/events.md) covers the feature.
+- Delivery is polymorphic and frozen at startup: a handler declared for a base class or interface receives every known assignable event, in one fixed order per event. Handlers register under their concrete type, not `IEventHandler<TEvent>`, so your own interface descriptor neither replaces nor joins publication.
+- A publish strategy decides how the handlers run: `SequentialPublishStrategy` by default, `ParallelPublishStrategy` under `PublishEventsInParallel()`, and `FailFastPublishStrategy` to stop at the first failure. Sequential and parallel give every applicable handler a turn unless a cancellation check stops the walk, and collect what failed into `EventPublishException.Failures`.
+- Write your own strategy against `IEventPublishStrategy` and the testable `EventDelivery`. Select one globally with `PublishAllEventsWith<TStrategy>()` or for one assignable event type with `PublishEventsWith<TEvent, TStrategy>()`, and set its lifetime through `EventStrategyOptions`; a custom strategy resolves from DI as a singleton unless you say otherwise.
+- Event exceptions: `EventNotRegisteredException` (a published type the event map does not know), `EventPublishException` (the collected handler failures), `EventPublishCanceledException` (a publisher-acknowledged stop), `EventHandlerNullTaskException` (a handler that returns a null task), and `EventStrategyNullTaskException` (a strategy that returns a null task). `EventHandlerFailure` names the handler, its declared contract, and the cause.
+- Event validation codes: `RF0114` (a known event with no applicable handler, allowed by `AllowUnhandledEvents()`), `RF0115` (a subscription that reaches no known event, reported only under `DisallowUnusedEventHandlers()`), `RF0116` (a type that is both a request and an event), `RF0117` (a type that is both a stream request and an event), and `RF0118` (a stage class that also handles events under a different lifetime, where the descriptor registered last decides how both roles resolve).
+- Event strategy validation codes: `RF0013`, `RF0014`, and `RF0119` through `RF0123` cover invalid strategy shapes, conflicting or ambiguous selection, lifetime conflicts, unused declarations, and shared-role lifetime collisions.
+- The validation model carries events: `RequestFlowModel.Events`, `EventSubscriptions`, and `EventStrategies`, the `EventModel`, `EventHandlerModel`, `EventSubscriptionModel`, and `EventStrategyModel` types, and the `UnhandledEventsAllowed` and `UnusedEventHandlersDisallowed` flags on the context. `RequestFlowModelBuilder` gains `AddEvent`, `AddEventHandler`, `PublishEventsWith`, and a four-flag `BuildContext` overload beside the unchanged two-flag one; `AddEvent` takes a concrete closed event type and rejects anything the model could not hold.
+- `IEventPublisher` follows the dispatchers' lifetime: scoped by default, transient under `WithTransientDispatcher`.
+
+### Changed
+
+- The request and event maps freeze together as one `FrozenPlans` singleton, on the first dispatcher or publisher resolution. `ValidateRequestFlow` forces that single freeze, and one `RequestFlowValidationException` still lists every problem from both halves.
+- `RF0109` now comes from the shared contract-conflict rule instead of the stream contract rule. On a type that also carries two stream contracts, other problems can now fall between `RF0108` and `RF0109` in `Problems`, and `RF0110` precedes `RF0109` instead of following it.
+
 ## [1.0.0-preview.7] - 2026-08-15
 
 ### Added
@@ -108,7 +127,8 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
-[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.6...HEAD
+[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.7...HEAD
+[1.0.0-preview.7]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.6...v1.0.0-preview.7
 [1.0.0-preview.6]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.5...v1.0.0-preview.6
 [1.0.0-preview.5]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.4...v1.0.0-preview.5
 [1.0.0-preview.4]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.3...v1.0.0-preview.4

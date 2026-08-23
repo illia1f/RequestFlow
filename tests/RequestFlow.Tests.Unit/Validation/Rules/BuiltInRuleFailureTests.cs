@@ -14,7 +14,7 @@ public sealed class BuiltInRuleFailureTests
         using ServiceProvider provider = new ServiceCollection().BuildServiceProvider();
 
         TypeLoadException exception =
-            Should.Throw<TypeLoadException>(() => registry.BuildDispatchMap(provider));
+            Should.Throw<TypeLoadException>(() => registry.Freeze(provider));
 
         exception.Message.ShouldBe("Could not load type 'Contracts.IAudited'.");
     }

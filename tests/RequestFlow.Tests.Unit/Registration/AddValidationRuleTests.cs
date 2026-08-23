@@ -225,6 +225,27 @@ public sealed class AddValidationRuleTests
             $"Validation rule '{typeof(NullProblemReturningRule).FullName}' returned a null problem.");
     }
 
+    [Fact]
+    public void Given_Event_Registration_When_An_External_Rule_Validates_Then_It_Reads_Event_Facts_And_Flags()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options => options
+                .RegisterHandlersFromAssemblyContaining<AddValidationRuleTests>()
+                .AllowUnhandledEvents()
+                .DisallowUnusedEventHandlers())
+            .AddValidationRule<EventFactsRule>();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception =
+            Should.Throw<RequestFlowValidationException>(() => provider.ValidateRequestFlow());
+
+        RequestFlowValidationProblem problem = exception.Problems.Single(candidate =>
+            candidate.Code == "TEST0005");
+        problem.Subject.ShouldBe(typeof(RequestFlow.Tests.ValidationFixtures.ExternalContractEvent));
+        problem.Message.ShouldBe(
+            "event=True subscription=True unhandled=True unused=True");
+    }
+
     #region Helpers
 
     private static int IndexOfCode(RequestFlowValidationException exception, string code)
@@ -244,6 +265,15 @@ public sealed class AddValidationRuleTests
     {
         public Task<string> HandleAsync(Echo request, CancellationToken cancellationToken)
             => Task.FromResult(string.Empty);
+    }
+
+    public sealed class ExternalContractEventHandler :
+        IEventHandler<RequestFlow.Tests.ValidationFixtures.ExternalContractEvent>
+    {
+        public Task HandleAsync(
+            RequestFlow.Tests.ValidationFixtures.ExternalContractEvent @event,
+            CancellationToken cancellationToken)
+            => Task.CompletedTask;
     }
 
     private sealed class AlwaysFailsRule : IRequestFlowValidationRule
@@ -304,6 +334,26 @@ public sealed class AddValidationRuleTests
     {
         public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
             => [null!];
+    }
+
+    private sealed class EventFactsRule : IRequestFlowValidationRule
+    {
+        public IEnumerable<RequestFlowValidationProblem> Validate(
+            RequestFlowValidationContext context)
+        {
+            bool hasEvent = context.Model.Events.Any(@event =>
+                @event.EventType
+                    == typeof(RequestFlow.Tests.ValidationFixtures.ExternalContractEvent));
+            bool hasSubscription = context.Model.EventSubscriptions.Any(subscription =>
+                subscription.HandlerType == typeof(ExternalContractEventHandler));
+
+            yield return new RequestFlowValidationProblem(
+                "TEST0005",
+                $"event={hasEvent} subscription={hasSubscription} " +
+                $"unhandled={context.UnhandledEventsAllowed} " +
+                $"unused={context.UnusedEventHandlersDisallowed}",
+                typeof(RequestFlow.Tests.ValidationFixtures.ExternalContractEvent));
+        }
     }
 
     #endregion

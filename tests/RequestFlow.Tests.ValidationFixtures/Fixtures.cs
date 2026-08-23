@@ -191,3 +191,119 @@ public sealed class UnreachedStreamStage : IStreamRequestStage<LonelyStream, int
         LonelyStream request, StreamContinuation<int> next, CancellationToken cancellationToken)
         => next.Invoke(cancellationToken);
 }
+
+/// <summary>
+/// An event with no applicable handler; startup validation must report it under RF0114.
+/// </summary>
+public sealed record UnhandledValidationEvent : IEvent;
+
+/// <summary>
+/// An abstract event used by a subscription that reaches no concrete event in this assembly.
+/// </summary>
+public abstract record DeadValidationEventBase : IEvent;
+
+/// <summary>
+/// An event interface used by a subscription that reaches no concrete event in this assembly.
+/// </summary>
+public interface IDeadValidationEvent : IEvent
+{ }
+
+/// <summary>
+/// Declares two dead subscriptions so validation reports the base and interface contracts separately.
+/// </summary>
+public sealed class DeadValidationEventHandler :
+    IEventHandler<DeadValidationEventBase>,
+    IEventHandler<IDeadValidationEvent>
+{
+    public Task HandleAsync(
+        DeadValidationEventBase @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+
+    public Task HandleAsync(IDeadValidationEvent @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+
+/// <summary>
+/// A concrete event contract consumed by a handler in another assembly.
+/// </summary>
+public sealed record ExternalContractEvent : IEvent;
+
+/// <summary>
+/// A generic event whose closed int form has an exact handler.
+/// </summary>
+public sealed record ClosedGenericValidationEvent<T> : IEvent;
+
+public sealed class ClosedGenericValidationEventHandler :
+    IEventHandler<ClosedGenericValidationEvent<int>>
+{
+    public Task HandleAsync(
+        ClosedGenericValidationEvent<int> @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+
+/// <summary>
+/// Carries request and event contracts; startup validation must report it under RF0116.
+/// </summary>
+public sealed record RequestEventConflict : IRequest<int>, IEvent;
+
+public sealed class RequestEventConflictRequestHandler :
+    IRequestHandler<RequestEventConflict, int>
+{
+    public Task<int> HandleAsync(
+        RequestEventConflict request, CancellationToken cancellationToken)
+        => Task.FromResult(0);
+}
+
+public sealed class RequestEventConflictEventHandler :
+    IEventHandler<RequestEventConflict>
+{
+    public Task HandleAsync(
+        RequestEventConflict @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+
+/// <summary>
+/// Carries stream-request and event contracts; startup validation must report it under RF0117.
+/// </summary>
+public sealed record StreamEventConflict : IStreamRequest<int>, IEvent;
+
+public sealed class StreamEventConflictStreamHandler :
+    IStreamRequestHandler<StreamEventConflict, int>
+{
+    public async IAsyncEnumerable<int> Handle(
+        StreamEventConflict request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        yield return 0;
+    }
+}
+
+public sealed class StreamEventConflictEventHandler :
+    IEventHandler<StreamEventConflict>
+{
+    public Task HandleAsync(
+        StreamEventConflict @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+
+/// <summary>
+/// Carries request, stream-request, and event contracts so every pair is reported.
+/// </summary>
+public sealed record AllMessageContracts : IRequest<int>, IStreamRequest<int>, IEvent;
+
+public sealed class AllMessageContractsRequestHandler :
+    IRequestHandler<AllMessageContracts, int>
+{
+    public Task<int> HandleAsync(
+        AllMessageContracts request, CancellationToken cancellationToken)
+        => Task.FromResult(0);
+}
+
+public sealed class AllMessageContractsEventHandler :
+    IEventHandler<AllMessageContracts>
+{
+    public Task HandleAsync(
+        AllMessageContracts @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}

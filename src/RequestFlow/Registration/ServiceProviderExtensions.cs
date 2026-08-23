@@ -10,7 +10,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceProviderExtensions
 {
     /// <summary>
-    /// Builds and validates this provider's dispatch map now instead of at first dispatch.
+    /// Builds and validates this provider's request and event maps now instead of at first dispatch.
     /// Returns the provider for chaining.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
@@ -22,7 +22,7 @@ public static class ServiceProviderExtensions
 
         using (IServiceScope scope = provider.CreateScope())
         {
-            scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
+            scope.ServiceProvider.GetRequiredService<FrozenPlans>();
         }
 
         return provider;

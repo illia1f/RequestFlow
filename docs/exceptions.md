@@ -13,17 +13,22 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 | [`StageNullTaskException`](#stagenulltaskexception) | `SendAsync` | A stage returned a null task from `HandleAsync` |
 | [`HandlerNullStreamException`](#handlernullstreamexception) | Enumeration | A stream handler returned a null sequence from `Handle` |
 | [`StageNullStreamException`](#stagenullstreamexception) | Enumeration | A stream stage returned a null sequence from `Handle` |
+| [`EventNotRegisteredException`](#eventnotregisteredexception) | `PublishAsync` call | The event's exact runtime type has no frozen plan |
+| [`EventPublishException`](#event-publication-failures) | Returned publish task | A publish strategy reported one or more event-handler failures |
+| [`EventPublishCanceledException`](#eventpublishcanceledexception) | Returned publish task | A publish strategy acknowledged cancellation |
+| [`EventHandlerNullTaskException`](#eventhandlernulltaskexception) | `EventHandlerFailure.Exception` | An event handler returned a null task from `HandleAsync` |
+| [`EventStrategyNullTaskException`](#eventstrategynulltaskexception) | Returned publish task | An event publish strategy returned a null task from `PublishAsync` |
 | [`InvalidOperationException`](#plain-invalidoperationexception) | `WhereHandlerImplements` | A second handler filter added to one stage |
 | [`InvalidOperationException`](#plain-invalidoperationexception) | Startup validation | A validation rule returned null, or a null problem |
-| [The container's `InvalidOperationException`](#plain-invalidoperationexception) | Startup validation | A validation rule depends on a RequestFlow dispatcher and the provider validates scopes; without that check nothing throws and startup hangs |
+| [The container's `InvalidOperationException`](#plain-invalidoperationexception) | Startup validation | A validation rule depends on a RequestFlow dispatcher or publisher and the provider validates scopes; without that check nothing throws and startup hangs |
 | [`ArgumentNullException`](#argument-validation) | All public entry points | A required argument is null |
 | [`ArgumentException`](#argument-validation) | `RegisterGenericHandler` | `closingTypes` contains a null element |
 
-The RequestFlow types all live in the `RequestFlow` namespace, derive from `InvalidOperationException`, and ship in `RequestFlow.Abstractions`. All are sealed except the two abstract bases, `NullTaskException` and `NullStreamException`. All of them signal programmer errors: fix the registration or the call site instead of catching them.
+The RequestFlow types all live in the `RequestFlow` namespace and ship in `RequestFlow.Abstractions`. Most derive from `InvalidOperationException`. `EventPublishException` derives from `AggregateException`, and `EventPublishCanceledException` derives from `OperationCanceledException`. All are sealed except the two abstract bases, `NullTaskException` and `NullStreamException`.
 
 ## RequestFlowValidationException
 
-Thrown when RequestFlow validates everything registered: the first time a dispatcher is resolved, or earlier if `ValidateRequestFlow` runs at startup (see [lifetimes.md](lifetimes.md) for validation timing). Problems accumulate across every `AddRequestFlow` call and surface as one exception. The message and the `Problems` property list all of them, so one failed start reports everything at once. Failed validation does not stick: every later dispatcher resolution validates again and throws the same list.
+Thrown when RequestFlow validates the whole registration. The first resolution of a dispatcher or event publisher triggers validation, unless `ValidateRequestFlow` runs earlier at startup (see [lifetimes.md](lifetimes.md) for validation timing). Problems accumulate across every `AddRequestFlow` call and surface as one exception. The message and the `Problems` property list all of them, so one failed start reports everything at once. Failed validation does not stick: a later resolution of either a dispatcher or an event publisher retries validation and throws the same list.
 
 `Problems` holds `RequestFlowValidationProblem` values: a stable `Code`, a `Message` saying what to fix, and the `Subject` type at fault where the problem has one. Each line of the exception message is one problem, printed as `CODE: message`. A rule of your own reports into the same list, and [validation-rules.md](validation-rules.md) covers writing one.
 
@@ -45,6 +50,8 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0010`](#stage-registration) | Stage registration | Stage type is partially closed |
 | [`RF0011`](#stage-registration) | Stage registration | Type does not implement a stage contract |
 | [`RF0012`](#stage-registration) | Stage registration | Stage type uses its generic parameters incorrectly |
+| [`RF0013`](#events) | Events | Event publish strategy type is an interface |
+| [`RF0014`](#events) | Events | Event publish strategy type is abstract |
 | [`RF0101`](#requests-and-handlers) | Requests and handlers | Request has more than one handler |
 | [`RF0102`](#requests-and-handlers) | Requests and handlers | Request has no handler |
 | [`RF0103`](#stages) | Stages | Stage type is registered more than once |
@@ -58,6 +65,16 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0111`](#stages) | Stages | Stream stage item type does not match the request |
 | [`RF0112`](#requests-and-handlers) | Requests and handlers | Handler response type does not match the request |
 | [`RF0113`](#stages) | Stages | Stage response type does not match the request |
+| [`RF0114`](#events) | Events | Event has no applicable handler |
+| [`RF0115`](#events) | Events | Event-handler subscription reaches no known event |
+| [`RF0116`](#events) | Events | Type implements both request and event contracts |
+| [`RF0117`](#events) | Events | Type implements both stream request and event contracts |
+| [`RF0118`](#events) | Events | Stage class also handles events under a different lifetime |
+| [`RF0119`](#events) | Events | One strategy target names different strategy types |
+| [`RF0120`](#events) | Events | Event strategy declarations tie at the winning tier |
+| [`RF0121`](#events) | Events | Strategy type is declared with different lifetimes |
+| [`RF0122`](#events) | Events | Event strategy declaration reaches no known event |
+| [`RF0123`](#events) | Events | Strategy class holds an event handler or stage role under a different lifetime |
 | [`CQRS0001`](#cqrs) | CQRS | Request is a command and a query, or a command and a stream query |
 
 ### Codes by area
@@ -114,6 +131,25 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | --- | --- | --- | --- |
 | `RF0107` | `Validation rule '...' threw ...` | A rule of yours or a package's threw out of `Validate`. That rule's findings were dropped, every other rule still reported, and the message names the exception type and text | Fix the rule, or catch inside it and report a problem so the message can name what was being checked |
 
+#### Events
+
+| Code | Problem message starts with | Cause | Fix |
+| --- | --- | --- | --- |
+| `RF0013` | `Event publish strategy '...' is an interface...` | A strategy declaration names an interface, which the container cannot construct | Name a concrete strategy class |
+| `RF0014` | `Event publish strategy '...' is abstract...` | A strategy declaration names an abstract class | Name a concrete strategy class |
+| `RF0114` | `Event '...' has no handler.` | A known concrete event has no applicable exact, base, interface, or `IEvent` handler | Add or scan a handler, or call `AllowUnhandledEvents` when a known empty plan is intentional |
+| `RF0115` | `Event subscription '...' declared for '...' reaches no known event...` | `DisallowUnusedEventHandlers` is on and one handler contract reaches no known concrete event | Scan the targeted event assembly, remove the dead contract, or drop the opt-in |
+| `RF0116` | `Type '...' implements both IRequest and IEvent...` | One concrete type belongs to the request and event contract families | Keep one role; split the type when both messages are needed |
+| `RF0117` | `Type '...' implements both IStreamRequest and IEvent...` | One concrete type belongs to the stream request and event contract families | Keep one role; split the type when both messages are needed |
+| `RF0118` | `Class '...' is registered as a ... stage and as a ... event handler...` | One class holds both roles, which share the concrete service key, so the descriptor registered last decides the lifetime both roles resolve under | Split the two roles into two classes, or give the stage the handler lifetime |
+| `RF0119` | `The global event strategy is declared as both...` or `Event target '...' is declared with both...` | Two additive declarations disagree for the same global or typed target | Keep one strategy declaration for that target |
+| `RF0120` | `Event '...' has equally specific strategy declarations...` | Two unrelated assignable targets tie at the winning specificity tier | Declare the strategy on the exact event type |
+| `RF0121` | `Event publish strategy '...' is declared with both...` | One strategy type has different lifetimes across declarations | Use one lifetime for the strategy type |
+| `RF0122` | `Event strategy '...' targets '...', but that declaration applies to no known event...` | `DisallowUnusedEventHandlers` is on and a per-event target reaches no known event | Scan the event assembly, correct the target, remove the declaration, or drop the opt-in |
+| `RF0123` | `Class '...' is registered as a ... event publish strategy and as a ... event handler or stage...` | One class is a publish strategy and also an event handler or reached stage under a different lifetime. Those roles share the concrete service key, so the descriptor registered last decides the lifetime both resolve under. A request or stream handler role is keyed on the handler interface and does not conflict | Use one lifetime or split the roles |
+
+`RF0115` and `RF0122` are opt-in and independent of `AllowUnhandledEvents`. The unhandled option suppresses `RF0114`; it never suppresses a dead subscription or strategy declaration requested through `DisallowUnusedEventHandlers`.
+
 #### CQRS
 
 `AddCqrs` contributes one package-specific check as a validation rule.
@@ -147,7 +183,7 @@ services.AddRequestFlow(o => o
 
 Thrown by `SendAsync`, and by `IStreamDispatcher.Stream` or `IStreamQueryDispatcher.Stream`, when the request's runtime type has no registered handler. The `RequestType` property holds the request type that had no handler. Both `Stream` methods throw it from the call rather than from the first enumeration, because the lookup is not part of the sequence they hand back.
 
-With default validation a scanned request without a handler already fails startup validation, so only three paths lead here:
+With default validation a scanned request without a handler already fails at startup, so only three paths lead here:
 
 1. The request's assembly was never scanned. RequestFlow never saw the type, so startup validation could not flag it. Include the assembly in a `RegisterHandlersFromAssembly*` call.
 2. A call opted out with `AllowUnhandledRequests`, so a missing handler surfaces at dispatch instead of at startup.
@@ -167,7 +203,39 @@ await dispatcher.SendAsync(new CreateOrder());          // works
 await dispatcher.SendAsync(new ExpressCreateOrder());   // HandlerNotFoundException
 ```
 
-The second call compiles because `ExpressCreateOrder` is an `IRequest<OrderId>`, but no handler is registered for its runtime type and `CreateOrderHandler` is never considered. Register a handler per concrete request type, and prefer marking request types `sealed` so the compiler prevents the situation outright.
+The second call compiles because `ExpressCreateOrder` is an `IRequest<OrderId>`, but no handler is registered for its runtime type and `CreateOrderHandler` is never considered. Register a handler per concrete request type, and mark request types `sealed` so the compiler rules this out.
+
+## EventNotRegisteredException
+
+Thrown directly from `PublishAsync` when the event's exact runtime type has no entry in the frozen `EventMap`. `EventType` holds that runtime type. The call throws before it returns a task and before any handler runs.
+
+This is an unknown event, not a known event with an empty plan. `AllowUnhandledEvents` permits the latter and has no effect on a map miss. Include the event's assembly in a `RegisterHandlersFromAssembly*` call. An unscanned derived type or runtime proxy remains unknown even when its base event is registered, because closure is computed at freeze rather than at publication.
+
+## Event publication failures
+
+The built-in sequential and parallel strategies run every applicable entry unless a cancellation check stops the walk. Fail-fast stops on its first entry failure. A custom strategy chooses which entries to start and which failures to report. The single-failure case still uses `EventPublishException` when the strategy calls `EventDelivery.ThrowIfAny`.
+
+### EventPublishException
+
+`EventPublishException` derives from `AggregateException`. `EventType` names the runtime event, and `Failures` holds one `EventHandlerFailure` per reported subscription invocation. The built-ins use frozen entry order; a custom strategy controls collection order. Each `EventHandlerFailure` has:
+
+- `HandlerType`, the concrete handler class;
+- `DeclaredEventType`, the event contract used for this invocation;
+- `Exception`, the original exception, or the handler task's `AggregateException` when that task held several exceptions.
+
+`InnerExceptions` contains the same exceptions in the same order. The declared event type matters when one class implements two applicable contracts: RequestFlow invokes the class twice, and either or both invocations can fail independently.
+
+Resolution failures, synchronous throws before a task is returned, canceled handler tasks, and null handler tasks all become entries in `Failures`. They do not stop later handlers. A null task's `Exception` is an `EventHandlerNullTaskException`.
+
+`SkippedHandlerCount` reports entries the strategy never started. It is zero for run-all outcomes and positive for fail-fast outcomes with later entries. An entry that started and remains unfinished is not skipped. The public constructor reports no skipped count and no handler total; a test that needs an exception carrying both builds a delivery with `EventDelivery.Over` and calls `ThrowIfAny(failures, skippedHandlerCount)`.
+
+## EventPublishCanceledException
+
+Produced through the returned task when a publish strategy acknowledges the publisher token. It derives from `OperationCanceledException`. `EventType` names the runtime event, the inherited `CancellationToken` is the token passed to `PublishAsync`, `Failures` keeps any handler failures collected before the stop, and `SkippedHandlerCount` is how many handlers the stop kept from starting.
+
+The built-ins check before any handler, including for an empty plan. Sequential and fail-fast check before each remaining handler. They do not check after the final sequential handler starts or after parallel fan-out begins. A custom strategy owns its acknowledgment points. A handler that throws `OperationCanceledException` or returns a canceled task is an ordinary entry failure.
+
+The task returned by a publisher-acknowledged cancellation has `Status == Canceled` and `Task.Exception == null`. Awaiting it throws the exact `EventPublishCanceledException`, not a replacement `TaskCanceledException`. Earlier handlers may already have completed, so cancellation does not make publication atomic. [events.md](events.md#cancellation) contains the complete outcome table.
 
 ## ResponseTypeMismatchException
 
@@ -217,16 +285,24 @@ Thrown by `SendAsync` when a stage returns a null task from `HandleAsync`. The `
 
 Return the task from `next.InvokeAsync()`, or a completed task when short-circuiting.
 
-Both null-task types derive from `NullTaskException`, so one catch clause covers a handler and a stage:
+All four null-task types derive from `NullTaskException`, so one catch clause covers a request handler, event handler, stage, or event publish strategy:
 
 ```csharp
-catch (NullTaskException e)
+catch (NullTaskException exception)
 {
-    // e is a HandlerNullTaskException or a StageNullTaskException
+    Console.Error.WriteLine(exception.Message);
 }
 ```
 
-The base class is abstract with no public constructor, so those two are the only cases it ever holds. Both checks exist so the failure names the handler or stage at fault instead of surfacing as a `NullReferenceException` at the await.
+The base class is abstract with no public constructor. The checks make the failure name the handler or stage at fault instead of surfacing as a `NullReferenceException` at the await.
+
+## EventHandlerNullTaskException
+
+An event handler that returns a null task contributes an `EventHandlerNullTaskException` to `EventPublishException.Failures`; it is not thrown directly from the public call. `EventType` names the runtime event and `HandlerType` names the concrete class. Later event handlers still run.
+
+## EventStrategyNullTaskException
+
+Thrown through the returned publish task when a custom `IEventPublishStrategy` returns null from `PublishAsync`. `StrategyType` names the strategy. It is not converted to an `EventHandlerFailure`, because strategy execution is outside any one handler entry.
 
 ## HandlerNullStreamException
 
@@ -259,7 +335,7 @@ Two cases are left with no type of their own. Adding a second `WhereHandlerImple
 
 The second comes from a broken validation rule: a rule that returns null instead of an empty sequence, or a sequence with a null problem in it, throws at the freeze with a message naming the rule. Those two are the only rule failures that come out this way. An exception the rule throws from its own code is reported as `RF0107` in the validation exception instead, and the rules after it still run (see [validation-rules.md](validation-rules.md)).
 
-One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher needs the map the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, rejects the rule earlier with `Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton 'RequestFlow.IRequestFlowValidationRule'`, since the dispatcher is scoped and a rule is a singleton. A rule taking a CQRS dispatcher gets the same message naming `IRequestDispatcher` or `IStreamDispatcher`, because the typed dispatchers are transient wrappers over those two. Both point at the same fix: take the dispatchers (`IRequestDispatcher`, `IStreamDispatcher`, `ICommandDispatcher`, `IQueryDispatcher`, `IStreamQueryDispatcher`) out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
+One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher or publisher needs the plans the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, can reject the rule earlier because the dispatch surface is scoped and a rule is a singleton. Both point at the same fix: take `IRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`, `IQueryDispatcher`, and `IStreamQueryDispatcher` out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
 
 ## Argument validation
 
@@ -272,6 +348,7 @@ Argument checks at the public surface throw immediately at the call site:
 | `ICommandDispatcher.SendAsync` (both) | `ArgumentNullException` | `command` is null                       |
 | `IQueryDispatcher.SendAsync`          | `ArgumentNullException` | `query` is null                         |
 | `IStreamQueryDispatcher.Stream`       | `ArgumentNullException` | `query` is null                         |
+| `IEventPublisher.PublishAsync`        | `ArgumentNullException` | `event` is null                         |
 | `Continuation<T>.Over`, `Continuation.Over`, `StreamContinuation<T>.Over` | `ArgumentNullException` | `rest` is null      |
 | `AddRequestFlow`                      | `ArgumentNullException` | `services` or `configure` is null       |
 | `RegisterHandlersFromAssembly`        | `ArgumentNullException` | `assembly` is null                      |
@@ -282,14 +359,18 @@ Argument checks at the public surface throw immediately at the call site:
 | `new RequestFlowValidationException`  | `ArgumentNullException` | `problems` is null                      |
 | `RequestFlowModelBuilder`, `RequestModelBuilder` | `ArgumentNullException` | A required `Type` argument is null |
 | `RequestFlowModelBuilder`, `RequestModelBuilder` | `ArgumentException` | `contractType` is not an open generic interface ([validation-rules.md](validation-rules.md#the-model)) |
+| Event failure type constructors       | `ArgumentNullException` | A required type, exception, or failure list is null |
+| Event aggregate constructors          | `ArgumentException` | A failure list contains a null entry |
 
 ## What RequestFlow never wraps
 
-Handler and stage exceptions propagate as thrown. The dispatcher and the stage chain add no try/catch and no wrapper exception, so `await dispatcher.SendAsync(...)` observes exactly what the failing `HandleAsync` threw. A stage that wants to translate exceptions does so itself, in a try/catch around `next`.
+Request handler and stage exceptions propagate unchanged. The request dispatcher and stage chain add no wrapper exception, so `await dispatcher.SendAsync(...)` observes exactly what the failing `HandleAsync` threw. A stage that wants to translate exceptions does so itself, in a try/catch around `next`.
 
 The stream path is the same rule, observed later. Nothing of the handler's runs until the first `MoveNextAsync`, so what it throws comes out of the `await foreach` rather than out of the `Stream` call.
 
 Cancellation follows the same rule. The token reaches `HandleAsync` as the caller gave it, unless a stage in between passes a different one to `next`, and an `OperationCanceledException` surfaces from the handler like any other exception. The library never inspects the token and never throws on it by itself. `Stream` is the one place RequestFlow builds a token of its own, and only to join the dispatch token with the one a caller passed to `WithCancellation`; it still never checks it.
+
+Events are the fan-out exception to that rule. Several handler failures cannot all propagate directly, so publication keeps each original exception in an `EventHandlerFailure` and throws one ordered `EventPublishException` after every started handler finishes. Event cancellation is also publisher-aware: the checks and `EventPublishCanceledException` are documented above. Events do not use stages.
 
 Container failures keep the container's own exception types. The dispatcher resolves the handler from the service provider on every dispatch, so a handler with a missing constructor dependency throws the container's `InvalidOperationException` at dispatch time, and so does a scoped handler resolved from the root provider while scope validation is on. On a stream nothing resolves until the chain runs, so both failures surface from the first enumeration rather than the `Stream` call. With scope validation off the second case throws nothing: the root provider builds the handler and reuses that instance for the life of the process. See [lifetimes.md](lifetimes.md) for the lifetime rules that prevent these.
 

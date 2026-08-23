@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 namespace RequestFlow;
 
 /// <summary>
-/// The requests and stages registration recorded, frozen and handed to every validation rule.
+/// The request, stage, and event registration handed to every validation rule.
 /// </summary>
 /// <remarks>
 /// One <c>AddStage</c> or <c>AddStreamStage</c> call is counted once in
@@ -18,8 +18,8 @@ namespace RequestFlow;
 /// twice. Reporting those is a rule's job.
 /// </para>
 /// <para>
-/// The opt-in flags are not here. <c>AllowUnhandledRequests</c> and <c>DisallowUnusedStages</c>
-/// pick which built-in rules run, and a rule reads them off <see cref="RequestFlowValidationContext"/>.
+/// Registration flags are held by <see cref="RequestFlowValidationContext"/>, not this model.
+/// They select which built-in rules run and remain available to rules added by the application.
 /// </para>
 /// <para>
 /// The library builds this. A rule test builds one with <see cref="RequestFlowModelBuilder"/>.
@@ -30,11 +30,36 @@ public sealed class RequestFlowModel
 {
     /// <exception cref="ArgumentNullException"/>
     internal RequestFlowModel(RequestModel[] requests, StageDeclarationModel[] stageDeclarations)
+        : this(requests, stageDeclarations, [], [], [])
+    { }
+
+    /// <exception cref="ArgumentNullException"/>
+    internal RequestFlowModel(
+        RequestModel[] requests,
+        StageDeclarationModel[] stageDeclarations,
+        EventModel[] events,
+        EventSubscriptionModel[] eventSubscriptions)
+        : this(requests, stageDeclarations, events, eventSubscriptions, [])
+    { }
+
+    /// <exception cref="ArgumentNullException"/>
+    internal RequestFlowModel(
+        RequestModel[] requests,
+        StageDeclarationModel[] stageDeclarations,
+        EventModel[] events,
+        EventSubscriptionModel[] eventSubscriptions,
+        EventStrategyModel[] eventStrategies)
     {
         Requests = new ReadOnlyCollection<RequestModel>(
             requests ?? throw new ArgumentNullException(nameof(requests)));
         StageDeclarations = new ReadOnlyCollection<StageDeclarationModel>(
             stageDeclarations ?? throw new ArgumentNullException(nameof(stageDeclarations)));
+        Events = new ReadOnlyCollection<EventModel>(
+            events ?? throw new ArgumentNullException(nameof(events)));
+        EventSubscriptions = new ReadOnlyCollection<EventSubscriptionModel>(
+            eventSubscriptions ?? throw new ArgumentNullException(nameof(eventSubscriptions)));
+        EventStrategies = new ReadOnlyCollection<EventStrategyModel>(
+            eventStrategies ?? throw new ArgumentNullException(nameof(eventStrategies)));
     }
 
     /// <summary>
@@ -47,4 +72,19 @@ public sealed class RequestFlowModel
     /// One entry per <c>AddStage</c> or <c>AddStreamStage</c> call, in the order the calls ran, duplicates included.
     /// </summary>
     public IReadOnlyList<StageDeclarationModel> StageDeclarations { get; }
+
+    /// <summary>
+    /// Every known concrete event and its handlers in frozen delivery order.
+    /// </summary>
+    public IReadOnlyList<EventModel> Events { get; }
+
+    /// <summary>
+    /// Every event handler subscription and the known events it reaches.
+    /// </summary>
+    public IReadOnlyList<EventSubscriptionModel> EventSubscriptions { get; }
+
+    /// <summary>
+    /// Every event publish strategy declaration and the known events it selects.
+    /// </summary>
+    public IReadOnlyList<EventStrategyModel> EventStrategies { get; }
 }

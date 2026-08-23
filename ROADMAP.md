@@ -13,9 +13,9 @@ Request/response dispatch, the stage pipeline, the CQRS layer, events, and strea
 - [x] `AddRequestFlow` registration with assembly scanning and generic handler closings
 - [x] Exceptions and startup validation (`ValidateRequestFlow`)
 - [x] Validation as pluggable rules: `IRequestFlowValidationRule`, `AddValidationRule<T>()`, and stable problem codes on `RequestFlowValidationException`
-- [x] NuGet publish: all four packages, latest preview `1.0.0-preview.6`
+- [x] NuGet publish: all four packages, latest preview `1.0.0-preview.7`
 - [x] `RequestFlow.*` package ID prefix reservation
-- [ ] Events: in-process publish/subscribe (`IEvent`, `IEventHandler`, `IEventPublisher`), RequestFlow's answer to MediatR notifications. Delivery, ordering, concurrency, failure, and cancellation semantics are settled and get written down before any code.
+- [x] Events: in-process publish/subscribe through `IEvent`, `IEventHandler`, and `IEventPublisher`, with built-in and custom publish strategies plus documented entry ordering, concurrency, failure, and cancellation semantics
 - [x] Streaming requests via `IAsyncEnumerable<T>`. The stream methods carry no `Async` suffix, because what they return is not awaitable.
 - [ ] Benchmark suite in the repository: BenchmarkDotNet against MediatR, martinothamar/Mediator, LiteBus, and DispatchR as pinned package references, with the raw artifacts, so the README can quote numbers instead of pointing here
 

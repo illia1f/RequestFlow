@@ -8,22 +8,38 @@ public sealed class RequestFlowValidationContextTests
     // Reaches the internal constructor through the InternalsVisibleTo grant in
     // RequestFlow.Abstractions.csproj; an application gets a context from the freeze.
     [Fact]
-    public void Given_A_Model_And_Both_Flags_When_Creating_The_Context_Then_The_Parts_Round_Trip()
+    public void Given_A_Model_And_Every_Flag_When_Creating_The_Context_Then_The_Parts_Round_Trip()
     {
         RequestFlowModel model = new RequestFlowModelBuilder().AddRequest(typeof(int)).Build();
 
         var context = new RequestFlowValidationContext(
-            model, unhandledRequestsAllowed: true, unusedStagesDisallowed: true);
+            model,
+            unhandledRequestsAllowed: true,
+            unusedStagesDisallowed: true,
+            unhandledEventsAllowed: true,
+            unusedEventHandlersDisallowed: true);
 
         context.Model.ShouldBeSameAs(model);
         context.UnhandledRequestsAllowed.ShouldBeTrue();
         context.UnusedStagesDisallowed.ShouldBeTrue();
+        context.UnhandledEventsAllowed.ShouldBeTrue();
+        context.UnusedEventHandlersDisallowed.ShouldBeTrue();
     }
 
     [Fact]
     public void Given_A_Null_Model_When_Creating_The_Context_Then_Throws_Argument_Null_Exception()
     {
-        Should.Throw<ArgumentNullException>(() => new RequestFlowValidationContext(null!, false, false));
+        Should.Throw<ArgumentNullException>(
+            () => new RequestFlowValidationContext(null!, false, false, false, false));
+    }
+
+    // Pins the binary signature a rule assembly compiled against 1.0.0-preview.7 binds to.
+    [Fact]
+    public void Given_The_Two_Flag_Signature_When_Resolving_It_Then_It_Is_Still_On_The_Assembly()
+    {
+        typeof(RequestFlowModelBuilder)
+            .GetMethod(nameof(RequestFlowModelBuilder.BuildContext), [typeof(bool), typeof(bool)])
+            .ShouldNotBeNull();
     }
 
     [Fact]

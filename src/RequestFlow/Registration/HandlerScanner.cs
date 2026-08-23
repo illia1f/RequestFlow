@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 
 namespace RequestFlow;
 
 /// <summary>
-/// Reflection scan over the configured assemblies for handlers and request types,
+/// Reflection scan over the configured assemblies for handlers, requests, and events,
 /// run once inside <c>AddRequestFlow</c>.
 /// </summary>
 internal static class HandlerScanner
@@ -14,6 +15,8 @@ internal static class HandlerScanner
     {
         List<HandlerDiscovery> handlers = [];
         List<Type> requestTypes = [];
+        List<EventHandlerDiscovery> eventHandlers = [];
+        List<Type> eventTypes = [];
 
         foreach (var assembly in assemblies)
         {
@@ -22,14 +25,22 @@ internal static class HandlerScanner
                 if (type is null || type.IsAbstract || type.IsInterface || type.IsGenericTypeDefinition)
                     continue;
 
-                handlers.AddRange(Discover(type));
+                Type[]? interfaces = GetLoadableInterfaces(type);
+                if (interfaces is null)
+                    continue;
 
-                if (IsRequestType(type))
+                handlers.AddRange(Discover(type, interfaces));
+                eventHandlers.AddRange(DiscoverEventHandlers(type, interfaces));
+
+                if (ContainsRequestContract(interfaces))
                     requestTypes.Add(type);
+
+                if (ContainsEventContract(interfaces))
+                    eventTypes.Add(type);
             }
         }
 
-        return new ScanResult(handlers, requestTypes);
+        return new ScanResult(handlers, requestTypes, eventHandlers, eventTypes);
     }
 
     private static Type?[] GetLoadableTypes(Assembly assembly)
@@ -45,11 +56,31 @@ internal static class HandlerScanner
         }
     }
 
+    private static Type[]? GetLoadableInterfaces(Type type)
+    {
+        try
+        {
+            return type.GetInterfaces();
+        }
+        // An interface from an undeployed assembly fails the load, not just the type; skip the type.
+        catch (Exception exception) when (
+            exception is TypeLoadException
+                or FileNotFoundException
+                or FileLoadException
+                or BadImageFormatException)
+        {
+            return null;
+        }
+    }
+
     internal static List<HandlerDiscovery> Discover(Type type)
+        => Discover(type, type.GetInterfaces());
+
+    private static List<HandlerDiscovery> Discover(Type type, Type[] interfaces)
     {
         List<HandlerDiscovery> handlers = [];
 
-        foreach (var iface in type.GetInterfaces())
+        foreach (var iface in interfaces)
         {
             if (!iface.IsGenericType)
                 continue;
@@ -71,15 +102,45 @@ internal static class HandlerScanner
         return handlers;
     }
 
-    private static bool IsRequestType(Type type)
+    private static bool ContainsRequestContract(Type[] interfaces)
     {
-        foreach (var iface in type.GetInterfaces())
+        foreach (var iface in interfaces)
         {
             if (!iface.IsGenericType)
                 continue;
 
             Type definition = iface.GetGenericTypeDefinition();
             if (definition == typeof(IRequest<>) || definition == typeof(IStreamRequest<>))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static List<EventHandlerDiscovery> DiscoverEventHandlers(Type type, Type[] interfaces)
+    {
+        List<EventHandlerDiscovery> eventHandlers = [];
+
+        foreach (var iface in interfaces)
+        {
+            if (!iface.IsGenericType
+                || iface.GetGenericTypeDefinition() != typeof(IEventHandler<>))
+            {
+                continue;
+            }
+
+            eventHandlers.Add(new EventHandlerDiscovery(
+                type, iface.GetGenericArguments()[0]));
+        }
+
+        return eventHandlers;
+    }
+
+    private static bool ContainsEventContract(Type[] interfaces)
+    {
+        foreach (var iface in interfaces)
+        {
+            if (iface == typeof(IEvent))
                 return true;
         }
 
@@ -124,10 +185,18 @@ internal sealed class HandlerDiscovery(
     public Type ContractDefinition { get; } = contract.GetGenericTypeDefinition();
 }
 
-/// <summary>
-/// Handlers and request types discovered by one scan pass.
-/// </summary>
-internal sealed class ScanResult(IReadOnlyList<HandlerDiscovery> handlers, IReadOnlyList<Type> requestTypes)
+internal sealed class EventHandlerDiscovery(Type handlerType, Type declaredEventType)
+{
+    public Type HandlerType { get; } = handlerType;
+
+    public Type DeclaredEventType { get; } = declaredEventType;
+}
+
+internal sealed class ScanResult(
+    IReadOnlyList<HandlerDiscovery> handlers,
+    IReadOnlyList<Type> requestTypes,
+    IReadOnlyList<EventHandlerDiscovery> eventHandlers,
+    IReadOnlyList<Type> eventTypes)
 {
     public IReadOnlyList<HandlerDiscovery> Handlers { get; } = handlers;
 
@@ -135,4 +204,8 @@ internal sealed class ScanResult(IReadOnlyList<HandlerDiscovery> handlers, IRead
     /// Every discovered request type, handled or not; validation reports the difference.
     /// </summary>
     public IReadOnlyList<Type> RequestTypes { get; } = requestTypes;
+
+    public IReadOnlyList<EventHandlerDiscovery> EventHandlers { get; } = eventHandlers;
+
+    public IReadOnlyList<Type> EventTypes { get; } = eventTypes;
 }

@@ -16,7 +16,13 @@ public sealed class RequestFlowOptions
 
     internal List<StageDeclaration> StageDeclarations { get; } = [];
 
+    internal List<EventStrategyDeclaration> EventStrategyDeclarations { get; } = [];
+
     internal bool UnusedStagesDisallowed { get; private set; }
+
+    internal bool UnhandledEventsAllowed { get; private set; }
+
+    internal bool UnusedEventHandlersDisallowed { get; private set; }
 
     internal ServiceLifetime HandlerLifetime { get; private set; } = ServiceLifetime.Transient;
 
@@ -55,6 +61,55 @@ public sealed class RequestFlowOptions
     public RequestFlowOptions AllowUnhandledRequests()
     {
         UnhandledRequestsAllowed = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Selects <see cref="ParallelPublishStrategy"/> as the global event strategy. A conflicting
+    /// global declaration from any <c>AddRequestFlow</c> call is a startup validation problem.
+    /// </summary>
+    public RequestFlowOptions PublishEventsInParallel()
+        => PublishAllEventsWith<ParallelPublishStrategy>();
+
+    /// <summary>
+    /// Selects <typeparamref name="TStrategy"/> as the fallback strategy for every event without
+    /// a matching per-event declaration.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"/>
+    public RequestFlowOptions PublishAllEventsWith<TStrategy>(
+        Action<EventStrategyOptions>? configure = null)
+        where TStrategy : class, IEventPublishStrategy
+        => DeclareEventStrategy(null, typeof(TStrategy), configure);
+
+    /// <summary>
+    /// Selects <typeparamref name="TStrategy"/> for known events assignable to
+    /// <typeparamref name="TEvent"/>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"/>
+    public RequestFlowOptions PublishEventsWith<TEvent, TStrategy>(
+        Action<EventStrategyOptions>? configure = null)
+        where TEvent : IEvent
+        where TStrategy : class, IEventPublishStrategy
+        => DeclareEventStrategy(typeof(TEvent), typeof(TStrategy), configure);
+
+    /// <summary>
+    /// Permits a known event to have no applicable handler. Once enabled, this setting applies
+    /// to every event registered by any <c>AddRequestFlow</c> call on the service collection.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledEvents()
+    {
+        UnhandledEventsAllowed = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Reports an event handler subscription or per-event strategy declaration that reaches no
+    /// known event. Once enabled, this setting applies to every declaration registered by any
+    /// <c>AddRequestFlow</c> call on the service collection.
+    /// </summary>
+    public RequestFlowOptions DisallowUnusedEventHandlers()
+    {
+        UnusedEventHandlersDisallowed = true;
         return this;
     }
 
@@ -190,6 +245,18 @@ public sealed class RequestFlowOptions
     public RequestFlowOptions DisallowUnusedStages()
     {
         UnusedStagesDisallowed = true;
+        return this;
+    }
+
+    private RequestFlowOptions DeclareEventStrategy(
+        Type? declaredEventType,
+        Type strategyType,
+        Action<EventStrategyOptions>? configure)
+    {
+        var strategy = new EventStrategyOptions(strategyType);
+        configure?.Invoke(strategy);
+        EventStrategyDeclarations.Add(new EventStrategyDeclaration(
+            declaredEventType, strategyType, strategy.Lifetime));
         return this;
     }
 }

@@ -16,6 +16,9 @@ public sealed class RequestFlowModelBuilder
     private readonly Dictionary<Type, RequestModelBuilder> _requests = [];
     private readonly List<Type> _requestOrder = [];
     private readonly List<StageDeclarationInput> _stageDeclarations = [];
+    private readonly List<Type> _eventTypes = [];
+    private readonly List<EventSubscriptionInput> _eventSubscriptions = [];
+    private readonly List<EventStrategyInput> _eventStrategies = [];
 
     /// <summary>
     /// Adds a request type, or configures one already added. Repeated calls for one type
@@ -77,7 +80,95 @@ public sealed class RequestFlowModelBuilder
     }
 
     /// <summary>
-    /// Produces the model, with requests in the order they were first added.
+    /// Adds a known event type, which has to be a concrete closed type implementing
+    /// <see cref="IEvent"/>, as only those get a plan at the freeze.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="ArgumentException"/>
+    public RequestFlowModelBuilder AddEvent(Type eventType)
+    {
+        if (eventType is null)
+            throw new ArgumentNullException(nameof(eventType));
+
+        // Rejected here rather than dropped at Build, where the rule under test would see an empty
+        // event list and report nothing.
+        if (!EventClosure.IsConcreteClosedEvent(eventType))
+        {
+            throw new ArgumentException(
+                $"'{eventType.FullName}' is not a concrete closed type implementing IEvent, so the " +
+                "model cannot hold it as a known event. Name the concrete event type; an interface, " +
+                "a base class, or an open generic belongs in AddEventHandler instead.",
+                nameof(eventType));
+        }
+
+        _eventTypes.Add(eventType);
+
+        return this;
+    }
+
+    /// <summary>
+    /// Adds one event handler subscription. The declared event type has to implement
+    /// <see cref="IEvent"/> or be <see cref="IEvent"/> itself, the way
+    /// <c>IEventHandler&lt;TEvent&gt;</c> constrains it.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="ArgumentException"/>
+    public RequestFlowModelBuilder AddEventHandler(
+        Type handlerType,
+        Type declaredEventType,
+        RequestFlowLifetime lifetime = RequestFlowLifetime.Transient)
+    {
+        if (handlerType is null)
+            throw new ArgumentNullException(nameof(handlerType));
+        if (declaredEventType is null)
+            throw new ArgumentNullException(nameof(declaredEventType));
+
+        // A type outside the constraint would still reach every event assignable to it in the
+        // closure, so the builder cannot accept a subscription the registry could never produce.
+        if (!EventClosure.IsEventContract(declaredEventType))
+        {
+            throw new ArgumentException(
+                $"'{declaredEventType.FullName}' does not implement IEvent, so no IEventHandler<TEvent> " +
+                "can declare it. Name the event type, one of its base classes, an event interface, or IEvent itself.",
+                nameof(declaredEventType));
+        }
+
+        _eventSubscriptions.Add(new EventSubscriptionInput(handlerType, declaredEventType, lifetime));
+
+        return this;
+    }
+
+    /// <summary>
+    /// Adds one event publish strategy declaration. A null <paramref name="declaredEventType"/>
+    /// records the global fallback.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="ArgumentException"/>
+    public RequestFlowModelBuilder PublishEventsWith(
+        Type? declaredEventType,
+        Type strategyType,
+        RequestFlowLifetime lifetime = RequestFlowLifetime.Singleton)
+    {
+        if (strategyType is null)
+            throw new ArgumentNullException(nameof(strategyType));
+
+        if (declaredEventType is not null && !EventClosure.IsEventContract(declaredEventType))
+        {
+            throw new ArgumentException(
+                $"'{declaredEventType.FullName}' does not implement IEvent, so an event strategy " +
+                "cannot target it. Name an event type, one of its base classes, an event interface, " +
+                "IEvent itself, or null for the global fallback.",
+                nameof(declaredEventType));
+        }
+
+        _eventStrategies.Add(new EventStrategyInput(
+            declaredEventType, strategyType, lifetime));
+
+        return this;
+    }
+
+    /// <summary>
+    /// Produces the model, preserving request and known-event order.
     /// </summary>
     /// <remarks>
     /// Callable more than once, with each call producing an independent model.
@@ -100,19 +191,43 @@ public sealed class RequestFlowModelBuilder
                 input.ContractType);
         }
 
-        return new RequestFlowModel(requests, declarations);
+        EventClosureResult eventClosure = EventClosure.Build(
+            _eventTypes, _eventSubscriptions, _eventStrategies);
+
+        return new RequestFlowModel(
+            requests,
+            declarations,
+            eventClosure.Events,
+            eventClosure.EventSubscriptions,
+            eventClosure.EventStrategies);
     }
 
     /// <summary>
     /// Produces the context a rule is given at startup, wrapping a freshly built model.
     /// </summary>
     /// <remarks>
-    /// The flags default to what registration does unless the application opts out: a request with
-    /// no handler is a problem, a stage that reached nothing is not.
+    /// The flags default to what registration does unless the application opts out: a request or
+    /// an event with no handler is a problem, a stage or a subscription that reached nothing is not.
     /// </remarks>
     public RequestFlowValidationContext BuildContext(
         bool unhandledRequestsAllowed = false, bool unusedStagesDisallowed = false)
-        => new(Build(), unhandledRequestsAllowed, unusedStagesDisallowed);
+        => BuildContext(unhandledRequestsAllowed, unusedStagesDisallowed, false, false);
+
+    /// <summary>
+    /// Produces the context with the event flags named as well. All four parameters are required,
+    /// so a call passing only the first two binds the two-flag overload.
+    /// </summary>
+    public RequestFlowValidationContext BuildContext(
+        bool unhandledRequestsAllowed,
+        bool unusedStagesDisallowed,
+        bool unhandledEventsAllowed,
+        bool unusedEventHandlersDisallowed)
+        => new(
+            Build(),
+            unhandledRequestsAllowed,
+            unusedStagesDisallowed,
+            unhandledEventsAllowed,
+            unusedEventHandlersDisallowed);
 
     private readonly struct StageDeclarationInput(
         Type stageType, RequestFlowLifetime lifetime, Type contractType)
