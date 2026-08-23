@@ -101,6 +101,68 @@ public sealed class EventStrategyOptionsTests
         declaration.Lifetime.ShouldBe(ServiceLifetime.Singleton);
     }
 
+    [Fact]
+    public void Given_Sequential_Publication_Sugar_When_Declaring_Then_Records_The_Sequential_Built_In()
+    {
+        var sut = new RequestFlowOptions();
+
+        sut.PublishEventsSequentially();
+
+        EventStrategyDeclaration declaration = sut.EventStrategyDeclarations.ShouldHaveSingleItem();
+        declaration.DeclaredEventType.ShouldBeNull();
+        declaration.StrategyType.ShouldBe(typeof(SequentialPublishStrategy));
+        declaration.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void Given_Fail_Fast_Publication_Sugar_When_Declaring_Then_Records_The_Fail_Fast_Built_In()
+    {
+        var sut = new RequestFlowOptions();
+
+        sut.PublishEventsFailFast();
+
+        EventStrategyDeclaration declaration = sut.EventStrategyDeclarations.ShouldHaveSingleItem();
+        declaration.DeclaredEventType.ShouldBeNull();
+        declaration.StrategyType.ShouldBe(typeof(FailFastPublishStrategy));
+        declaration.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+    }
+
+    [Fact]
+    public void Given_Per_Event_Parallel_Sugar_When_Declaring_Then_Records_The_Event_Contract()
+    {
+        var sut = new RequestFlowOptions();
+
+        sut.PublishEventsInParallel<ITestEvent>();
+
+        EventStrategyDeclaration declaration = sut.EventStrategyDeclarations.ShouldHaveSingleItem();
+        declaration.DeclaredEventType.ShouldBe(typeof(ITestEvent));
+        declaration.StrategyType.ShouldBe(typeof(ParallelPublishStrategy));
+    }
+
+    [Fact]
+    public void Given_Per_Event_Sequential_Sugar_When_Declaring_Then_Records_The_Event_Contract()
+    {
+        var sut = new RequestFlowOptions();
+
+        sut.PublishEventsSequentially<ITestEvent>();
+
+        EventStrategyDeclaration declaration = sut.EventStrategyDeclarations.ShouldHaveSingleItem();
+        declaration.DeclaredEventType.ShouldBe(typeof(ITestEvent));
+        declaration.StrategyType.ShouldBe(typeof(SequentialPublishStrategy));
+    }
+
+    [Fact]
+    public void Given_Per_Event_Fail_Fast_Sugar_When_Declaring_Then_Records_The_Event_Contract()
+    {
+        var sut = new RequestFlowOptions();
+
+        sut.PublishEventsFailFast<ITestEvent>();
+
+        EventStrategyDeclaration declaration = sut.EventStrategyDeclarations.ShouldHaveSingleItem();
+        declaration.DeclaredEventType.ShouldBe(typeof(ITestEvent));
+        declaration.StrategyType.ShouldBe(typeof(FailFastPublishStrategy));
+    }
+
     #region Helpers
 
     private interface ITestEvent : IEvent

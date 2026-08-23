@@ -23,7 +23,7 @@ services.AddRequestFlow(o => o
 | `AllowUnhandledRequests()`                    | Skips the missing-handler check at startup validation                           |
 | `PublishAllEventsWith<TStrategy>(configure?)` | Selects the global event strategy and configures a custom strategy lifetime |
 | `PublishEventsWith<TEvent, TStrategy>(configure?)` | Selects a strategy for an assignable event target |
-| `PublishEventsInParallel()`                   | Selects the global `ParallelPublishStrategy` (see [events.md](events.md)) |
+| `PublishEventsInParallel()`, `PublishEventsSequentially()`, `PublishEventsFailFast()` | Select a built-in strategy globally; each has a `<TEvent>` overload for an assignable event target (see [events.md](events.md)) |
 | `AllowUnhandledEvents()`                      | Permits a known event to have no applicable handler                            |
 | `DisallowUnusedEventHandlers()`               | Fails validation when an event subscription or typed strategy reaches no known event |
 | `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |

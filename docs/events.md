@@ -63,7 +63,7 @@ services.AddRequestFlow(options => options
     .PublishEventsWith<OrderPlaced, FailFastPublishStrategy>());
 ```
 
-`PublishEventsInParallel()` is shorthand for `PublishAllEventsWith<ParallelPublishStrategy>()`.
+Each built-in strategy has shorthand. `PublishEventsInParallel()`, `PublishEventsSequentially()`, and `PublishEventsFailFast()` select one globally; each also has a `<TEvent>` overload for one assignable event target.
 
 Per-event declarations use this precedence:
 
@@ -270,6 +270,9 @@ Event declarations and validation flags accumulate through additive `AddRequestF
 | `PublishAllEventsWith<TStrategy>()` | Selects the global fallback strategy |
 | `PublishEventsWith<TEvent, TStrategy>()` | Selects a strategy for an assignable event target |
 | `PublishEventsInParallel()` | Selects `ParallelPublishStrategy` globally |
+| `PublishEventsSequentially()` | Selects `SequentialPublishStrategy` globally; explicit form of the default |
+| `PublishEventsFailFast()` | Selects `FailFastPublishStrategy` globally |
+| `PublishEventsInParallel<TEvent>()`, `PublishEventsSequentially<TEvent>()`, `PublishEventsFailFast<TEvent>()` | Select that strategy for an assignable event target |
 | `AllowUnhandledEvents()` | Suppresses `RF0114` and permits known empty plans |
 | `DisallowUnusedEventHandlers()` | Enables `RF0115` for a dead subscription and `RF0122` for a dead strategy declaration |
 
