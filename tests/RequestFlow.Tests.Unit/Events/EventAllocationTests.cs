@@ -246,6 +246,10 @@ public sealed class EventAllocationTests
     // samples is the publish's own cost.
     private const int MeasurementSamples = 16;
 
+    // A suspension sample counts only when the resumed continuation finished inline; the cap
+    // stops the resample loop on a runner so saturated it never yields one.
+    private const int MaxMeasurementAttempts = 1024;
+
     private static MeasurementContext Build(bool parallel, bool customStrategy = false)
     {
         var first = new AlphaAllocationHandler();
@@ -320,9 +324,30 @@ public sealed class EventAllocationTests
         return best;
     }
 
-    // The gate and delegates are built before the first reading. SetResult runs the publisher's
-    // continuation inline, so both allocation readings stay on this thread.
+    // The runtime refuses to inline an await continuation onto a thread that has a
+    // SynchronizationContext, and xUnit sets one, so the suspension measurements run without it.
+    private static long WithoutSynchronizationContext(Func<long> measure)
+    {
+        SynchronizationContext? previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(null);
+        try
+        {
+            return measure();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
+    // The gate and delegates are built before the first reading. A sample counts only when
+    // SetResult ran the publisher's continuation inline, so both allocation readings stay on
+    // this thread.
     private static long MeasureOneSuspension(
+        Func<TaskCompletionSource<object?>, Task> start)
+        => WithoutSynchronizationContext(() => MeasureOneSuspensionCore(start));
+
+    private static long MeasureOneSuspensionCore(
         Func<TaskCompletionSource<object?>, Task> start)
     {
         for (int i = 0; i < WarmupIterations; i++)
@@ -337,17 +362,29 @@ public sealed class EventAllocationTests
         }
 
         long best = long.MaxValue;
-        for (int i = 0; i < MeasurementSamples; i++)
+        int cleanSamples = 0;
+        for (int attempt = 0; cleanSamples < MeasurementSamples; attempt++)
         {
+            if (attempt == MaxMeasurementAttempts)
+                throw new InvalidOperationException("No suspension sample completed inline within the attempt budget.");
+
             var gate = new TaskCompletionSource<object?>();
             long before = GC.GetAllocatedBytesForCurrentThread();
             Task task = start(gate);
             bool suspended = !task.IsCompleted;
             gate.SetResult(null);
+            // A continuation that lost the inline race finishes on the pool, and the blocking
+            // wait inside GetResult would bill its wait handle to this thread, so the sample is
+            // discarded.
+            bool completedInline = task.IsCompleted;
             task.GetAwaiter().GetResult();
             long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
             suspended.ShouldBeTrue();
+            if (!completedInline)
+                continue;
+
+            cleanSamples++;
             best = Math.Min(best, allocated);
         }
 
@@ -357,6 +394,10 @@ public sealed class EventAllocationTests
     // The second gate is still incomplete when the first continuation reaches it. The same async
     // state object must carry both waits.
     private static long MeasureTwoSuspensions(
+        Func<TaskCompletionSource<object?>, TaskCompletionSource<object?>, Task> start)
+        => WithoutSynchronizationContext(() => MeasureTwoSuspensionsCore(start));
+
+    private static long MeasureTwoSuspensionsCore(
         Func<TaskCompletionSource<object?>, TaskCompletionSource<object?>, Task> start)
     {
         for (int i = 0; i < WarmupIterations; i++)
@@ -376,8 +417,12 @@ public sealed class EventAllocationTests
         }
 
         long best = long.MaxValue;
-        for (int i = 0; i < MeasurementSamples; i++)
+        int cleanSamples = 0;
+        for (int attempt = 0; cleanSamples < MeasurementSamples; attempt++)
         {
+            if (attempt == MaxMeasurementAttempts)
+                throw new InvalidOperationException("No suspension sample completed inline within the attempt budget.");
+
             var firstGate = new TaskCompletionSource<object?>();
             var secondGate = new TaskCompletionSource<object?>();
             long before = GC.GetAllocatedBytesForCurrentThread();
@@ -386,11 +431,16 @@ public sealed class EventAllocationTests
             firstGate.SetResult(null);
             bool secondSuspended = !task.IsCompleted;
             secondGate.SetResult(null);
+            bool completedInline = task.IsCompleted;
             task.GetAwaiter().GetResult();
             long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
             firstSuspended.ShouldBeTrue();
             secondSuspended.ShouldBeTrue();
+            if (!completedInline)
+                continue;
+
+            cleanSamples++;
             best = Math.Min(best, allocated);
         }
 
