@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 using RequestFlow.Tests.ValidationFixtures;
@@ -134,6 +135,20 @@ public sealed class RegisterGenericHandlerTests
         string handlerName = handlerType.Name.Split('`')[0];
         exception.Problems.ShouldContain(p =>
             p.Code == expectedCode && p.Subject == handlerType && p.Message.Contains(handlerName));
+    }
+
+    [Fact]
+    public void Given_A_Definition_Whose_Interfaces_Cannot_Load_When_Resolving_Dispatcher_Then_Validation_Reports_Declaration()
+    {
+        var handlerType = new UnloadableInterfacesDefinition();
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o.RegisterGenericHandler(handlerType, typeof(Order)));
+
+        var exception = Should.Throw<RequestFlowValidationException>(() =>
+            services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.ShouldContain(p =>
+            p.Code == "RF0004" && p.Subject == handlerType && p.Message.Contains("could not be loaded"));
     }
 
     [Fact]
@@ -311,6 +326,19 @@ public sealed class RegisterGenericHandlerTests
     {
         public Task<string> HandleAsync(AuditRequest<T1> request, CancellationToken cancellationToken)
             => Task.FromResult(request.Payload);
+    }
+
+    // A definition that loaded while an interface it implements did not; asking for its interfaces
+    // throws. The generic members forward explicitly so the shape checks before the interface read pass.
+    private sealed class UnloadableInterfacesDefinition() : TypeDelegator(typeof(AuditHandler<>))
+    {
+        public override bool IsGenericTypeDefinition => true;
+
+        public override Type[] GetGenericArguments()
+            => typeof(AuditHandler<>).GetGenericArguments();
+
+        public override Type[] GetInterfaces()
+            => throw new TypeLoadException("Could not load type 'Contracts.IAudited'.");
     }
 
     #endregion

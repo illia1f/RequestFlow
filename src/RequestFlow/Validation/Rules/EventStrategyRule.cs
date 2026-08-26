@@ -17,16 +17,16 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
     {
         IReadOnlyList<EventStrategyModel> strategies = context.Model.EventStrategies;
 
-        foreach (RequestFlowValidationProblem problem in ShapeProblems(strategies))
+        foreach (RequestFlowValidationProblem problem in FindShapeProblems(strategies))
             yield return problem;
 
-        foreach (RequestFlowValidationProblem problem in TargetConflicts(strategies))
+        foreach (RequestFlowValidationProblem problem in FindTargetConflicts(strategies))
             yield return problem;
 
         foreach (EventStrategyAmbiguity ambiguity in _resolution.Ambiguities)
-            yield return AmbiguityProblem(ambiguity, strategies);
+            yield return CreateAmbiguityProblem(ambiguity, strategies);
 
-        foreach (RequestFlowValidationProblem problem in LifetimeConflicts(strategies))
+        foreach (RequestFlowValidationProblem problem in FindLifetimeConflicts(strategies))
             yield return problem;
 
         if (context.UnusedEventHandlersDisallowed)
@@ -47,14 +47,14 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
             }
         }
 
-        foreach (RequestFlowValidationProblem problem in RoleLifetimeConflicts(
+        foreach (RequestFlowValidationProblem problem in FindRoleLifetimeConflicts(
             context.Model, strategies))
         {
             yield return problem;
         }
     }
 
-    private static IEnumerable<RequestFlowValidationProblem> ShapeProblems(
+    private static IEnumerable<RequestFlowValidationProblem> FindShapeProblems(
         IReadOnlyList<EventStrategyModel> strategies)
     {
         var reportedInterfaces = new HashSet<Type>();
@@ -81,7 +81,7 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
         }
     }
 
-    private static IEnumerable<RequestFlowValidationProblem> TargetConflicts(
+    private static IEnumerable<RequestFlowValidationProblem> FindTargetConflicts(
         IReadOnlyList<EventStrategyModel> strategies)
     {
         EventStrategyModel? global = null;
@@ -127,7 +127,7 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
         }
     }
 
-    private static RequestFlowValidationProblem AmbiguityProblem(
+    private static RequestFlowValidationProblem CreateAmbiguityProblem(
         EventStrategyAmbiguity ambiguity,
         IReadOnlyList<EventStrategyModel> strategies)
     {
@@ -147,7 +147,7 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
             ambiguity.EventType);
     }
 
-    private static IEnumerable<RequestFlowValidationProblem> LifetimeConflicts(
+    private static IEnumerable<RequestFlowValidationProblem> FindLifetimeConflicts(
         IReadOnlyList<EventStrategyModel> strategies)
     {
         var firstLifetimes = new Dictionary<Type, RequestFlowLifetime>();
@@ -171,11 +171,11 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
         }
     }
 
-    private static IEnumerable<RequestFlowValidationProblem> RoleLifetimeConflicts(
+    private static IEnumerable<RequestFlowValidationProblem> FindRoleLifetimeConflicts(
         RequestFlowModel model,
         IReadOnlyList<EventStrategyModel> strategies)
     {
-        Dictionary<Type, List<RequestFlowLifetime>> roleLifetimes = RoleLifetimes(model);
+        Dictionary<Type, List<RequestFlowLifetime>> roleLifetimes = BuildRoleLifetimes(model);
         var reported = new HashSet<Type>();
         foreach (EventStrategyModel strategy in strategies)
         {
@@ -208,7 +208,7 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
         }
     }
 
-    private static Dictionary<Type, List<RequestFlowLifetime>> RoleLifetimes(
+    private static Dictionary<Type, List<RequestFlowLifetime>> BuildRoleLifetimes(
         RequestFlowModel model)
     {
         var lifetimes = new Dictionary<Type, List<RequestFlowLifetime>>();

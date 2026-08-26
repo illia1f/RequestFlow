@@ -47,12 +47,12 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
             // mismatch; the one-parameter form fixes the response in the class, so it can. A stage
             // that wrapped a handler somewhere is scoped, not trapped.
             if ((stageType.IsGenericTypeDefinition && stageType.GetGenericArguments().Length != 1)
-                || _facts.FamilyOf(stageType, declaration.ContractType) != StageFamily.Request
+                || _facts.GetFamily(stageType, declaration.ContractType) != StageFamily.Request
                 || declaration.ReachedRequests.Count > 0
                 || !checkedStages.Add(stageType))
                 continue;
 
-            Type? handlerFilter = _facts.HandlerFilterOf(stageType);
+            Type? handlerFilter = _facts.GetHandlerFilter(stageType);
 
             foreach (var request in context.Model.Requests)
             {
@@ -62,7 +62,7 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
 
                 // No sole contract, no response type to hold the stage to; RF0106 reports the ambiguity.
                 Type? declaredResponse =
-                    RequestContracts.SoleDeclaredResponse(request.RequestType, declaredResponses);
+                    RequestContracts.GetSoleDeclaredResponse(request.RequestType, declaredResponses);
                 if (declaredResponse is null)
                     continue;
 

@@ -6,6 +6,17 @@ Pre-1.0: the public API can still change between previews.
 
 Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
 
+## [Unreleased]
+
+### Added
+
+- `AddHandler<THandler>()` registers one request or stream handler without scanning its assembly, and `ExcludeHandler<THandler>()` keeps one handler's request and stream handler contracts out of the same call's scan, so MediatR's conditional `AddTransient<IRequestHandler<X, Y>, H>()` and scan-filter patterns port directly. A handler both scanned and added manually registers once, and a type that is not a concrete handler class is a startup problem (`RF0018` to `RF0020`).
+- `RF0124`: a handler declared against an interface or abstract request type now fails the freeze, from any registration source, when the target cannot expose the declared type as the request's exact runtime type. The `net462` asset keeps interface and abstract `MarshalByRefObject` handlers valid for `RealProxy` transparent proxies.
+
+### Fixed
+
+- `AddEventHandler<THandler>()` and `RegisterGenericHandler(...)` with a type whose interface list cannot load, because an interface's assembly is not deployed, no longer throw a raw loader exception out of `AddRequestFlow`; the freeze reports `RF0017` or `RF0004` beside the other problems.
+
 ## [1.0.0-preview.8] - 2026-08-24
 
 ### Added
@@ -128,7 +139,8 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
-[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.7...HEAD
+[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.8...HEAD
+[1.0.0-preview.8]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.7...v1.0.0-preview.8
 [1.0.0-preview.7]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.6...v1.0.0-preview.7
 [1.0.0-preview.6]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.5...v1.0.0-preview.6
 [1.0.0-preview.5]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.4...v1.0.0-preview.5

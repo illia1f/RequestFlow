@@ -2,8 +2,7 @@ namespace RequestFlow;
 
 /// <summary>
 /// Stable codes for every built-in validation problem. Documented in docs/validation-rules.md;
-/// never renumbered. Match <see cref="RequestFlowValidationProblem.Code"/> against these
-/// instead of literal strings.
+/// never renumbered. Match <see cref="RequestFlowValidationProblem.Code"/> against these instead of literal strings.
 /// </summary>
 public static class ProblemCodes
 {
@@ -24,6 +23,9 @@ public static class ProblemCodes
     public const string EventHandlerIsInterface = "RF0015";
     public const string EventHandlerAbstract = "RF0016";
     public const string EventHandlerMissingContract = "RF0017";
+    public const string ManualHandlerIsInterface = "RF0018";
+    public const string ManualHandlerAbstract = "RF0019";
+    public const string ManualHandlerMissingContract = "RF0020";
     public const string DuplicateHandler = "RF0101";
     public const string UnhandledRequest = "RF0102";
     public const string DuplicateStage = "RF0103";
@@ -47,4 +49,5 @@ public static class ProblemCodes
     public const string EventStrategyLifetime = "RF0121";
     public const string UnusedEventStrategy = "RF0122";
     public const string EventStrategyRoleLifetime = "RF0123";
+    public const string NonConcreteRequest = "RF0124";
 }

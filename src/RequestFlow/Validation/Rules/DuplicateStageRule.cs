@@ -37,7 +37,7 @@ internal sealed class DuplicateStageRule(StageDeclarationFacts? facts = null) : 
             {
                 string remedy = _facts.RegisteredInBothFamilies(stage.StageType)
                     ? $"Remove the {StageFamily.Request.CallName} call or the {StageFamily.Stream.CallName} call."
-                    : $"Remove the duplicate {_facts.FamilyOf(stage.StageType, stage.ContractType).CallName} call.";
+                    : $"Remove the duplicate {_facts.GetFamily(stage.StageType, stage.ContractType).CallName} call.";
 
                 yield return new RequestFlowValidationProblem(
                     ProblemCodes.DuplicateStage,

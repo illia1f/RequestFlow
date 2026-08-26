@@ -10,7 +10,7 @@ public sealed class BuiltInRuleFailureTests
     {
         var registry = new RequestFlowRegistry();
         registry.AllowUnhandledRequests();
-        registry.Add([], [new UnloadableInterfacesType(typeof(Probe))], []);
+        registry.Add([new UnloadableInterfacesType(typeof(Probe))], []);
         using ServiceProvider provider = new ServiceCollection().BuildServiceProvider();
 
         TypeLoadException exception =

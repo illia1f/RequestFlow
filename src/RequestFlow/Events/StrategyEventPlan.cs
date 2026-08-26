@@ -19,7 +19,7 @@ internal sealed class StrategyEventPlan(
         try
         {
             var strategy = (IEventPublishStrategy)services.GetRequiredService(strategyType);
-            EventDelivery delivery = Delivery(@event, services, cancellationToken);
+            EventDelivery delivery = CreateDelivery(@event, services, cancellationToken);
             return NullTaskGuard.FromStrategy(
                 strategy.PublishAsync(delivery, cancellationToken),
                 strategyType);

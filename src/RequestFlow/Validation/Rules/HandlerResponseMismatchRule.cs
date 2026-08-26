@@ -27,7 +27,7 @@ internal sealed class HandlerResponseMismatchRule : IRequestFlowValidationRule
             if (request.Handlers.Count == 0)
                 continue;
 
-            Type? declared = RequestContracts.SoleDeclaredResponse(request.RequestType);
+            Type? declared = RequestContracts.GetSoleDeclaredResponse(request.RequestType);
             if (declared is null)
                 continue;
 

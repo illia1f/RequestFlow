@@ -28,6 +28,8 @@ services.AddRequestFlow(o => o
 | `DisallowUnusedEventHandlers()`               | Fails validation when an event subscription or typed strategy reaches no known event |
 | `AddEventHandler<THandler>()`                 | Registers one event handler without scanning its assembly (see [events.md](events.md)) |
 | `ExcludeEventHandler<THandler>()`             | Keeps one handler's event contracts out of this call's scan (see [events.md](events.md)) |
+| `AddHandler<THandler>()`                      | Registers one request or stream handler without scanning its assembly (see [Manual handlers](#manual-handlers)) |
+| `ExcludeHandler<THandler>()`                  | Keeps one handler's request and stream handler contracts out of this call's scan (see [Manual handlers](#manual-handlers)) |
 | `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |
 | `WithTransientDispatcher()`                   | Registers the dispatcher transient instead of scoped (see [lifetimes.md](lifetimes.md))    |
 
@@ -82,6 +84,24 @@ await dispatcher.SendAsync(new Audit<Refund>("r7"));  // HandlerNotFoundExceptio
 The undeclared closing surfaces at dispatch rather than at startup, because a generic request definition is not a scannable request type. Declare every closing you dispatch.
 
 The handler type must be a concrete open generic definition with exactly one type parameter that implements a handler interface. Each closing type must be a closed type that satisfies the handler's `where` constraints. A declaration that breaks these rules fails startup validation with a problem naming the type; the full list is in [exceptions.md](exceptions.md). Declaring the same closing twice does nothing: the first declaration wins, the same rule as repeated assemblies.
+
+## Manual handlers
+
+`AddHandler<THandler>()` registers one handler without scanning its assembly. Every request and stream handler contract the class implements becomes a registration, validated and frozen exactly like a scanned one. `ExcludeHandler<THandler>()` keeps a handler's request and stream handler contracts out of the same call's scan; the type's event handler contracts are unaffected.
+
+```csharp
+services.AddRequestFlow(o => o
+    .RegisterHandlersFromAssemblyContaining<Program>()
+    .ExcludeHandler<PlaceOrderHandler>()          // drop the scanned handler
+    .AddHandler<AuditedOrderHandler>());          // register the replacement
+```
+
+- A handler both scanned and added manually registers once, and the first registration decides the lifetime. `WithScopedHandlers()` covers the same call's manual adds wherever it appears in the delegate.
+- Excluding a request's only handler leaves it unhandled: `RF0102` at startup validation unless `AllowUnhandledRequests()`.
+- A second handler type for the same request is still `RF0101`, whichever source registered it.
+- A closed generic such as `AddHandler<AuditHandler<Order>>()` registers one closing without `RegisterGenericHandler`.
+- An exclusion filters the scan only. A closing declared with `RegisterGenericHandler` registers either way, and a closed generic never comes from a scan, so `ExcludeHandler` on one is a no-op; drop the closing type from the declaration instead.
+- An exclusion applies only to the call that declares it, but an assembly is never re-scanned, so the handler stays out until `AddHandler` names it.
 
 ## AllowUnhandledRequests
 

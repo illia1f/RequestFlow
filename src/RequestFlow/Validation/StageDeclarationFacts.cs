@@ -50,7 +50,7 @@ internal sealed class StageDeclarationFacts
     /// <summary>
     /// The family the call belongs to, falling back to what <paramref name="contractType"/> implies.
     /// </summary>
-    public StageFamily FamilyOf(Type stageType, Type contractType)
+    public StageFamily GetFamily(Type stageType, Type contractType)
         => _families.TryGetValue(stageType, out StageFamily? family)
             ? family
             : StageFamily.FromContract(contractType);
@@ -58,7 +58,7 @@ internal sealed class StageDeclarationFacts
     /// <summary>
     /// The handler contract the call was narrowed to, or null when it named none.
     /// </summary>
-    public Type? HandlerFilterOf(Type stageType)
+    public Type? GetHandlerFilter(Type stageType)
         => _handlerFilters.TryGetValue(stageType, out Type? filter) ? filter : null;
 
     /// <summary>

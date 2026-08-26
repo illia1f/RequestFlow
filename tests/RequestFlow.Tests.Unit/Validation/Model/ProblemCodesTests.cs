@@ -81,6 +81,24 @@ public sealed class ProblemCodesTests
     }
 
     [Fact]
+    public void Given_The_Manual_Handler_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.ManualHandlerIsInterface.ShouldBe("RF0018");
+    }
+
+    [Fact]
+    public void Given_The_Manual_Handler_Abstract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.ManualHandlerAbstract.ShouldBe("RF0019");
+    }
+
+    [Fact]
+    public void Given_The_Manual_Handler_Missing_Contract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.ManualHandlerMissingContract.ShouldBe("RF0020");
+    }
+
+    [Fact]
     public void Given_The_Event_Strategy_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
     {
         ProblemCodes.EventStrategyIsInterface.ShouldBe("RF0013");
@@ -120,5 +138,11 @@ public sealed class ProblemCodesTests
     public void Given_The_Event_Strategy_Role_Lifetime_Code_When_Reading_Then_It_Matches_The_Documented_Value()
     {
         ProblemCodes.EventStrategyRoleLifetime.ShouldBe("RF0123");
+    }
+
+    [Fact]
+    public void Given_The_Non_Concrete_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.NonConcreteRequest.ShouldBe("RF0124");
     }
 }

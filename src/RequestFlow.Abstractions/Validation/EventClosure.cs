@@ -34,19 +34,19 @@ internal static class EventClosure
             Type eventType = eventTypes[i];
             events[i] = new EventModel(
                 eventType,
-                HandlersFor(eventType, subscriptions, reachedEvents),
-                strategyResolution.StrategyFor(eventType));
+                BuildHandlerModels(eventType, subscriptions, reachedEvents),
+                strategyResolution.GetStrategy(eventType));
         }
 
         return new EventClosureResult(
             events,
-            SubscriptionModels(subscriptions, reachedEvents),
+            BuildSubscriptionModels(subscriptions, reachedEvents),
             strategyResolution.Models,
             strategyResolution);
     }
 
     // Fills the reach as it goes: a subscription reaches every event it hands a handler to.
-    private static EventHandlerModel[] HandlersFor(
+    private static EventHandlerModel[] BuildHandlerModels(
         Type eventType,
         IReadOnlyList<EventSubscriptionInput> subscriptions,
         List<Type>[] reachedEvents)
@@ -79,7 +79,7 @@ internal static class EventClosure
         return handlers;
     }
 
-    private static EventSubscriptionModel[] SubscriptionModels(
+    private static EventSubscriptionModel[] BuildSubscriptionModels(
         IReadOnlyList<EventSubscriptionInput> subscriptions,
         List<Type>[] reachedEvents)
     {
@@ -108,11 +108,11 @@ internal static class EventClosure
         for (int i = 0; i < reachedEvents.Length; i++)
             reachedEvents[i] = [];
 
-        int globalWinner = GlobalWinner(strategies);
+        int globalWinner = FindGlobalWinner(strategies);
         for (int i = 0; i < eventTypes.Count; i++)
         {
             Type eventType = eventTypes[i];
-            int winner = StrategyWinner(
+            int winner = FindStrategyWinner(
                 eventType,
                 strategies,
                 applicableDeclarations,
@@ -160,7 +160,7 @@ internal static class EventClosure
             [.. ambiguities]);
     }
 
-    private static int GlobalWinner(IReadOnlyList<EventStrategyInput> strategies)
+    private static int FindGlobalWinner(IReadOnlyList<EventStrategyInput> strategies)
     {
         int winner = EventStrategyResolution.None;
         for (int i = 0; i < strategies.Count; i++)
@@ -182,7 +182,7 @@ internal static class EventClosure
         return winner;
     }
 
-    private static int StrategyWinner(
+    private static int FindStrategyWinner(
         Type eventType,
         IReadOnlyList<EventStrategyInput> strategies,
         bool[] applicableDeclarations,
@@ -197,7 +197,7 @@ internal static class EventClosure
                 continue;
 
             applicableDeclarations[i] = true;
-            int tier = EventTypeSpecificity.Tier(eventType, declaredEventType);
+            int tier = EventTypeSpecificity.GetTier(eventType, declaredEventType);
             if (tier < bestTier)
             {
                 bestTier = tier;
@@ -212,8 +212,8 @@ internal static class EventClosure
             return EventStrategyResolution.None;
 
         List<int> winners = bestTier == EventTypeSpecificity.EventInterfaceTier
-            ? MostDerivedInterfaces(applicable, strategies)
-            : ClosestDeclarations(eventType, applicable, strategies);
+            ? FindMostDerivedInterfaces(applicable, strategies)
+            : FindClosestDeclarations(eventType, applicable, strategies);
 
         if (winners.Count == 1 || SameTargetAndStrategy(winners, strategies))
             return winners[0];
@@ -224,7 +224,7 @@ internal static class EventClosure
         return EventStrategyResolution.Ambiguous;
     }
 
-    private static List<int> ClosestDeclarations(
+    private static List<int> FindClosestDeclarations(
         Type eventType,
         List<int> candidates,
         IReadOnlyList<EventStrategyInput> strategies)
@@ -235,7 +235,7 @@ internal static class EventClosure
         {
             int candidate = candidates[i];
             Type declaredEventType = strategies[candidate].DeclaredEventType!;
-            int specificity = EventTypeSpecificity.DeliverySpecificity(
+            int specificity = EventTypeSpecificity.GetDeliverySpecificity(
                 eventType, declaredEventType);
             if (specificity < bestSpecificity)
             {
@@ -250,7 +250,7 @@ internal static class EventClosure
         return winners;
     }
 
-    private static List<int> MostDerivedInterfaces(
+    private static List<int> FindMostDerivedInterfaces(
         List<int> candidates,
         IReadOnlyList<EventStrategyInput> strategies)
     {
@@ -393,10 +393,10 @@ internal static class EventClosure
             SubscriptionIndex = subscriptionIndex;
 
             Type declaredEventType = subscription.DeclaredEventType;
-            Tier = EventTypeSpecificity.Tier(eventType, declaredEventType);
+            Tier = EventTypeSpecificity.GetTier(eventType, declaredEventType);
             Specificity = Tier is EventTypeSpecificity.BaseClassTier
                 or EventTypeSpecificity.EventInterfaceTier
-                ? EventTypeSpecificity.DeliverySpecificity(eventType, declaredEventType)
+                ? EventTypeSpecificity.GetDeliverySpecificity(eventType, declaredEventType)
                 : 0;
         }
 
@@ -461,7 +461,7 @@ internal sealed class EventStrategyResolution
 
     public EventStrategyAmbiguity[] Ambiguities { get; }
 
-    public Type? StrategyFor(Type eventType) => _strategies[eventType];
+    public Type? GetStrategy(Type eventType) => _strategies[eventType];
 }
 
 internal sealed class EventStrategyAmbiguity

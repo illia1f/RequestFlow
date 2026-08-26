@@ -56,7 +56,7 @@ internal static class HandlerScanner
         }
     }
 
-    private static Type[]? GetLoadableInterfaces(Type type)
+    internal static Type[]? GetLoadableInterfaces(Type type)
     {
         try
         {
@@ -212,7 +212,28 @@ internal sealed class ScanResult(
 
     public IReadOnlyList<Type> EventTypes { get; } = eventTypes;
 
-    public IEnumerable<EventHandlerDiscovery> EventHandlersExcept(HashSet<Type> excludedHandlerTypes)
+    public IEnumerable<HandlerDiscovery> GetHandlersExcept(HashSet<Type> excludedHandlerTypes)
+    {
+        foreach (var discovery in Handlers)
+        {
+            if (!excludedHandlerTypes.Contains(discovery.ImplementationType))
+                yield return discovery;
+        }
+    }
+
+    public List<Type> GetRequestTypesHandledBy(HashSet<Type> handlerTypes)
+    {
+        List<Type> requestTypes = [];
+        foreach (var discovery in Handlers)
+        {
+            if (handlerTypes.Contains(discovery.ImplementationType))
+                requestTypes.Add(discovery.RequestType);
+        }
+
+        return requestTypes;
+    }
+
+    public IEnumerable<EventHandlerDiscovery> GetEventHandlersExcept(HashSet<Type> excludedHandlerTypes)
     {
         foreach (var discovery in EventHandlers)
         {
