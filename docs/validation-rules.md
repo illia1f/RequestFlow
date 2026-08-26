@@ -13,7 +13,7 @@ The built-in checks below are fixed. A rule adds checks to the pass and cannot r
 Each row says what the check stops you doing. [exceptions.md](exceptions.md) has the cause and the fix behind each one.
 
 - Codes are stable and never renumbered. Numbering is allocation order, not run order.
-- `RF0001` to `RF0017` are shape checks on a single declaration. The `RF01xx` codes look at the whole registration at the freeze.
+- `RF0001` to `RF0020` are shape checks on a single declaration. The `RF01xx` codes look at the whole registration at the freeze.
 - `RF0107` is the odd one out: the pass reports it about a rule that threw, not about a registration.
 - The `RF` constants live on `ProblemCodes` in `RequestFlow.Abstractions`, and the CQRS one on `CqrsProblemCodes` in `RequestFlow.Cqrs.Abstractions`, so a caller matches `ProblemCodes.UnhandledRequest` rather than a literal without referencing the runtime packages.
 
@@ -36,6 +36,9 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0015` | pass an interface to `AddEventHandler` |
 | `RF0016` | pass an abstract class to `AddEventHandler` |
 | `RF0017` | pass a type without an `IEventHandler<TEvent>` contract to `AddEventHandler` |
+| `RF0018` | pass an interface to `AddHandler` |
+| `RF0019` | pass an abstract class to `AddHandler` |
+| `RF0020` | pass a type without a request or stream handler contract to `AddHandler` |
 | `RF0101` | cover one request with two handlers |
 | `RF0102` | leave a request unhandled, unless you call `AllowUnhandledRequests` |
 | `RF0103` | register one stage type twice |
@@ -59,9 +62,10 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0121` | declare one strategy type with two different lifetimes |
 | `RF0122` | keep a per-event strategy declaration that reaches no known event, once you call `DisallowUnusedEventHandlers` |
 | `RF0123` | register one class as a strategy and as a handler or stage under different lifetimes |
+| `RF0124` | give a handler an interface or abstract request type that the target cannot expose as an exact runtime type |
 | `CQRS0001` | classify one request as both a command and a query, or as both a command and a stream query; contributed by `AddCqrs` |
 
-Problems come out in fixed rule order: registration shape problems first, then the request and stage built-ins, then the event rules. That is ascending code order with two exceptions.
+Problems come out in fixed rule order: registration shape problems first, then the request and stage built-ins, then the event rules, then `RF0124`. That is ascending code order with two exceptions.
 
 - The stream contract rule reports `RF0108` and `RF0110`, so both precede the `RF0109` conflict from the rule after it.
 - `EventStrategyRule` runs after `RF0118` and reports its shape codes `RF0013` and `RF0014` before `RF0119` to `RF0123`.
@@ -197,7 +201,7 @@ Two problems are equal when their code, message, and subject match, so a test ca
 
 ## The model
 
-`context.Model` is the registration as recorded, minus what the shape checks threw out. A declaration reported under `RF0001` to `RF0012` or `RF0015` to `RF0017` never reaches a rule, so a rule auditing every registered stage type sees only the ones that could run. Past that nothing is cleaned up: a request no handler covers is in the list with an empty `Handlers`, and a stage registered twice appears twice. Every rule reads the same snapshot, and every list on it is read-only, so one rule cannot change what the next one reads.
+`context.Model` is the registration as recorded, minus what the shape checks threw out. A declaration reported under `RF0001` to `RF0012` or `RF0015` to `RF0020` never reaches a rule, so a rule auditing every registered stage type sees only the ones that could run. Past that nothing is cleaned up: a request no handler covers is in the list with an empty `Handlers`, and a stage registered twice appears twice. Every rule reads the same snapshot, and every list on it is read-only, so one rule cannot change what the next one reads.
 
 | Type | Carries |
 | --- | --- |

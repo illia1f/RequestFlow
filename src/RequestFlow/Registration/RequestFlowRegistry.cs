@@ -15,6 +15,7 @@ internal sealed class RequestFlowRegistry
     private readonly List<Type> _requestTypes = [];
     private readonly List<EventHandlerRegistration> _eventHandlers = [];
 
+    private readonly HashSet<HandlerContractKey> _seenHandlerContracts = [];
     private readonly HashSet<EventSubscriptionKey> _seenEventSubscriptions = [];
     private readonly List<Type> _eventTypes = [];
     private readonly List<EventStrategyDeclaration> _eventStrategyDeclarations = [];
@@ -155,19 +156,35 @@ internal sealed class RequestFlowRegistry
         return added;
     }
 
-    public void Add(
-        IReadOnlyList<HandlerRegistration> handlers,
-        IReadOnlyList<Type> requestTypes,
-        IReadOnlyList<RequestFlowValidationProblem> problems)
-        => Add(handlers, requestTypes, [], problems);
+    /// <summary>
+    /// Adds the handlers whose implementation and contract pair is not already present and returns the newly added ones.
+    /// </summary>
+    public IReadOnlyList<HandlerRegistration> AddNewHandlers(
+        IReadOnlyList<HandlerRegistration> handlers)
+    {
+        List<HandlerRegistration> added = [];
+        foreach (var handler in handlers)
+        {
+            if (_seenHandlerContracts.Add(new HandlerContractKey(handler.ImplementationType, handler.Contract)))
+            {
+                _handlers.Add(handler);
+                added.Add(handler);
+            }
+        }
+
+        return added;
+    }
 
     public void Add(
-        IReadOnlyList<HandlerRegistration> handlers,
+        IReadOnlyList<Type> requestTypes,
+        IReadOnlyList<RequestFlowValidationProblem> problems)
+        => Add(requestTypes, [], problems);
+
+    public void Add(
         IReadOnlyList<Type> requestTypes,
         IReadOnlyList<Type> eventTypes,
         IReadOnlyList<RequestFlowValidationProblem> problems)
     {
-        _handlers.AddRange(handlers);
         _requestTypes.AddRange(requestTypes);
         _eventTypes.AddRange(eventTypes);
 
@@ -190,7 +207,7 @@ internal sealed class RequestFlowRegistry
     public FrozenPlans Freeze(IServiceProvider provider)
     {
         EventClosureResult eventClosure = EventClosure.Build(
-            _eventTypes, EventSubscriptions(), EventStrategies());
+            _eventTypes, BuildEventSubscriptions(), BuildEventStrategies());
         RequestFlowModel model = RegistrationSnapshot.Capture(
             _handlers, _requestTypes, _stageDeclarations, ClosingCache, eventClosure);
 
@@ -228,7 +245,7 @@ internal sealed class RequestFlowRegistry
         return new FrozenPlans(dispatch, events);
     }
 
-    private EventStrategyInput[] EventStrategies()
+    private EventStrategyInput[] BuildEventStrategies()
     {
         var strategies = new EventStrategyInput[_eventStrategyDeclarations.Count];
         for (int i = 0; i < strategies.Length; i++)
@@ -243,7 +260,7 @@ internal sealed class RequestFlowRegistry
         return strategies;
     }
 
-    private EventSubscriptionInput[] EventSubscriptions()
+    private EventSubscriptionInput[] BuildEventSubscriptions()
     {
         var subscriptions = new EventSubscriptionInput[_eventHandlers.Count];
         for (int i = 0; i < subscriptions.Length; i++)
@@ -277,7 +294,7 @@ internal sealed class RequestFlowRegistry
             Type[] stageTypes = ordered.ToArray();
 
             chainsByRequest[handler.RequestType] =
-                new StageChain(stageTypes, TypedShapesFor(handler, stageTypes));
+                new StageChain(stageTypes, BuildTypedShapes(handler, stageTypes));
         }
 
         return chainsByRequest;
@@ -285,7 +302,7 @@ internal sealed class RequestFlowRegistry
 
     // Only a void request can take stages of either contract shape, so only its chain records
     // which shape each level runs under. A stage implementing both runs as the two-parameter form.
-    private static bool[] TypedShapesFor(HandlerRegistration handler, Type[] stageTypes)
+    private static bool[] BuildTypedShapes(HandlerRegistration handler, Type[] stageTypes)
     {
         if (!handler.IsVoid || stageTypes.Length == 0)
             return [];
@@ -301,14 +318,14 @@ internal sealed class RequestFlowRegistry
     private static RequestPlanBase CreatePlan(HandlerRegistration handler, StageChain chain)
     {
         bool staged = chain.StageTypes.Length > 0;
-        Type planType = PlanTypeFor(handler, staged);
+        Type planType = GetPlanType(handler, staged);
 
         return staged
             ? (RequestPlanBase)Activator.CreateInstance(planType, [chain])!
             : (RequestPlanBase)Activator.CreateInstance(planType)!;
     }
 
-    private static Type PlanTypeFor(HandlerRegistration handler, bool staged)
+    private static Type GetPlanType(HandlerRegistration handler, bool staged)
     {
         if (handler.ContractDefinition == typeof(IStreamRequestHandler<,>))
         {
@@ -325,6 +342,8 @@ internal sealed class RequestFlowRegistry
             ? typeof(StagedRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType)
             : typeof(RequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
     }
+
+    private readonly record struct HandlerContractKey(Type ImplementationType, Type Contract);
 
     private readonly record struct EventSubscriptionKey(Type HandlerType, Type DeclaredEventType);
 }

@@ -37,7 +37,14 @@ internal static class RegistrationValidator
                 $"'{handlerType.FullName}' has {handlerType.GetGenericArguments().Length} generic parameters; only single-parameter generic handlers are supported.",
                 handlerType);
 
-        if (!ImplementsHandlerContract(handlerType))
+        Type[]? interfaces = HandlerScanner.GetLoadableInterfaces(handlerType);
+        if (interfaces is null)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.HandlerMissingContract,
+                $"'{handlerType.FullName}' has an interface that could not be loaded; deploy the assembly that defines it.",
+                handlerType);
+
+        if (!ImplementsHandlerContract(interfaces))
             return new RequestFlowValidationProblem(
                 ProblemCodes.HandlerMissingContract,
                 $"'{handlerType.FullName}' does not implement IRequestHandler or IStreamRequestHandler.",
@@ -61,9 +68,9 @@ internal static class RegistrationValidator
         return null;
     }
 
-    private static bool ImplementsHandlerContract(Type handlerType)
+    private static bool ImplementsHandlerContract(Type[] interfaces)
     {
-        foreach (var iface in handlerType.GetInterfaces())
+        foreach (var iface in interfaces)
         {
             if (!iface.IsGenericType)
                 continue;
@@ -126,7 +133,14 @@ internal static class RegistrationValidator
                 $"'{handlerType.FullName}' is abstract; only concrete event handler classes can be registered.",
                 handlerType);
 
-        if (!ImplementsEventHandlerContract(handlerType))
+        Type[]? interfaces = HandlerScanner.GetLoadableInterfaces(handlerType);
+        if (interfaces is null)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.EventHandlerMissingContract,
+                $"'{handlerType.FullName}' has an interface that could not be loaded; deploy the assembly that defines it.",
+                handlerType);
+
+        if (!ImplementsEventHandlerContract(interfaces))
             return new RequestFlowValidationProblem(
                 ProblemCodes.EventHandlerMissingContract,
                 $"'{handlerType.FullName}' does not implement IEventHandler.",
@@ -135,15 +149,51 @@ internal static class RegistrationValidator
         return null;
     }
 
-    private static bool ImplementsEventHandlerContract(Type handlerType)
+    private static bool ImplementsEventHandlerContract(Type[] interfaces)
     {
-        foreach (var iface in handlerType.GetInterfaces())
+        foreach (var iface in interfaces)
         {
             if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(IEventHandler<>))
                 return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Checks each manually added handler's shape, stopping at that type's first failure.
+    /// </summary>
+    public static Validated<Type> ValidateManualHandlerDeclarations(IReadOnlyList<Type> handlerTypes)
+        => Partition(handlerTypes, ValidateManualHandlerDeclaration);
+
+    private static RequestFlowValidationProblem? ValidateManualHandlerDeclaration(Type handlerType)
+    {
+        if (handlerType.IsInterface)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.ManualHandlerIsInterface,
+                $"'{handlerType.FullName}' is an interface; only concrete handler classes can be registered.",
+                handlerType);
+
+        if (handlerType.IsAbstract)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.ManualHandlerAbstract,
+                $"'{handlerType.FullName}' is abstract; only concrete handler classes can be registered.",
+                handlerType);
+
+        Type[]? interfaces = HandlerScanner.GetLoadableInterfaces(handlerType);
+        if (interfaces is null)
+            return new RequestFlowValidationProblem(
+                ProblemCodes.ManualHandlerMissingContract,
+                $"'{handlerType.FullName}' has an interface that could not be loaded; deploy the assembly that defines it.",
+                handlerType);
+
+        if (!ImplementsHandlerContract(interfaces))
+            return new RequestFlowValidationProblem(
+                ProblemCodes.ManualHandlerMissingContract,
+                $"'{handlerType.FullName}' does not implement IRequestHandler or IStreamRequestHandler.",
+                handlerType);
+
+        return null;
     }
 
     /// <summary>
@@ -178,7 +228,7 @@ internal static class RegistrationValidator
         if (!ImplementsStageContract(stageType, declaration.Family))
             return new RequestFlowValidationProblem(
                 ProblemCodes.StageMissingContract,
-                declaration.Family.MissingContractMessage(stageType),
+                declaration.Family.BuildMissingContractMessage(stageType),
                 stageType);
 
         if (stageType.IsGenericTypeDefinition && !ClosesOverItsOwnParameters(stageType, declaration.Family))
@@ -188,7 +238,7 @@ internal static class RegistrationValidator
 
             return new RequestFlowValidationProblem(
                 ProblemCodes.StageParametersMisused,
-                declaration.Family.ParametersMisusedMessage(stageType, parameterNames),
+                declaration.Family.BuildParametersMisusedMessage(stageType, parameterNames),
                 stageType);
         }
 

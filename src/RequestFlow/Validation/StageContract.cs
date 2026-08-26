@@ -87,10 +87,10 @@ internal static class StageContract
         }
 
         if (typed.Count > 0)
-            return MostDerived(typed, family.TypedContract);
+            return SelectMostDerived(typed, family.TypedContract);
 
         return untyped.Count > 0 && family.VoidContract is not null
-            ? MostDerived(untyped, family.VoidContract)
+            ? SelectMostDerived(untyped, family.VoidContract)
             : family.TypedContract;
     }
 
@@ -111,10 +111,10 @@ internal static class StageContract
         }
 
         if (typed.Count > 0)
-            return MostDerived(typed, family.TypedContract);
+            return SelectMostDerived(typed, family.TypedContract);
 
         return untyped.Count > 0 && family.VoidContract is not null
-            ? MostDerived(untyped, family.VoidContract)
+            ? SelectMostDerived(untyped, family.VoidContract)
             : family.TypedContract;
     }
 
@@ -132,7 +132,7 @@ internal static class StageContract
         return false;
     }
 
-    private static Type MostDerived(List<Type> definitions, Type coreContract)
+    private static Type SelectMostDerived(List<Type> definitions, Type coreContract)
     {
         foreach (var definition in definitions)
         {

@@ -51,23 +51,28 @@ public static class ServiceCollectionExtensions
         IReadOnlyList<Assembly> newAssemblies = registry.AddNewAssemblies(options.Assemblies);
         ScanResult scan = HandlerScanner.Scan(newAssemblies);
 
-        List<HandlerRegistration> handlers = scan.Registrations(closed, options.HandlerLifetime);
+        Validated<Type> manualHandlers =
+            RegistrationValidator.ValidateManualHandlerDeclarations(options.ManualHandlers);
+        List<HandlerRegistration> handlers = scan.BuildHandlerRegistrations(
+            closed, manualHandlers.Valid, options.ExcludedHandlers, options.HandlerLifetime);
+        IReadOnlyList<HandlerRegistration> newHandlers = registry.AddNewHandlers(handlers);
         Validated<Type> manualEventHandlers =
             RegistrationValidator.ValidateEventHandlerDeclarations(options.ManualEventHandlers);
-        List<EventHandlerRegistration> eventHandlers = scan.EventRegistrations(
+        List<EventHandlerRegistration> eventHandlers = scan.BuildEventHandlerRegistrations(
             manualEventHandlers, options.ExcludedEventHandlers, options.HandlerLifetime);
         IReadOnlyList<EventHandlerRegistration> newEventHandlers = registry.AddNewEventHandlers(eventHandlers);
 
         Validated<StageDeclaration> stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
         registry.AddStageDeclarations(stages.Valid);
 
-        // Manual event-handler problems come after the stage ones so the report stays in
-        // ascending code order, which docs/validation-rules.md promises.
         List<RequestFlowValidationProblem> problems =
-            [.. declarations.Problems, .. closed.Problems, .. stages.Problems, .. manualEventHandlers.Problems];
-        registry.Add(handlers, scan.RequestTypes, scan.EventTypes, problems);
+            [.. declarations.Problems, .. closed.Problems, .. stages.Problems,
+             .. manualEventHandlers.Problems, .. manualHandlers.Problems];
+        List<Type> requestTypes =
+            [.. scan.RequestTypes, .. scan.GetRequestTypesHandledBy(options.ExcludedHandlers)];
+        registry.Add(requestTypes, scan.EventTypes, problems);
 
-        RegisterHandlers(services, handlers);
+        RegisterHandlers(services, newHandlers);
         RegisterEventHandlers(services, newEventHandlers);
         RegisterStages(services, registry);
         RegisterEventStrategies(services, registry);
@@ -85,11 +90,15 @@ public static class ServiceCollectionExtensions
         return new RequestFlowBuilder(services);
     }
 
-    private static List<HandlerRegistration> Registrations(
-        this ScanResult scan, Validated<Type> closed, ServiceLifetime lifetime)
+    private static List<HandlerRegistration> BuildHandlerRegistrations(
+        this ScanResult scan,
+        Validated<Type> closed,
+        IReadOnlyList<Type> manual,
+        HashSet<Type> excluded,
+        ServiceLifetime lifetime)
     {
         List<HandlerRegistration> handlers = [];
-        foreach (var discovery in scan.Handlers)
+        foreach (var discovery in scan.GetHandlersExcept(excluded))
             handlers.Add(new HandlerRegistration(discovery, lifetime));
 
         foreach (var closedType in closed.Valid)
@@ -98,15 +107,21 @@ public static class ServiceCollectionExtensions
                 handlers.Add(new HandlerRegistration(discovery, lifetime));
         }
 
+        foreach (var handlerType in manual)
+        {
+            foreach (var discovery in HandlerScanner.Discover(handlerType))
+                handlers.Add(new HandlerRegistration(discovery, lifetime));
+        }
+
         return handlers;
     }
 
     // Exclusions filter the scan only; a manual add is an explicit opt-in and lands either way.
-    private static List<EventHandlerRegistration> EventRegistrations(
+    private static List<EventHandlerRegistration> BuildEventHandlerRegistrations(
         this ScanResult scan, Validated<Type> manual, HashSet<Type> excluded, ServiceLifetime lifetime)
     {
         List<EventHandlerRegistration> handlers = [];
-        foreach (var discovery in scan.EventHandlersExcept(excluded))
+        foreach (var discovery in scan.GetEventHandlersExcept(excluded))
             handlers.Add(new EventHandlerRegistration(discovery, lifetime));
 
         foreach (var handlerType in manual.Valid)

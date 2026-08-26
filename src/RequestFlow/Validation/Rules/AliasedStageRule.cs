@@ -54,7 +54,7 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
 
             foreach (var closing in request.Stages)
             {
-                Type key = oneChain ? StageClassOf(closing.ClosedType) : closing.ClosedType;
+                Type key = oneChain ? GetStageClass(closing.ClosedType) : closing.ClosedType;
 
                 if (!groups.TryGetValue(key, out List<ClosedStageModel>? members))
                 {
@@ -76,7 +76,7 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
                 if (members.Count < 2)
                     continue;
 
-                Type stageClass = StageClassOf(members[0].ClosedType);
+                Type stageClass = GetStageClass(members[0].ClosedType);
 
                 Type[] declaredTypes = new Type[members.Count];
                 for (int i = 0; i < members.Count; i++)
@@ -95,7 +95,7 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
         }
     }
 
-    private static Type StageClassOf(Type closedType)
+    private static Type GetStageClass(Type closedType)
         => closedType.IsGenericType ? closedType.GetGenericTypeDefinition() : closedType;
 
     // A request with more than one handler has one chain per handler, so the closings the model

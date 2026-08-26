@@ -265,7 +265,7 @@ public sealed class EventAllocationTests
             RegistrationFor<AlphaAllocationHandler>(),
             RegistrationFor<ZuluAllocationHandler>(),
         ]);
-        registry.Add([], [], [typeof(ClassAllocationEvent), typeof(StructAllocationEvent)], []);
+        registry.Add([], [typeof(ClassAllocationEvent), typeof(StructAllocationEvent)], []);
         if (customStrategy)
         {
             registry.AddEventStrategyDeclarations([
@@ -566,7 +566,7 @@ public sealed class EventAllocationTests
         : EventPlan(model, entries)
     {
         public EventDelivery Create(IEvent @event, IServiceProvider services)
-            => Delivery(@event, services, default);
+            => CreateDelivery(@event, services, default);
 
         public override Task ExecuteAsync(
             IEvent @event,

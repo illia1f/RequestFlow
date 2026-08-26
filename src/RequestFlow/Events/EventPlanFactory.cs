@@ -23,10 +23,10 @@ internal static class EventPlanFactory
 
         foreach (var @event in events)
         {
-            Type strategyType = strategyResolution.StrategyFor(@event.EventType)
+            Type strategyType = strategyResolution.GetStrategy(@event.EventType)
                 ?? throw new InvalidOperationException(
                     $"The event strategy for '{@event.EventType.FullName}' was not resolved.");
-            plans[@event.EventType] = PlanFor(
+            plans[@event.EventType] = CreatePlan(
                 strategyType,
                 @event,
                 BuildEntries(@event, factories));
@@ -35,7 +35,7 @@ internal static class EventPlanFactory
         return new EventMap(plans);
     }
 
-    private static EventPlan PlanFor(
+    private static EventPlan CreatePlan(
         Type strategyType,
         EventModel @event,
         HandlerEntry[] entries)

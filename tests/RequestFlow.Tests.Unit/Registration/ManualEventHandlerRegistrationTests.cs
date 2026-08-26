@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
@@ -147,6 +148,20 @@ public sealed class ManualEventHandlerRegistrationTests
         RequestFlowValidationProblem problem = exception.Problems.ShouldHaveSingleItem();
         problem.Code.ShouldBe(ProblemCodes.EventHandlerMissingContract);
         problem.Subject.ShouldBe(typeof(NotAHandler));
+    }
+
+    [Fact]
+    public void Given_A_Handler_Whose_Interfaces_Cannot_Load_When_Adding_It_Manually_Then_Freeze_Reports_The_Missing_Contract_Problem()
+    {
+        var handlerType = new UnloadableInterfacesHandlerType();
+        using ServiceProvider provider = Build(o => o.ManualEventHandlers.Add(handlerType));
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => provider.ValidateRequestFlow());
+
+        RequestFlowValidationProblem problem = exception.Problems.ShouldHaveSingleItem();
+        problem.Code.ShouldBe(ProblemCodes.EventHandlerMissingContract);
+        problem.Subject.ShouldBe(handlerType);
     }
 
     [Fact]
@@ -348,6 +363,13 @@ public sealed class ManualEventHandlerRegistrationTests
 
     public sealed class NotAHandler
     { }
+
+    // A handler type that loaded while an interface it implements did not; asking for its interfaces throws.
+    private sealed class UnloadableInterfacesHandlerType() : TypeDelegator(typeof(PortedHandler))
+    {
+        public override Type[] GetInterfaces()
+            => throw new TypeLoadException("Could not load type 'Contracts.IAudited'.");
+    }
 
     public sealed record ExcludedEvent : IEvent;
 

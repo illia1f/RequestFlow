@@ -74,7 +74,7 @@ internal abstract class EventPlan
         }
     }
 
-    protected EventDelivery Delivery(
+    protected EventDelivery CreateDelivery(
         IEvent @event,
         IServiceProvider services,
         CancellationToken cancellationToken)

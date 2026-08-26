@@ -43,12 +43,12 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
             // mismatch; the one-parameter form fixes the item in the class, so it can. A stage
             // that wrapped a handler somewhere is scoped, not trapped.
             if ((stageType.IsGenericTypeDefinition && stageType.GetGenericArguments().Length != 1)
-                || _facts.FamilyOf(stageType, declaration.ContractType) != StageFamily.Stream
+                || _facts.GetFamily(stageType, declaration.ContractType) != StageFamily.Stream
                 || declaration.ReachedRequests.Count > 0
                 || !checkedStages.Add(stageType))
                 continue;
 
-            Type? handlerFilter = _facts.HandlerFilterOf(stageType);
+            Type? handlerFilter = _facts.GetHandlerFilter(stageType);
 
             foreach (var request in context.Model.Requests)
             {
@@ -57,7 +57,7 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
                     continue;
 
                 // No sole contract, no item type to hold the stage to; RF0108 reports the ambiguity.
-                Type? declaredItem = SoleDeclaredItem(request.RequestType, declaredItems);
+                Type? declaredItem = GetSoleDeclaredItem(request.RequestType, declaredItems);
                 if (declaredItem is null)
                     continue;
 
@@ -133,18 +133,18 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
 
     // The answer kept per request type, since every stage asks about the same requests; null
     // records "no sole contract". The memo belongs to one pass, so it needs no lock.
-    private static Type? SoleDeclaredItem(Type requestType, Dictionary<Type, Type?> memo)
+    private static Type? GetSoleDeclaredItem(Type requestType, Dictionary<Type, Type?> memo)
     {
         if (memo.TryGetValue(requestType, out Type? cached))
             return cached;
 
-        Type? declared = SoleDeclaredItem(requestType);
+        Type? declared = GetSoleDeclaredItem(requestType);
         memo[requestType] = declared;
 
         return declared;
     }
 
-    private static Type? SoleDeclaredItem(Type requestType)
+    private static Type? GetSoleDeclaredItem(Type requestType)
     {
         Type? declared = null;
 

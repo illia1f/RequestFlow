@@ -9,7 +9,7 @@ internal static class EventTypeSpecificity
     public const int EventInterfaceTier = 2;
     public const int CatchAllEventTier = 3;
 
-    public static int Tier(Type eventType, Type declaredEventType)
+    public static int GetTier(Type eventType, Type declaredEventType)
     {
         if (declaredEventType == eventType)
             return ExactMatchTier;
@@ -19,15 +19,15 @@ internal static class EventTypeSpecificity
         return declaredEventType.IsInterface ? EventInterfaceTier : BaseClassTier;
     }
 
-    public static int DeliverySpecificity(Type eventType, Type declaredEventType)
+    public static int GetDeliverySpecificity(Type eventType, Type declaredEventType)
     {
         if (declaredEventType.IsInterface)
             return -declaredEventType.GetInterfaces().Length;
 
-        return ClassDistance(eventType, declaredEventType);
+        return GetClassDistance(eventType, declaredEventType);
     }
 
-    private static int ClassDistance(Type eventType, Type declaredEventType)
+    private static int GetClassDistance(Type eventType, Type declaredEventType)
     {
         int distance = 0;
         for (Type? current = eventType; current is not null; current = current.BaseType)

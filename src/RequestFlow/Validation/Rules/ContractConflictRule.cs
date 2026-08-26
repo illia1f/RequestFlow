@@ -29,7 +29,7 @@ internal sealed class ContractConflictRule(
                 && HasContract(request.RequestType, first)
                 && HasContract(request.RequestType, second))
             {
-                yield return Problem(request.RequestType);
+                yield return CreateProblem(request.RequestType);
             }
         }
 
@@ -39,27 +39,27 @@ internal sealed class ContractConflictRule(
                 && HasContract(@event.EventType, first)
                 && HasContract(@event.EventType, second))
             {
-                yield return Problem(@event.EventType);
+                yield return CreateProblem(@event.EventType);
             }
         }
     }
 
-    private RequestFlowValidationProblem Problem(Type messageType)
-        => new(problemCode, MessageFor(messageType), messageType);
+    private RequestFlowValidationProblem CreateProblem(Type messageType)
+        => new(problemCode, BuildMessage(messageType), messageType);
 
-    private string MessageFor(Type messageType)
+    private string BuildMessage(Type messageType)
         => first == MessageContract.Request && second == MessageContract.StreamRequest
-            ? RequestAndStreamRequestMessage(messageType)
-            : SharedMessage(messageType);
+            ? BuildRequestAndStreamRequestMessage(messageType)
+            : BuildSharedMessage(messageType);
 
     // RF0109 names what the conflict costs the dispatch map, which the shared wording cannot.
-    private static string RequestAndStreamRequestMessage(Type messageType)
+    private static string BuildRequestAndStreamRequestMessage(Type messageType)
         => $"Request '{messageType.FullName}' implements both IRequest and IStreamRequest; " +
             "the map holds one plan per request type, so one would overwrite the other. Keep " +
             "one contract and split the type if both are needed.";
 
-    private string SharedMessage(Type messageType)
-        => $"Type '{messageType.FullName}' implements both {Name(first)} and {Name(second)}; " +
+    private string BuildSharedMessage(Type messageType)
+        => $"Type '{messageType.FullName}' implements both {GetContractName(first)} and {GetContractName(second)}; " +
             "a message type must use one RequestFlow contract family. Keep one contract and split " +
             "the type if both roles are needed.";
 
@@ -86,7 +86,7 @@ internal sealed class ContractConflictRule(
         return false;
     }
 
-    private static string Name(MessageContract contract)
+    private static string GetContractName(MessageContract contract)
         => contract switch
         {
             MessageContract.Request => "IRequest",

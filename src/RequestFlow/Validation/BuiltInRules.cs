@@ -12,7 +12,6 @@ internal static class BuiltInRules
         IReadOnlyList<StageDeclaration> stageDeclarations,
         EventStrategyResolution eventStrategies)
     {
-        // Built once, since three rules read it.
         StageDeclarationFacts facts = new(stageDeclarations);
 
         yield return new DuplicateHandlerRule();
@@ -29,8 +28,6 @@ internal static class BuiltInRules
         yield return new MultiContractRequestRule();
         yield return new StreamRequestContractRule();
 
-        // After the stream contract rule, so an RF0110 from the same freeze precedes this RF0109.
-        // Report order is ascending by code apart from that pair.
         yield return new ContractConflictRule(
             MessageContract.Request,
             MessageContract.StreamRequest,
@@ -57,5 +54,7 @@ internal static class BuiltInRules
 
         yield return new StageEventHandlerLifetimeRule();
         yield return new EventStrategyRule(eventStrategies);
+
+        yield return new NonConcreteRequestRule();
     }
 }

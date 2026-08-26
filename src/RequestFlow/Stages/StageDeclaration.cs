@@ -36,8 +36,7 @@ internal sealed class StageFamily
         parameterAdvice:
             "An open generic stage implements IRequestStage<TRequest, TResponse> with its own two " +
             "parameters in that order, or declares one parameter and uses it as the request: " +
-            "IRequestStage<TRequest> for void requests, or IRequestStage<TRequest, TResponse> with " +
-            "a fixed response type.");
+            "IRequestStage<TRequest> for void requests, or IRequestStage<TRequest, TResponse> with a fixed response type.");
 
     public static readonly StageFamily Stream = new(
         typedContract: typeof(IStreamRequestStage<,>),
@@ -108,8 +107,7 @@ internal sealed class StageFamily
     public string CallName { get; }
 
     /// <summary>
-    /// True when a handler discovered through <paramref name="handlerContractDefinition"/> can be
-    /// wrapped by a stage of this family.
+    /// True when a handler discovered through <paramref name="handlerContractDefinition"/> can be wrapped by a stage of this family.
     /// </summary>
     public bool Handles(Type handlerContractDefinition)
     {
@@ -122,10 +120,9 @@ internal sealed class StageFamily
         return false;
     }
 
-    public string MissingContractMessage(Type stageType)
+    public string BuildMissingContractMessage(Type stageType)
         => $"'{stageType.FullName}' does not implement {_contractList}; {_missingAdvice}";
 
-    public string ParametersMisusedMessage(Type stageType, string parameterNames)
-        => $"'{stageType.FullName}' declares generic parameters <{parameterNames}> that its " +
-            $"{_contractName} implementation does not use as its request. {_parameterAdvice}";
+    public string BuildParametersMisusedMessage(Type stageType, string parameterNames)
+        => $"'{stageType.FullName}' declares generic parameters <{parameterNames}> that its {_contractName} implementation does not use as its request. {_parameterAdvice}";
 }

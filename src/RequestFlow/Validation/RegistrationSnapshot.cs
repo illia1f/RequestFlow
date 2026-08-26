@@ -125,7 +125,7 @@ internal static class RegistrationSnapshot
                 StageContract.Of(
                     declaration.StageType,
                     declaration.Family,
-                    MemoFor(declaration.Family, memoRequestContracts, memoStreamContracts)));
+                    SelectMemo(declaration.Family, memoRequestContracts, memoStreamContracts)));
         }
 
         return new RequestFlowModel(
@@ -136,7 +136,7 @@ internal static class RegistrationSnapshot
             eventClosure.EventStrategies);
     }
 
-    private static Dictionary<Type, Type> MemoFor(
+    private static Dictionary<Type, Type> SelectMemo(
         StageFamily family, Dictionary<Type, Type> request, Dictionary<Type, Type> stream)
         => family == StageFamily.Stream ? stream : request;
 }

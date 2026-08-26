@@ -55,6 +55,9 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0015`](#events) | Events | Manually added event handler type is an interface |
 | [`RF0016`](#events) | Events | Manually added event handler type is abstract |
 | [`RF0017`](#events) | Events | Manually added type does not implement the event handler contract |
+| [`RF0018`](#manual-handler-registration) | Manual handler registration | Manually added handler type is an interface |
+| [`RF0019`](#manual-handler-registration) | Manual handler registration | Manually added handler type is abstract |
+| [`RF0020`](#manual-handler-registration) | Manual handler registration | Manually added type does not implement a handler contract |
 | [`RF0101`](#requests-and-handlers) | Requests and handlers | Request has more than one handler |
 | [`RF0102`](#requests-and-handlers) | Requests and handlers | Request has no handler |
 | [`RF0103`](#stages) | Stages | Stage type is registered more than once |
@@ -78,6 +81,7 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0121`](#events) | Events | Strategy type is declared with different lifetimes |
 | [`RF0122`](#events) | Events | Event strategy declaration reaches no known event |
 | [`RF0123`](#events) | Events | Strategy class holds an event handler or stage role under a different lifetime |
+| [`RF0124`](#requests-and-handlers) | Requests and handlers | Handler's interface or abstract request type cannot be an exact runtime type |
 | [`CQRS0001`](#cqrs) | CQRS | Request is a command and a query, or a command and a stream query |
 
 ### Codes by area
@@ -90,6 +94,7 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | `RF0002` | `'...' is abstract...` | An abstract class passed to `RegisterGenericHandler` | Register a concrete handler class |
 | `RF0003` | `'...' has N generic parameters...` | An open generic with more than one type parameter | Only single-parameter generic handlers are supported |
 | `RF0004` | `'...' does not implement IRequestHandler or IStreamRequestHandler.` | The type is not a handler | Implement `IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, or `IStreamRequestHandler<TRequest, TItem>` |
+| `RF0004` | `'...' has an interface that could not be loaded...` | An interface on the definition passed to `RegisterGenericHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
 | `RF0005` | `Generic handler '...' declares no closing types...` | `RegisterGenericHandler(typeof(AuditHandler<>))` with no closings | Declare at least one closing type |
 | `RF0006` | `Closing type '...' ... is not a closed type.` | An open generic passed as a closing type | Close it first: `typeof(Audit<Order>)`, not `typeof(Audit<>)` |
 | `RF0007` | `Generic handler '...' cannot be closed over '...'...` | The closing type violates the handler's generic constraints | Pick a closing type that satisfies the `where` clauses |
@@ -117,6 +122,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0109` | `Request '...' implements both IRequest and IStreamRequest...` | One type carries a request contract and a stream contract. The map holds one plan per request type, so one would overwrite the other | Keep one contract; split the type if both are needed |
 | `RF0110` | `Stream handler '...' produces '...' items for request '...'` | The handler's item type is wider than the one the request declares. `IStreamRequest<TItem>` is covariant, so the pair compiles, but `Stream` infers the declared item type and the plan holds the handler's, so dispatching the request throws | Give the handler the item type the request declares |
 | `RF0112` | `Handler '...' produces '...' for request '...', which declares IRequest<...>...` | The handler's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the pair compiles, but `SendAsync` infers the declared response type and the plan holds the handler's, so dispatching the request throws | Give the handler the response type the request declares |
+| `RF0124` | `Handler '...' handles '...', which is an interface...` | The target cannot produce an instance whose exact runtime type matches the handler's interface or abstract request type. The `net462` asset permits interfaces and abstract `MarshalByRefObject` types because `RealProxy` can expose either through `GetType()` | Use a concrete request type, or a `net462` transparent proxy over an interface or abstract `MarshalByRefObject` request |
 
 #### Stages
 
@@ -143,6 +149,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0015` | `'...' is an interface; only concrete event handler classes...` | An interface passed to `AddEventHandler` | Register the implementing class |
 | `RF0016` | `'...' is abstract; only concrete event handler classes...` | An abstract class passed to `AddEventHandler` | Register a concrete subclass |
 | `RF0017` | `'...' does not implement IEventHandler.` | The type passed to `AddEventHandler` is not an event handler | Implement `IEventHandler<TEvent>` |
+| `RF0017` | `'...' has an interface that could not be loaded...` | An interface on the type passed to `AddEventHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
 | `RF0114` | `Event '...' has no handler.` | A known concrete event has no applicable exact, base, interface, or `IEvent` handler | Add or scan a handler, or call `AllowUnhandledEvents` when a known empty plan is intentional |
 | `RF0115` | `Event subscription '...' declared for '...' reaches no known event...` | `DisallowUnusedEventHandlers` is on and one handler contract reaches no known concrete event | Scan the targeted event assembly, remove the dead contract, or drop the opt-in |
 | `RF0116` | `Type '...' implements both IRequest and IEvent...` | One concrete type belongs to the request and event contract families | Keep one role; split the type when both messages are needed |
@@ -155,6 +162,15 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0123` | `Class '...' is registered as a ... event publish strategy and as a ... event handler or stage...` | One class is a publish strategy and also an event handler or reached stage under a different lifetime. Those roles share the concrete service key, so the descriptor registered last decides the lifetime both resolve under. A request or stream handler role is keyed on the handler interface and does not conflict | Use one lifetime or split the roles |
 
 `RF0115` and `RF0122` are opt-in and independent of `AllowUnhandledEvents`. The unhandled option suppresses `RF0114`; it never suppresses a dead subscription or strategy declaration requested through `DisallowUnusedEventHandlers`.
+
+#### Manual handler registration
+
+| Code | Problem message starts with | Cause | Fix |
+| --- | --- | --- | --- |
+| `RF0018` | `'...' is an interface; only concrete handler classes...` | An interface passed to `AddHandler` | Register the implementing class |
+| `RF0019` | `'...' is abstract; only concrete handler classes...` | An abstract class passed to `AddHandler` | Register a concrete subclass |
+| `RF0020` | `'...' does not implement IRequestHandler or IStreamRequestHandler.` | The type passed to `AddHandler` is not a request or stream handler | Implement a handler contract, or use `AddEventHandler` for an event handler |
+| `RF0020` | `'...' has an interface that could not be loaded...` | An interface on the type passed to `AddHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
 
 #### CQRS
 
