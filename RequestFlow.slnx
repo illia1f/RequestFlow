@@ -1,7 +1,9 @@
 <Solution>
   <Folder Name="/samples/">
-    <Project Path="samples/Orders.Api/Orders.Api.csproj" />
     <Project Path="samples/Orders.Api.Violations/Orders.Api.Violations.csproj" />
+    <Project Path="samples/Orders.Api/Orders.Api.csproj" />
+    <Project Path="samples/Orders.Modules.Audit/Orders.Modules.Audit.csproj" />
+    <Project Path="samples/Orders.Modules.Orders/Orders.Modules.Orders.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/RequestFlow.Abstractions/RequestFlow.Abstractions.csproj" Id="27f5d4e3-f8fc-491c-b221-d870df727eae" />
@@ -11,6 +13,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/RequestFlow.Cqrs.Tests.Unit/RequestFlow.Cqrs.Tests.Unit.csproj" Id="7c22705e-0b73-4769-950c-e4ec7b3c8ef9" />
+    <Project Path="tests/RequestFlow.Tests.RegistrationFixtures/RequestFlow.Tests.RegistrationFixtures.csproj" />
     <Project Path="tests/RequestFlow.Tests.Unit/RequestFlow.Tests.Unit.csproj" Id="28aa02f8-015d-4a9e-84e2-049aa9fcf333" />
     <Project Path="tests/RequestFlow.Tests.ValidationFixtures/RequestFlow.Tests.ValidationFixtures.csproj" />
   </Folder>

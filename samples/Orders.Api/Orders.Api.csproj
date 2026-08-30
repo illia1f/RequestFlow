@@ -11,8 +11,9 @@
     <ProjectReference Include="..\..\src\RequestFlow\RequestFlow.csproj" />
     <ProjectReference Include="..\..\src\RequestFlow.Cqrs\RequestFlow.Cqrs.csproj" />
     <ProjectReference Include="..\Orders.Api.Violations\Orders.Api.Violations.csproj" />
+    <ProjectReference Include="..\Orders.Modules.Audit\Orders.Modules.Audit.csproj" />
+    <ProjectReference Include="..\Orders.Modules.Orders\Orders.Modules.Orders.csproj" />
   </ItemGroup>
-  <!-- ASP.NET Core generates the OpenAPI document; the UI assets are a separate package. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />

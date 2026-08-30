@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
+using RequestFlow.Tests.RegistrationFixtures;
 using RequestFlow.Tests.ValidationFixtures;
 
 namespace RequestFlow.Tests.Unit;
@@ -94,6 +95,29 @@ public sealed class AddRequestFlowBuilderTests
 
 public sealed class AddRequestFlowValidationTests
 {
+    [Fact]
+    public void Given_Configuration_Delegate_When_Registering_Request_Flow_Then_Its_Assembly_Handlers_Are_Registered()
+    {
+        var services = new ServiceCollection();
+
+        services.AddRequestFlow(o => o.RegisterHandlersFromCallingAssembly());
+
+        services.ShouldContain(d =>
+            d.ServiceType == typeof(IRequestHandler<AddRequestFlowTests.Echo, string>));
+    }
+
+    [Fact]
+    public void Given_Configuration_Delegate_With_External_Helper_When_Registering_Request_Flow_Then_Configuration_Delegate_Assembly_Is_Scanned()
+    {
+        var services = new ServiceCollection();
+
+        services.AddRequestFlow(options =>
+            RegistrationBridge.RegisterHandlersFromCallingAssembly(options));
+
+        services.ShouldContain(descriptor =>
+            descriptor.ServiceType == typeof(IRequestHandler<AddRequestFlowTests.Echo, string>));
+    }
+
     [Fact]
     public void Given_Void_Handler_When_Registering_Request_Flow_Then_Handler_Is_Registered_Under_Standalone_Interface_Only()
     {

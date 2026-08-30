@@ -8,13 +8,14 @@ Every `AddRequestFlow` option: what each one registers and when to reach for it.
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .WithScopedHandlers());
 ```
 
 | Option                                        | What it does                                                                  |
 | --------------------------------------------- | ------------------------------------------------------------------------------ |
 | `RegisterHandlersFromAssemblyContaining<T>()` | Scans the assembly containing `T`                                              |
+| `RegisterHandlersFromCallingAssembly()`       | Scans the assembly containing the `AddRequestFlow` configuration delegate       |
 | `RegisterHandlersFromAssembly(assembly)`      | Scans the given assembly                                                        |
 | `RegisterGenericHandler(handlerType, ...)`    | Closes an open generic handler over the declared types                          |
 | `AddStage(stageType, configure?)`             | Wraps applicable handlers in a stage; `configure` narrows its reach and sets its lifetime (see [stages.md](stages.md)) |
@@ -32,6 +33,8 @@ services.AddRequestFlow(o => o
 | `ExcludeHandler<THandler>()`                  | Keeps one handler's request and stream handler contracts out of this call's scan (see [Manual handlers](#manual-handlers)) |
 | `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |
 | `WithTransientDispatcher()`                   | Registers the dispatcher transient instead of scoped (see [lifetimes.md](lifetimes.md))    |
+
+`RegisterHandlersFromCallingAssembly()` scans the assembly containing the `AddRequestFlow` configuration delegate. RequestFlow records the assembly before invoking the delegate, so inlining and tail calls cannot change the target. Outside `AddRequestFlow`, the method falls back to `Assembly.GetCallingAssembly()`. Use `RegisterHandlersFromAssemblyContaining<T>()` or `RegisterHandlersFromAssembly(assembly)` when the target must be explicit.
 
 ## What the scan picks up
 
@@ -70,7 +73,7 @@ public sealed class AuditHandler<T> : IRequestHandler<Audit<T>, string>
 }
 
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .RegisterGenericHandler(typeof(AuditHandler<>), typeof(Order), typeof(User)));
 ```
 
@@ -91,7 +94,7 @@ The handler type must be a concrete open generic definition with exactly one typ
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .ExcludeHandler<PlaceOrderHandler>()          // drop the scanned handler
     .AddHandler<AuditedOrderHandler>());          // register the replacement
 ```
@@ -121,7 +124,7 @@ Event publication uses `SequentialPublishStrategy` by default. Select a global f
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .PublishAllEventsWith<ParallelPublishStrategy>()
     .PublishEventsWith<IAuditEvent, ThrottledStrategy>(strategy => strategy.AsScoped())
     .PublishEventsWith<OrderPlaced, FailFastPublishStrategy>()
@@ -163,7 +166,7 @@ All problems are reported in one `RequestFlowValidationException`, not one at a 
 `AddRequestFlow` returns a builder, and `AddValidationRule` puts a check of yours in the same startup pass:
 
 ```csharp
-services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<Program>())
+services.AddRequestFlow(o => o.RegisterHandlersFromCallingAssembly())
     .AddValidationRule<RequestNameRule>();
 ```
 

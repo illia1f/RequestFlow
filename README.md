@@ -1,79 +1,115 @@
 # ![R](https://raw.githubusercontent.com/illia1f/RequestFlow/main/assets/RequestFlowIcon-89x52.png)equestFlow
 
-A small, fast request/handler and event-publishing library for .NET. You define messages and handlers, register them with one call, and dispatch through focused interfaces. All the wiring happens at runtime, once at startup, with no compiler plugin and no build-time code generation: if a project can reference a NuGet package, it can run RequestFlow.
+This is a request/handler mediator for .NET. Built-in validation system checks mediator and application-defined rules at startup. Frozen maps route requests through prebuilt execution plans for extremely fast dispatch with near-zero memory allocations.
 
-The core library stays unopinionated about how you name your requests. If you want a type-level split between commands and queries for CQRS- and DDD-style apps, install `RequestFlow.Cqrs` instead; it already contains the core package.
+Supports handlers, stages, streams, events. Additionally,`RequestFlow.Cqrs` adds a type-enforced command/query split. Registration runs at startup without a source generator, analyzer, or other build step.
 
 [![NuGet](https://img.shields.io/nuget/vpre/RequestFlow?label=nuget)](https://www.nuget.org/packages/RequestFlow)
 [![Downloads](https://img.shields.io/nuget/dt/RequestFlow?label=downloads)](https://www.nuget.org/packages/RequestFlow)
 [![CI](https://github.com/illia1f/RequestFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/illia1f/RequestFlow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/illia1f/RequestFlow/blob/main/LICENSE)
 ![Status](https://img.shields.io/badge/status-preview-orange)
-![Targets](https://img.shields.io/badge/targets-netstandard2.0%20%7C%20net462%20%7C%20net8.0%20%7C%20net10.0-512BD4)
+![Targets](https://img.shields.io/badge/targets-net10.0%20%7C%20net8.0%20%7C%20netstandard2.0%20%7C%20net462-512BD4)
 
 > **Status:** [preview on NuGet](https://www.nuget.org/packages/RequestFlow). Install with the `--prerelease` flag:
 >
-> ```
+> ```bash
 > dotnet add package RequestFlow --prerelease
 > ```
 
-## Why
+## Startup validation
 
-[MediatR](https://github.com/LuckyPennySoftware/MediatR) went commercial in 2025, and the search for a replacement now turns up a crowded field of free mediators. Many of the fastest are built on source generators: compiler plugins that write the dispatch code during your build. That buys speed and compile-time checks. It also ties the library to your toolchain: a recent compiler, `PackageReference`, analyzers left on, and generated code in every build.
+`AddRequestFlow` collects registrations. `ValidateRequestFlow()` closes the stage chains and runs every built-in and application-defined rule. If all validations pass, it freezes the valid model. Otherwise, it reports all problems in a single `RequestFlowValidationException`.
 
-RequestFlow trades those requirements away and keeps everything at runtime.
+```csharp
+builder.Services
+    .AddRequestFlow(options =>
+    {
+        options.RegisterHandlersFromCallingAssembly();
+        options.AddStage(
+            typeof(ValidationStage<,>),
+            stage => stage.WhereHandlerImplements<IOrdersCommandHandler>());
+    })
+    .AddValidationRule<CommandValidationStageRule>();
 
-- Errors surface at startup, not in production. Discovery, validation, and the request and event plans all finish before traffic, and a broken configuration fails the boot with one exception listing every problem. After that, dispatch and publication start with one dictionary lookup and use no reflection, LINQ, or locking.
-- No build step. Nothing runs inside your compiler, and there is no generated code to step through when something misbehaves. One package behaves the same from .NET 10 down to .NET Framework 4.6.2.
-- MIT, permanently. This library exists because a license changed underneath its users once. It takes no dependency whose license could do the same.
-- Migration is mostly renames. Requests and handlers keep their shape coming from MediatR; the mapping table below covers a typical codebase.
+WebApplication app = builder.Build();
+app.Services.ValidateRequestFlow();
+```
 
-Fast is a claim to prove, not to assert. A BenchmarkDotNet suite against the other mediators, raw artifacts included, is on the [roadmap](ROADMAP.md) before v1. Until it lands, this README quotes no numbers.
+In the [modular sample](https://github.com/illia1f/RequestFlow/blob/main/samples/README.md), [`CommandValidationStageRule`](https://github.com/illia1f/RequestFlow/blob/main/samples/Orders.Modules.Orders/Rules/CommandValidationStageRule.cs) reads the frozen stage chain and rejects commands without `ValidationStage<,>`. The convention is checked at startup instead of during code review.
+
+A custom rule can inspect request and response contracts, selected handlers, closed stages, stream shapes, events, and event strategies. It reports into the same exception as the built-in checks. See [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md).
+
+## Why RequestFlow
+
+- Startup validation reports missing and duplicate handlers, invalid stage closures, event problems, CQRS conflicts, and application-defined rule failures in one exception.
+- Request, stream, and event plans freeze once. Dispatch starts with a map lookup and uses no reflection, LINQ, or locking.
+- Repeated `AddRequestFlow` calls are additive, so each module can register its assembly into the same application model.
+- Requests, streams, and events use separate dispatch surfaces. The optional CQRS package adds command, query, and stream-query dispatchers. Void handlers return plain `Task`.
+
+## Modular monoliths
+
+The sample keeps module registration beside module code:
+
+```csharp
+builder.Services.AddOrdersModule().AddCqrs();
+builder.Services.AddAuditModule();
+```
+
+`AddOrdersModule()` and `AddAuditModule()` each call `AddRequestFlow` for their own assembly and add to the same registry. An `OrderPlaced` event from Orders can reach an Audit handler, and startup validation covers both modules.
+
+See the [sample walkthrough](https://github.com/illia1f/RequestFlow/blob/main/samples/README.md).
+
+## Modern .NET first
+
+RequestFlow targets .NET 10 and .NET 8 directly. It also ships `netstandard2.0` and `net462` assets for applications that still run on older targets.
+
+Runtime registration uses assembly discovery and dynamic generic construction during freeze, so RequestFlow does not support trimming or NativeAOT. See [Compatibility](https://github.com/illia1f/RequestFlow/blob/main/docs/compatibility.md).
 
 ## Coming from MediatR
 
-| MediatR                                              | RequestFlow                                           |
-| ---------------------------------------------------- | ----------------------------------------------------- |
-| `IRequest<TResponse>`, `IRequest`                    | same names, `RequestFlow` namespace                   |
-| `IRequestHandler<TRequest, TResponse>` with `Handle` | same interface, method is `HandleAsync`               |
-| `IMediator.Send(...)`                                | `IRequestDispatcher.SendAsync(...)`                   |
-| void requests through `Unit`                         | void handlers return plain `Task`, no `Unit` anywhere |
-| `IPipelineBehavior<,>`                               | `IRequestStage<,>`                                    |
-| `IStreamRequest<TResponse>`                          | `IStreamRequest<TItem>`, `RequestFlow` namespace      |
-| `IStreamRequestHandler<,>` with `Handle`             | same interface and same method name                   |
-| `IMediator.CreateStream(...)`                        | `IStreamDispatcher.Stream(...)`                       |
-| `INotification`                                     | `IEvent`                                              |
-| `INotificationHandler<T>` with `Handle`              | `IEventHandler<T>` with `HandleAsync`                 |
-| `IPublisher.Publish(...)` / `IMediator.Publish(...)` | `IEventPublisher.PublishAsync(...)`                   |
-| `INotificationPublisher`                             | `IEventPublishStrategy`                               |
-| `services.AddMediatR(...)`                           | `services.AddRequestFlow(...)`                        |
+Most request and handler changes are mechanical. Event semantics and some extension points differ.
 
-Event migration needs more than renames. RequestFlow delivers derived events to applicable base and interface handlers. Its default strategy runs every handler after failures, and frozen same-tier entry order is not a compatibility promise. These differences are documented in [Events](docs/events.md#notes-for-mediatr-migrations).
+| MediatR                                       | RequestFlow                                        |
+| --------------------------------------------- | -------------------------------------------------- |
+| `IRequest<TResponse>`, `IRequest`             | same names in the `RequestFlow` namespace          |
+| `IRequestHandler<TRequest, TResponse>.Handle` | `IRequestHandler<TRequest, TResponse>.HandleAsync` |
+| `ISender.Send` or `IMediator.Send`            | `IRequestDispatcher.SendAsync`                     |
+| `IPipelineBehavior<,>`                        | `IRequestStage<,>`                                 |
+| `IStreamRequest<T>` and `CreateStream`        | `IStreamRequest<T>` and `IStreamDispatcher.Stream` |
+| `INotification` and `Publish`                 | `IEvent` and `IEventPublisher.PublishAsync`        |
+| `services.AddMediatR(...)`                    | `services.AddRequestFlow(...)`                     |
+
+Void handlers return plain `Task`; `Unit` does not appear in user code. Existing `Task` and `Task<T>` handlers keep those return types.
+
+The [MediatR migration guide](https://github.com/illia1f/RequestFlow/blob/main/docs/migrating-from-mediatr.md) covers the file-by-file sequence, event differences, conditional registration, and unsupported extension points.
 
 ## Packages
 
-- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds the contracts: requests, handlers, dispatchers, stages, events and publish strategies, `NoResult`, and the streaming set. Depends on nothing on `net8.0` and `net10.0`; on `netstandard2.0` and `net462` it carries one Microsoft package, `Microsoft.Bcl.AsyncInterfaces`, which supplies `IAsyncEnumerable<T>` there.
-- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** is the runtime: request and stream dispatch, event publication, `AddRequestFlow` with assembly scanning, and startup validation. Depends on `RequestFlow.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
-- **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds the CQRS contracts: `ICommand`, `IQuery`, `IStreamQuery`, their handler interfaces, `ICommandDispatcher`, `IQueryDispatcher`, `IStreamQueryDispatcher`. Depends on `RequestFlow.Abstractions` only.
-- **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** is the CQRS runtime: typed dispatcher implementations, registered with `AddRequestFlow(...).AddCqrs()`. Depends on the contracts package and the core runtime.
+- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds requests, handlers, dispatchers, stages, streaming, events, publish strategies, validation models, and exceptions. It has no package dependency on `net8.0` or `net10.0`.
+- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** adds dispatch, event publication, assembly and manual registration, startup validation, and frozen execution plans.
+- **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds command, query, stream-query, handler, and typed-dispatcher contracts.
+- **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** adds the typed dispatchers and `AddCqrs()` validation rule on top of the core runtime.
 
-Contracts live in their own packages so your domain layer, and any future add-on package, can reference the interfaces without taking a dependency on a runtime. Install a runtime package at the composition root and the matching contracts arrive transitively. Core types share the `RequestFlow` namespace; the CQRS types live in `RequestFlow.Cqrs`.
+Install a runtime package at the composition root. Reference an abstractions package directly from a domain or application layer that should not depend on runtime registration.
 
 ## Documentation
 
 - [Getting started](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md): install, first request and handler, dispatching
-- [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): every `AddRequestFlow` option, scanning, generic handlers, startup validation
-- [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, which requests a stage reaches, filters
-- [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests over `IAsyncEnumerable`, stream stages, cancellation, and which package a stream handler needs
-- [Events](https://github.com/illia1f/RequestFlow/blob/main/docs/events.md): polymorphic entries, publish strategies, ordering, failures, and cancellation
-- [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): what RequestFlow registers, with which lifetime, and what you can change
-- [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): every exception RequestFlow throws, when it surfaces, and how to fix it
-- [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): contributing custom checks to startup validation, the model rules see, built-in problem codes
-- [Sample](https://github.com/illia1f/RequestFlow/blob/main/samples/README.md): a minimal API using commands, queries, stages, and two validation rules of its own
+- [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): scanning, manual registration, generic handlers, additive calls, startup validation
+- [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, filters, and request selection
+- [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests, stream stages, cancellation, and enumeration timing
+- [Events](https://github.com/illia1f/RequestFlow/blob/main/docs/events.md): polymorphic delivery, strategies, ordering, failures, and cancellation
+- [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): application-defined checks over the frozen registration model
+- [Compatibility](https://github.com/illia1f/RequestFlow/blob/main/docs/compatibility.md): modern targets, downlevel targets, trimming, and NativeAOT
+- [Migrating from MediatR](https://github.com/illia1f/RequestFlow/blob/main/docs/migrating-from-mediatr.md): concept mapping and semantic differences
+- [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): handler, stage, dispatcher, and publisher lifetimes
+- [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): exceptions, timing, and fixes
+- [Modular sample](https://github.com/illia1f/RequestFlow/blob/main/samples/README.md): an API host with independently registered Orders and Audit modules
 
 ## Contributing
 
-Design feedback is the most useful contribution right now.
+Design feedback is the most useful contribution while the packages are in preview.
 
 ## License
 

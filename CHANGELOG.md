@@ -10,6 +10,7 @@ Releases are cut from this file. The `release` workflow reads the section matchi
 
 ### Added
 
+- `RegisterHandlersFromCallingAssembly()` scans the assembly containing the `AddRequestFlow` configuration delegate, so no marker type is needed. Use `RegisterHandlersFromAssemblyContaining<T>()` or `RegisterHandlersFromAssembly(assembly)` when the target assembly must be explicit.
 - `AddHandler<THandler>()` registers one request or stream handler without scanning its assembly, and `ExcludeHandler<THandler>()` keeps one handler's request and stream handler contracts out of the same call's scan, so MediatR's conditional `AddTransient<IRequestHandler<X, Y>, H>()` and scan-filter patterns port directly. A handler both scanned and added manually registers once, and a type that is not a concrete handler class is a startup problem (`RF0018` to `RF0020`).
 - `RF0124`: a handler declared against an interface or abstract request type now fails the freeze, from any registration source, when the target cannot expose the declared type as the request's exact runtime type. The `net462` asset keeps interface and abstract `MarshalByRefObject` handlers valid for `RealProxy` transparent proxies.
 

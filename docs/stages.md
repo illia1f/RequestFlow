@@ -105,7 +105,7 @@ A handler that never looks at its token cannot be stopped by any of this. Cancel
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStage(typeof(LoggingStage<,>))
     .AddStage(typeof(ValidationStage<,>)));
 ```
@@ -170,7 +170,7 @@ Stream requests are a chain of their own. `IRequestStage` constrains `TRequest` 
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStage(typeof(TransactionStage<,>), s => s.WhereHandlerImplements<IWriteHandler>()));
 ```
 
@@ -229,7 +229,7 @@ A stage that reaches no registered request is a silent no-op by default. `Disall
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStage(typeof(AuditStage<,>))
     .DisallowUnusedStages());
 ```
@@ -242,7 +242,7 @@ Each stage declares its own lifetime, because a chain is rarely homogeneous. A l
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStage(typeof(LoggingStage<,>), s => s.AsSingleton())
     .AddStage(typeof(UnitOfWorkStage<,>), s => s.AsScoped()));
 ```
@@ -284,7 +284,7 @@ To register a stage on terms the declaration cannot express, a factory or an ins
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStage(typeof(LoggingStage<,>)));
 
 services.Replace(ServiceDescriptor.Singleton(new LoggingStage<Ping, string>(sink)));

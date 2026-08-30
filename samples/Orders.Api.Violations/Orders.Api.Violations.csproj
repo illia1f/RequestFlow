@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <!-- Contracts only. This assembly never references the sample it breaks. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\RequestFlow.Cqrs.Abstractions\RequestFlow.Cqrs.Abstractions.csproj" />
   </ItemGroup>

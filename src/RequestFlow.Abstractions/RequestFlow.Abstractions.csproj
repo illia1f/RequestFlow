@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Contracts for RequestFlow: requests, handlers, streaming, and dispatch abstractions. No dependencies on modern .NET; Microsoft.Bcl.AsyncInterfaces on netstandard2.0 and net462. Reference this from application layers; the RequestFlow package provides the runtime.</Description>
+    <Description>Contracts for RequestFlow requests, handlers, stages, streaming, events, dispatch, and startup validation rules. Reference this from domain and application layers without taking the runtime.</Description>
   </PropertyGroup>
 
   <!-- netstandard2.0 and net462 have no IAsyncEnumerable. The two modern targets have it inbox and
