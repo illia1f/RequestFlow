@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RequestFlow\RequestFlow.csproj" />
+    <ProjectReference Include="..\RequestFlow.Tests.RegistrationFixtures\RequestFlow.Tests.RegistrationFixtures.csproj" />
     <ProjectReference Include="..\RequestFlow.Tests.ValidationFixtures\RequestFlow.Tests.ValidationFixtures.csproj" />
   </ItemGroup>
 

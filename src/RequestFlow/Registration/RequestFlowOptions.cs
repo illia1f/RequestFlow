@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
@@ -36,13 +37,26 @@ public sealed class RequestFlowOptions
 
     internal ServiceLifetime DispatcherLifetime { get; private set; } = ServiceLifetime.Scoped;
 
+    private Assembly? ConfigurationDelegateAssembly { get; set; }
+
     /// <exception cref="ArgumentNullException"/>
     internal RequestFlowOptions Apply(Action<RequestFlowOptions> configure)
     {
         if (configure is null)
             throw new ArgumentNullException(nameof(configure));
 
-        configure(this);
+        try
+        {
+            foreach (Action<RequestFlowOptions> invocation in configure.GetInvocationList())
+            {
+                ConfigurationDelegateAssembly = invocation.Method.Module.Assembly;
+                invocation(this);
+            }
+        }
+        finally
+        {
+            ConfigurationDelegateAssembly = null;
+        }
 
         return this;
     }
@@ -223,6 +237,22 @@ public sealed class RequestFlowOptions
     /// </summary>
     public RequestFlowOptions RegisterHandlersFromAssemblyContaining<T>()
         => RegisterHandlersFromAssembly(typeof(T).Assembly);
+
+    /// <summary>
+    /// Scans the assembly containing the active <c>AddRequestFlow</c> configuration delegate.
+    /// </summary>
+    /// <remarks>
+    /// Outside <c>AddRequestFlow</c>, this method falls back to <see cref="Assembly.GetCallingAssembly"/>,
+    /// whose result can change under method inlining or tail calls.
+    /// See the <see href="https://learn.microsoft.com/dotnet/api/system.reflection.assembly.getcallingassembly#remarks">.NET documentation</see>.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public RequestFlowOptions RegisterHandlersFromCallingAssembly()
+    {
+        Assembly assembly = ConfigurationDelegateAssembly ?? Assembly.GetCallingAssembly();
+
+        return RegisterHandlersFromAssembly(assembly);
+    }
 
     /// <summary>
     /// Scans <paramref name="assembly"/> for handlers and requests.

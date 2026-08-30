@@ -52,7 +52,7 @@ public sealed class ClearCacheHandler : IRequestHandler<ClearCache>
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<CreateOrderHandler>());
+    .RegisterHandlersFromCallingAssembly());
 ```
 
 That one call registers the handlers, the `IRequestDispatcher`, and the validation that runs when the first dispatcher is resolved. To surface registration problems at startup instead, call `ValidateRequestFlow` once after building the provider:
@@ -87,7 +87,7 @@ Outside a web host, the same flow works with a plain `ServiceCollection`:
 ```csharp
 var services = new ServiceCollection();
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<CreateOrderHandler>());
+    .RegisterHandlersFromCallingAssembly());
 
 IServiceProvider provider = services.BuildServiceProvider().ValidateRequestFlow();
 

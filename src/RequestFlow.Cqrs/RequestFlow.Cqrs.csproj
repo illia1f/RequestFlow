@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Opt-in, type-enforced command/query split for RequestFlow: typed dispatcher implementations and AddCqrs registration on top of the RequestFlow runtime. Contracts live in RequestFlow.Cqrs.Abstractions.</Description>
+    <Description>Type-enforced CQRS for RequestFlow with command, query, and stream-query dispatchers plus startup validation through AddCqrs. Includes the RequestFlow runtime.</Description>
   </PropertyGroup>
 
   <ItemGroup>

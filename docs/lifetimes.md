@@ -24,14 +24,14 @@ Handlers are transient by default. Every call into the handler gets a fresh inst
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .WithScopedHandlers());
 ```
 
 Those two are the whole set. There is no singleton option: a singleton handler pins every dependency it injects for the life of the process, and that dependency is usually a `DbContext`. To register one anyway, add it yourself after the last `AddRequestFlow` call:
 
 ```csharp
-services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<Program>());
+services.AddRequestFlow(o => o.RegisterHandlersFromCallingAssembly());
 services.AddSingleton<IRequestHandler<Ping, string>, PingHandler>();
 ```
 
@@ -85,7 +85,7 @@ Handlers are homogeneous, so one lifetime per registration call fits them. Stage
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStage(typeof(LoggingStage<,>), s => s.AsSingleton())
     .AddStage(typeof(UnitOfWorkStage<,>), s => s.AsScoped()));
 ```
@@ -131,7 +131,7 @@ The pattern also serves `IEventPublisher`. Keep publication inside the scope bec
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .WithTransientDispatcher());
 ```
 

@@ -120,7 +120,7 @@ Two failures stay outside that net. A rule whose constructor throws fails while 
 
 ```csharp
 services.AddRequestFlow(o => o
-        .RegisterHandlersFromAssemblyContaining<Program>())
+        .RegisterHandlersFromCallingAssembly())
     .AddValidationRule<RequestNameRule>();
 ```
 

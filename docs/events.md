@@ -25,7 +25,7 @@ The usual assembly scan picks up both the event and the handler, and the runtime
 
 ```csharp
 services.AddRequestFlow(options =>
-    options.RegisterHandlersFromAssemblyContaining<OrderPlaced>());
+    options.RegisterHandlersFromCallingAssembly());
 
 IServiceProvider provider = services.BuildServiceProvider().ValidateRequestFlow();
 
@@ -44,7 +44,7 @@ The assembly is not the only unit. `AddEventHandler<THandler>()` registers one h
 ```csharp
 services.AddRequestFlow(options =>
 {
-    options.RegisterHandlersFromAssemblyContaining<OrderPlaced>();
+    options.RegisterHandlersFromCallingAssembly();
     options.ExcludeEventHandler<NoisyAuditHandler>();
     if (darkLaunchEnabled)
         options.AddEventHandler<DarkLaunchHandler>();
@@ -75,7 +75,7 @@ Select a global fallback or an assignable event target:
 
 ```csharp
 services.AddRequestFlow(options => options
-    .RegisterHandlersFromAssemblyContaining<OrderPlaced>()
+    .RegisterHandlersFromCallingAssembly()
     .PublishAllEventsWith<ParallelPublishStrategy>()
     .PublishEventsWith<OrderEvent, SequentialPublishStrategy>()
     .PublishEventsWith<OrderPlaced, FailFastPublishStrategy>());
@@ -150,7 +150,7 @@ public sealed class MigratedPublisher : IEventPublishStrategy
 }
 
 services.AddRequestFlow(options => options
-    .RegisterHandlersFromAssemblyContaining<OrderPlaced>()
+    .RegisterHandlersFromCallingAssembly()
     .PublishAllEventsWith<MigratedPublisher>());
 ```
 

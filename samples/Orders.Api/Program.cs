@@ -1,46 +1,24 @@
 using Orders.Api;
-using Orders.Api.Orders;
-using Orders.Api.Rules;
-using Orders.Api.Stages;
-using Orders.Api.Validation;
 using Orders.Api.Violations;
+using Orders.Modules.Audit;
+using Orders.Modules.Orders;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<OrderStore>();
-builder.Services.AddSingleton<OrderMetrics>();
-builder.Services.AddSingleton<OrderAuditTrail>();
 builder.Services.AddOpenApi();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ExceptionHandler>();
 
-builder.Services
-    .AddRequestFlow(options =>
-    {
-        options.RegisterHandlersFromAssemblyContaining<Program>();
-        options.AddStage(typeof(LoggingStage<,>));
-        options.AddStage(
-            typeof(ValidationStage<,>), stage => stage.WhereHandlerImplements<IOrdersCommandHandler>());
+builder.Services.AddOrdersModule().AddCqrs();
+builder.Services.AddAuditModule();
 
-        // OrderPlaced has three subscribers; start them together.
-        options.PublishEventsInParallel<OrderPlaced>();
-
-        // A cancellation side effect that fails stops the ones after it. Other order events keep the sequential default.
-        options.PublishEventsFailFast<OrderCancelled>();
-
-        // The scan finds request types as well as handlers, so the types that break conventions
-        // only stay out of a normal start by sitting in an assembly of their own.
-        if (args.Contains("--break-rules"))
-            options.RegisterHandlersFromAssembly(typeof(RefundOrderCommand).Assembly);
-    })
-    .AddCqrs()
-    .AddValidationRule<CommandNamingRule>()
-    .AddValidationRule<CommandValidatedRule>();
+if (args.Contains("--break-rules"))
+    builder.Services.AddRequestFlow(options =>
+        options.RegisterHandlersFromAssembly(typeof(RefundOrderCommand).Assembly));
 
 WebApplication app = builder.Build();
 
-// Every problem lands here, at startup, instead of on the first request.
 app.Services.ValidateRequestFlow();
 
 app.UseExceptionHandler();
@@ -52,5 +30,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapOrders();
+app.MapAuditModule();
 
 app.Run();

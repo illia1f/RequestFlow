@@ -62,7 +62,7 @@ app.MapGet("/orders/export", (DateTimeOffset since, IStreamDispatcher dispatcher
 There is no `AddStreaming` call. `AddRequestFlow` finds stream handlers in the same scan as the rest and registers `IStreamDispatcher` beside `IRequestDispatcher`, on the same lifetime and over the same frozen map:
 
 ```csharp
-services.AddRequestFlow(o => o.RegisterHandlersFromAssemblyContaining<Program>());
+services.AddRequestFlow(o => o.RegisterHandlersFromCallingAssembly());
 ```
 
 Resolving either dispatcher runs the one validation pass and freezes the one map, so a stream handler and a task handler in the same assembly are validated together.
@@ -163,7 +163,7 @@ Registration order is execution order, outermost first:
 
 ```csharp
 services.AddRequestFlow(o => o
-    .RegisterHandlersFromAssemblyContaining<Program>()
+    .RegisterHandlersFromCallingAssembly()
     .AddStreamStage(typeof(VisibleOnlyStage<,>))
     .AddStreamStage<RedactStage>());
 ```

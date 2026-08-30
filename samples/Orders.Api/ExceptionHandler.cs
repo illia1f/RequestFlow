@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Diagnostics;
-using Orders.Api.Orders;
-using Orders.Api.Validation;
+using Orders.Modules.Orders;
+using Orders.Modules.Orders.Validation;
 
 namespace Orders.Api;
 
-public sealed class ExceptionHandler : IExceptionHandler
+internal sealed class ExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken cancellationToken)
     {

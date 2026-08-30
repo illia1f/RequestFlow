@@ -3,15 +3,15 @@ using RequestFlow.Cqrs;
 
 namespace Orders.Api.Violations;
 
-// Everything here breaks a convention the Orders.Api rules enforce. The scan finds request types as
-// well as handlers, so these need an assembly of their own that only --break-rules registers.
+// These types produce the documented startup failures. They live in their own assembly so a normal
+// start does not register them.
 
 /// <summary>
 /// Trips ORDERS0001: a query handler covers it, so the name has to end in "Query".
 /// </summary>
 public sealed record FetchOrderDetails(Guid Id) : IQuery<string>;
 
-public sealed class FetchOrderDetailsHandler : IQueryHandler<FetchOrderDetails, string>
+internal sealed class FetchOrderDetailsHandler : IQueryHandler<FetchOrderDetails, string>
 {
     public Task<string> HandleAsync(FetchOrderDetails query, CancellationToken cancellationToken)
         => Task.FromResult($"order {query.Id}");
@@ -22,7 +22,7 @@ public sealed class FetchOrderDetailsHandler : IQueryHandler<FetchOrderDetails, 
 /// </summary>
 public sealed record ArchiveOrderCommand(Guid Id) : ICommand<Guid>;
 
-public sealed class ArchiveOrderCommandHandler : ICommandHandler<ArchiveOrderCommand, Guid>
+internal sealed class ArchiveOrderCommandHandler : ICommandHandler<ArchiveOrderCommand, Guid>
 {
     public Task<Guid> HandleAsync(ArchiveOrderCommand command, CancellationToken cancellationToken)
         => Task.FromResult(command.Id);
