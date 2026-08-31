@@ -18,7 +18,7 @@ dotnet test --filter "FullyQualifiedName~RequestDispatcherTests"
 
 Builds treat warnings as errors in `src/`. Test projects turn warnings-as-errors off.
 
-CI builds and tests on Windows, then packs on Ubuntu. Tests target net462 only on Windows, which is why the test job needs a Windows runner.
+CI builds, tests, and packs on Windows. The release workflow publishes from Ubuntu. Tests target net462 only on Windows, so the build job needs a Windows runner.
 
 CI sets `CI=true`, which turns on `ContinuousIntegrationBuild`: debug symbols then record repository paths instead of local machine paths. Locally you only need it to reproduce a packaging problem:
 

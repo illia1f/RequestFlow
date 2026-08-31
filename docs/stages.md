@@ -204,7 +204,7 @@ public async Task Given_A_Failing_Chain_Then_The_Stage_Retries_Once()
 
     await new RetryStage().HandleAsync(new PlaceOrder(), next, CancellationToken.None);
 
-    Assert.Equal(2, calls);
+    calls.ShouldBe(2);
 }
 ```
 

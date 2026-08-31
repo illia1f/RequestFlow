@@ -176,7 +176,7 @@ options.AddStage(typeof(LoggingStage<,>));
 options.AddStage(typeof(ValidationStage<,>));
 ```
 
-RequestFlow closes each applicable stage for each handler at startup. Filters and generic constraints decide which handlers a stage reaches. If a stage cannot close, startup validation reports it with the other registration problems.
+RequestFlow closes each applicable stage for each handler at startup. Filters and generic constraints decide which handlers a stage reaches. Invalid stage declarations fail startup validation. A declaration that reaches no request is allowed unless registration calls `DisallowUnusedStages()`.
 
 RequestFlow has no separate request pre-processor, post-processor, exception-handler, or exception-action abstractions. Implement those concerns as stages or keep an application-owned adapter during migration.
 
@@ -222,7 +222,7 @@ A base or interface handler can receive a derived event even when no exact-type 
 
 The default strategy runs handlers sequentially and attempts every applicable entry. Failures are collected into `EventPublishException.Failures` after all started entries finish.
 
-`PublishEventsInParallel<TEvent>()` runs applicable handlers concurrently for the selected event family. `PublishEventsFailFast<TEvent>()` stops the sequential walk after a failure. Custom strategies implement `IEventPublishStrategy`.
+`PublishEventsInParallel<TEvent>()` starts applicable handlers in frozen order and overlaps only incomplete asynchronous work for the selected event family. It waits for every handler. `PublishEventsFailFast<TEvent>()` stops the sequential walk after a failure. Custom strategies implement `IEventPublishStrategy`.
 
 Tier order is part of the contract. Same-tier handler order is not a compatibility promise. Remove code that depends on notification registration order or make the order explicit inside an application handler.
 
@@ -236,7 +236,7 @@ Call `ValidateRequestFlow()` during startup, then fix every reported problem:
 
 - every request and stream request has exactly one handler;
 - a request does not declare conflicting response contracts;
-- every stage closes over the handlers it targets;
+- every stage declaration is valid; a declaration that reaches no request is reported only under `DisallowUnusedStages()`;
 - every known event has a handler unless unhandled events are explicitly allowed;
 - every event strategy declaration selects an applicable concrete strategy;
 - every command and query stays on one side of the CQRS split;

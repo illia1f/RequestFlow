@@ -196,7 +196,7 @@ public async Task Given_A_Row_With_An_Email_When_The_Stage_Runs_Then_It_Is_Redac
         rows.Add(row);
     }
 
-    Assert.Equal("redacted", Assert.Single(rows).CustomerEmail);
+    rows.ShouldHaveSingleItem().CustomerEmail.ShouldBe("redacted");
 }
 
 private static async IAsyncEnumerable<OrderRow> OneRow()

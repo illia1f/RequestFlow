@@ -175,7 +175,7 @@ public void Given_A_Request_Without_The_Suffix_When_Validating_Then_The_Rule_Rep
 
     RequestFlowValidationProblem[] problems = [.. new RequestNameRule().Validate(context)];
 
-    Assert.Equal("ACME0001", Assert.Single(problems).Code);
+    problems.ShouldHaveSingleItem().Code.ShouldBe("ACME0001");
 }
 ```
 
