@@ -6,11 +6,11 @@ What RequestFlow registers, with which lifetime, and what you can change.
 
 | Service                                                                        | Lifetime                                                   | Configurable                   |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------ |
-| Handlers (request and stream contracts; event handlers under their concrete class) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
-| Stages (`IRequestStage<TRequest, TResponse>`, `IRequestStage<TRequest>`, `IStreamRequestStage<TRequest, TItem>`)       | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage` or `AddStreamStage` call |
+| Handlers (Task, ValueTask, and stream contracts; event handlers under their concrete class) | Transient                                                  | Yes, `WithScopedHandlers`, per `AddRequestFlow` call |
+| Stages (`IRequestStage`, `IValueRequestStage`, and `IStreamRequestStage` contracts) | Transient                                                  | Yes, `AsSingleton` or `AsScoped`, per `AddStage`, `AddValueStage`, or `AddStreamStage` call |
 | Custom event publish strategies | Singleton | Yes, `AsScoped` or `AsTransient`, per strategy declaration |
-| `IRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`                   | Scoped                                                     | Yes, `WithTransientDispatcher`, which moves all three |
-| Typed CQRS dispatchers (`ICommandDispatcher`, `IQueryDispatcher`, `IStreamQueryDispatcher`) | Transient, added by `AddCqrs`; each forwards to a dispatcher above, so a singleton injecting one still fails with `Cannot consume scoped service`, naming the core dispatcher inside | Not through `AddCqrs`; a descriptor of your own registered before it wins |
+| `IRequestDispatcher`, `IValueRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher` | Scoped                                                     | Yes, `WithTransientDispatcher`, which moves all four |
+| Typed CQRS dispatchers (`ICommandDispatcher`, `IQueryDispatcher`, `IValueCommandDispatcher`, `IValueQueryDispatcher`, `IStreamQueryDispatcher`) | Transient, added by `AddCqrs`; each forwards to a dispatcher above, so a singleton injecting one still fails with `Cannot consume scoped service`, naming the core dispatcher inside | Not through `AddCqrs`; a descriptor of your own registered before it wins |
 | Validation rules (`IRequestFlowValidationRule`)                                | Singleton, added by `AddValidationRule` and by `AddCqrs`    | Not through those calls; register your own descriptor for another lifetime |
 | Frozen request and event maps (internal handler lookup)                        | Singleton, built together on first dispatcher or publisher resolution | No             |
 
@@ -45,7 +45,7 @@ Past that point, the captive dependency rules below are yours to keep.
 
 ### Event handlers use concrete service keys
 
-Request and stream handlers register under their handler interfaces. Event handler classes register under their concrete types instead, once per class. Each applicable event subscription resolves that concrete type immediately before invoking it. This avoids resolving every event handler before any handler runs and lets one broken resolution become one entry in `EventPublishException.Failures`.
+Task, ValueTask, and stream handlers register under their handler interfaces. Event handler classes register under their concrete types instead, once per class. Each applicable event subscription resolves that concrete type immediately before invoking it. This avoids resolving every event handler before any handler runs and lets one broken resolution become one entry in `EventPublishException.Failures`.
 
 `WithScopedHandlers` applies to event handlers found by that registration call. If one scoped class implements two applicable `IEventHandler<TEvent>` contracts, both subscription entries resolve the same instance and invoke it twice.
 
@@ -57,7 +57,7 @@ A custom `IEventPublishStrategy` is singleton unless its declaration calls `AsSc
 
 Singleton strategy fields are shared across concurrent publishes. Keep per-publish collections and counters in method locals. Fields are suitable for deliberately shared coordination such as a semaphore or meter. `RF0121` rejects one strategy type declared with different lifetimes, and `RF0123` rejects a strategy class that holds an event handler or stage role under another lifetime.
 
-A class in both roles, request or stream handler and event handler, gets two descriptors under two different keys: the handler interface for one role, the concrete class for the other. Under `WithScopedHandlers` a scope holds one instance per key, so the constructor runs twice and neither role sees the other's state. Two keys cannot disagree about a lifetime, so nothing is reported. Split the class when either role has state or its constructor does work.
+A class in both roles, Task, ValueTask, or stream handler and event handler, gets two descriptors under two different keys: the handler interface for one role, the concrete class for the other. Under `WithScopedHandlers` a scope holds one instance per key, so the constructor runs twice and neither role sees the other's state. Two keys cannot disagree about a lifetime, so nothing is reported. Split the class when either role has state or its constructor does work.
 
 Stages use that same key, so a class registered with `AddStage` that also handles events has two descriptors under it, and the one registered last sets the lifetime for both roles. Within a single `AddRequestFlow` call that is the stage. A stage declared by an earlier call than the one that scans the class loses to the event handler instead. The freeze reports `RF0118` when the two lifetimes disagree; splitting the class in two is the fix.
 
@@ -93,7 +93,7 @@ services.AddRequestFlow(o => o
 Stages get the singleton option that handlers do not: a stage is usually a cross-cutting class holding no dependency worth pinning. The rest of the container's rules still apply:
 
 - A singleton stage is shared by every dispatch in the process, so it has to be thread safe, and anything it injects lives as long as it does.
-- A scoped stage resolved from the root provider is the case that can pass unnoticed. With scope validation on, the resolution throws when the level runs: at dispatch on the task path, at the first enumeration on a stream. With it off, the root provider builds the stage and caches it there, so one instance serves every dispatch until the process exits. A chain arrives there through `WithTransientDispatcher` plus a dispatcher injected into a singleton. A unit-of-work stage shared across every request corrupts data rather than failing.
+- A scoped stage resolved from the root provider is the case that can pass unnoticed. With scope validation on, the resolution throws when the level runs: at dispatch on the Task or ValueTask path, at the first enumeration on a stream. With it off, the root provider builds the stage and caches it there, so one instance serves every dispatch until the process exits. A chain arrives there through `WithTransientDispatcher` plus a dispatcher injected into a singleton. A unit-of-work stage shared across every request corrupts data rather than failing.
 - A stage above that overlaps its `next` calls runs the levels below it side by side. So within one dispatch, a scoped or singleton stage under it is entered twice at once and has to be thread safe on that path too. Only transient stays clear of it, because every call resolves an instance of its own. [stages.md](stages.md) has the shape.
 - A transient stage that owns an `IDisposable` is tracked by the scope that resolved it, which is the root scope for a root-resolved dispatcher.
 - Repeated `next` calls multiply that. A level is resolved once per entry, so a retry stage that makes three attempts leaves three instances behind, and a hedging stage leaves one per branch. Inside a request scope they are disposed when the request ends. Under a root-resolved dispatcher they go on the root provider's disposal list instead. Nothing releases them until the process exits, and the list grows with every dispatch.
@@ -121,13 +121,14 @@ public sealed class OutboxWorker(IServiceScopeFactory scopeFactory) : Background
 }
 ```
 
-The same pattern serves `IStreamDispatcher`, with one more rule: finish the enumeration inside the scope. A stream resolves its handler and stages from the dispatching scope on the first enumeration, not on the `Stream` call, so a sequence carried out of the `using` block throws `ObjectDisposedException` when it is finally enumerated. Keep the `await foreach` inside the block that created the scope.
+The same pattern serves `IValueRequestDispatcher`. It also serves `IStreamDispatcher`, with one more rule: finish the enumeration inside the scope. A stream resolves its handler and stages from the dispatching scope on the first enumeration, not on the `Stream` call, so a sequence carried out of the `using` block throws `ObjectDisposedException` when it is finally enumerated. Keep the `await foreach` inside the block that created the scope.
 
 The pattern also serves `IEventPublisher`. Keep publication inside the scope because event handlers resolve from that scope. Parallel publication shares the scope across every handler, so two handlers can use one scoped dependency concurrently. Sequential publication avoids overlap within one call, but two concurrent publishes from the same scope can still enter the same scoped handler together. Use separate scopes for concurrent units of work when scoped dependencies such as `DbContext` are not thread safe.
 
 ## Switching the dispatcher to transient
 
-`WithTransientDispatcher` registers the request dispatcher, stream dispatcher, and event publisher as transient instead of scoped:
+`WithTransientDispatcher` registers the Task request dispatcher, ValueTask request dispatcher,
+stream dispatcher, and event publisher as transient instead of scoped:
 
 ```csharp
 services.AddRequestFlow(o => o
@@ -142,7 +143,7 @@ Dispatch behavior does not change: a transient dispatcher still resolves handler
 
 Root-resolved dispatch has one more cost, and nothing reports it. The container tracks every transient `IDisposable` it creates in the scope that resolved it, and the root scope only ends at application shutdown. So a transient handler that is or owns an `IDisposable` is kept alive by the root provider on every send, and memory grows for the life of the process. Inside a request scope, or an explicit `IServiceScopeFactory` scope, the same handler is disposed at scope end. This is standard Microsoft DI behavior, not something RequestFlow can override, and one more reason to prefer a scope per unit of work.
 
-The first `AddRequestFlow` call fixes the dispatcher and publisher lifetime, and later calls cannot change it. This matches how the first registration wins for assemblies. There is no singleton option: a singleton dispatch surface would resolve every handler from the root provider, so scoped handlers could never work with it.
+The first `AddRequestFlow` call fixes every dispatcher and the publisher lifetime, and later calls cannot change it. This matches how the first registration wins for assemblies. There is no singleton option: a singleton dispatch surface would resolve every handler from the root provider, so scoped handlers could never work with it.
 
 ## Captive dependencies
 

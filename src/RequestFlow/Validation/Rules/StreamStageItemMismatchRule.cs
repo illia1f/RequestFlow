@@ -4,25 +4,14 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports a stream stage whose fixed item type is not the one its request declares.
+/// Rejects stream stages whose fixed item type differs from the request contract.
 /// </summary>
 /// <remarks>
-/// The stage twin of the item check in <see cref="StreamRequestContractRule"/>. The stage
-/// contract's constraint accepts a wider item because <c>IStreamRequest&lt;TItem&gt;</c> is
-/// covariant, but closing is invariant in the item, so such a stage compiles and then wraps no
-/// handler. Only <see cref="UnusedStageRule"/> would notice, and only behind
-/// <c>DisallowUnusedStages</c>, so this rule runs unconditionally for a stage that wrapped
-/// nothing. A stage that reached any request is not reported, since skipping the rest can be deliberate scoping.
-/// <para>
-/// A filtered call wraps nothing when its filter admits no handler, which says nothing about its
-/// item type, so only requests with a handler the filter admits are examined. The filter and the
-/// declaration's own family come from <paramref name="facts"/>, since the model holds neither.
-/// </para>
+/// Covariance allows wider item types to compile, but stage closing requires an exact match.
+/// Only stages that reached no handler in this family are checked.
+/// A request is checked when any declaration's filter admits one of its handlers.
+/// <paramref name="facts"/> supplies filters; when null, the model's recorded contract is used.
 /// </remarks>
-/// <param name="facts">
-/// What the calls that registered these stages named. Null for a model built by hand, where the
-/// recorded contract answers instead.
-/// </param>
 internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts = null)
     : IRequestFlowValidationRule
 {
@@ -39,24 +28,24 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
         {
             Type stageType = declaration.StageType;
 
-            // A two-parameter definition closes over the handler's own item type, so it cannot
-            // mismatch; the one-parameter form fixes the item in the class, so it can. A stage
-            // that wrapped a handler somewhere is scoped, not trapped.
+            // Two-parameter stages use the handler's item type; one-parameter stages can fix a wider type.
+            // A stage that reached any handler in this family is treated as deliberately scoped.
             if ((stageType.IsGenericTypeDefinition && stageType.GetGenericArguments().Length != 1)
-                || _facts.GetFamily(stageType, declaration.ContractType) != StageFamily.Stream
-                || declaration.ReachedRequests.Count > 0
+                || !_facts.HasFamily(stageType, StageFamily.Stream, declaration.ContractType)
+                || _facts.AnyDeclarationReached(
+                    stageType,
+                    StageFamily.Stream,
+                    declaration.ReachedRequests.Count > 0)
                 || !checkedStages.Add(stageType))
                 continue;
 
-            Type? handlerFilter = _facts.GetHandlerFilter(stageType);
-
             foreach (var request in context.Model.Requests)
             {
-                // A filter the request's handlers fail is why this stage skipped it, whatever its item type.
-                if (handlerFilter is not null && !Admits(handlerFilter, request))
+                // A request excluded by every declaration's filter says nothing about the item type.
+                if (!_facts.AnyDeclarationAdmits(stageType, StageFamily.Stream, request))
                     continue;
 
-                // No sole contract, no item type to hold the stage to; RF0108 reports the ambiguity.
+                // RF0108 or a pairwise conflict owns a request with no sole stream item.
                 Type? declaredItem = GetSoleDeclaredItem(request.RequestType, declaredItems);
                 if (declaredItem is null)
                     continue;
@@ -103,19 +92,7 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
         }
     }
 
-    private static bool Admits(Type handlerFilter, RequestModel request)
-    {
-        foreach (var handler in request.Handlers)
-        {
-            if (handlerFilter.IsAssignableFrom(handler.HandlerType))
-                return true;
-        }
-
-        return false;
-    }
-
-    // The closed type the freeze would test, or null when generic constraints exclude the
-    // request; exclusion is an answer, not a mismatch.
+    // Constraint rejection excludes the request; it is not an item mismatch.
     private static Type? CloseOver(Type stageType, Type requestType)
     {
         if (!stageType.IsGenericTypeDefinition)
@@ -131,8 +108,7 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
         }
     }
 
-    // The answer kept per request type, since every stage asks about the same requests; null
-    // records "no sole contract". The memo belongs to one pass, so it needs no lock.
+    // Cache results, including null, per request type for one validation pass.
     private static Type? GetSoleDeclaredItem(Type requestType, Dictionary<Type, Type?> memo)
     {
         if (memo.TryGetValue(requestType, out Type? cached))
@@ -150,7 +126,14 @@ internal sealed class StreamStageItemMismatchRule(StageDeclarationFacts? facts =
 
         foreach (var iface in requestType.GetInterfaces())
         {
-            if (!iface.IsGenericType || iface.GetGenericTypeDefinition() != typeof(IStreamRequest<>))
+            if (!iface.IsGenericType)
+                continue;
+
+            Type definition = iface.GetGenericTypeDefinition();
+            if (definition == typeof(IRequest<>) || definition == typeof(IValueRequest<>))
+                return null;
+
+            if (definition != typeof(IStreamRequest<>))
                 continue;
 
             if (declared is not null)

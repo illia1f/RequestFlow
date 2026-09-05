@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Contracts for RequestFlow requests, handlers, stages, streaming, events, dispatch, and startup validation rules. Reference this from domain and application layers without taking the runtime.</Description>
+    <Description>Contracts for RequestFlow Task and ValueTask requests, handlers, stages, streaming, events, dispatch, and startup validation rules. Reference this from domain and application layers without taking the runtime.</Description>
   </PropertyGroup>
 
-  <!-- netstandard2.0 and net462 have no IAsyncEnumerable. The two modern targets have it inbox and
-       pack with an empty dependency group. Keep the version aligned with what
-       Microsoft.Extensions.DependencyInjection.Abstractions already resolves downlevel. -->
+  <!-- Microsoft.Bcl.AsyncInterfaces supplies streaming contracts directly and ValueTask through
+       System.Threading.Tasks.Extensions transitively on netstandard2.0 and net462. Both are in-box
+       on the modern targets, which pack with an empty dependency group. Keep the version aligned
+       with what Microsoft.Extensions.DependencyInjection.Abstractions resolves downlevel. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' Or '$(TargetFramework)' == 'net462'">
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
   </ItemGroup>

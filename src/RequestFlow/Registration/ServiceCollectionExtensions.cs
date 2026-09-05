@@ -13,13 +13,10 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers RequestFlow: scans the configured assemblies and registers the discovered
-    /// handlers. Calls are additive; assemblies and closings already registered by an
-    /// earlier call are skipped. The first dispatcher resolution or call to
-    /// <c>ValidateRequestFlow</c> validates and builds the request and event maps together once
-    /// per provider. Invalid registration throws a <see cref="RequestFlowValidationException"/>
-    /// that lists every problem.
-    /// Returns a <see cref="RequestFlowBuilder"/> for chaining optional feature registrations.
+    /// Registers handlers, dispatchers, and the event publisher.
+    /// Calls are additive; previously registered assemblies and generic closings are skipped.
+    /// First dispatcher or publisher resolution, or <c>ValidateRequestFlow</c>, validates and freezes the maps once per provider.
+    /// Invalid registrations produce one <see cref="RequestFlowValidationException"/> listing every problem.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
@@ -82,6 +79,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(sp => sp.GetRequiredService<FrozenPlans>().Events);
         services.TryAdd(new ServiceDescriptor(
             typeof(IRequestDispatcher), typeof(RequestDispatcher), options.DispatcherLifetime));
+        services.TryAdd(new ServiceDescriptor(
+            typeof(IValueRequestDispatcher), typeof(ValueRequestDispatcher), options.DispatcherLifetime));
         services.TryAdd(new ServiceDescriptor(
             typeof(IStreamDispatcher), typeof(StreamDispatcher), options.DispatcherLifetime));
         services.TryAdd(new ServiceDescriptor(

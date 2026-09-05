@@ -4,8 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// One registered stage: the stage type, the family it belongs to, the optional handler contract
-/// that narrows which requests it reaches, and its lifetime. Position in the registry's list is execution order.
+/// A stage registration whose position in the registry sets its execution order.
 /// </summary>
 internal sealed class StageDeclaration(
     Type stageType, Type? handlerFilter, StageFamily family, ServiceLifetime lifetime = ServiceLifetime.Transient)
@@ -20,8 +19,7 @@ internal sealed class StageDeclaration(
 }
 
 /// <summary>
-/// The contracts one kind of stage is written against, and the handler contracts it can wrap.
-/// The two families never mix: a stream declaration cannot close over a task handler, and the reverse is equally impossible.
+/// Stage and handler contracts for one family; stages wrap only handlers in that family.
 /// </summary>
 internal sealed class StageFamily
 {
@@ -37,6 +35,19 @@ internal sealed class StageFamily
             "An open generic stage implements IRequestStage<TRequest, TResponse> with its own two " +
             "parameters in that order, or declares one parameter and uses it as the request: " +
             "IRequestStage<TRequest> for void requests, or IRequestStage<TRequest, TResponse> with a fixed response type.");
+
+    public static readonly StageFamily Value = new(
+        typedContract: typeof(IValueRequestStage<,>),
+        voidContract: typeof(IValueRequestStage<>),
+        handlerContracts: [typeof(IValueRequestHandler<,>), typeof(IValueRequestHandler<>)],
+        contractName: "IValueRequestStage",
+        contractList: "IValueRequestStage<TRequest, TResponse> or IValueRequestStage<TRequest>",
+        callName: "AddValueStage",
+        missingAdvice: "implement one of them or remove the AddValueStage call.",
+        parameterAdvice:
+            "An open generic value stage implements IValueRequestStage<TRequest, TResponse> with its own two " +
+            "parameters in that order, or declares one parameter and uses it as the request: " +
+            "IValueRequestStage<TRequest> for void requests, or IValueRequestStage<TRequest, TResponse> with a fixed response type.");
 
     public static readonly StageFamily Stream = new(
         typedContract: typeof(IStreamRequestStage<,>),
@@ -79,12 +90,18 @@ internal sealed class StageFamily
     }
 
     /// <summary>
-    /// The family whose typed or void contract <paramref name="contractType"/> implements or
-    /// derives from. Falls back to <see cref="Request"/>, the only family left once
-    /// <see cref="Stream"/> is ruled out.
+    /// Finds the family of a stage contract, defaulting to <see cref="Request"/>.
     /// </summary>
     public static StageFamily FromContract(Type contractType)
-        => StageContract.Implements(contractType, Stream.TypedContract) ? Stream : Request;
+    {
+        if (StageContract.Implements(contractType, Stream.TypedContract))
+            return Stream;
+        if (StageContract.Implements(contractType, Value.TypedContract)
+            || StageContract.Implements(contractType, Value.VoidContract!))
+            return Value;
+
+        return Request;
+    }
 
     /// <summary>
     /// The two-argument contract, which every stage in the family can be written against.
@@ -102,7 +119,7 @@ internal sealed class StageFamily
     public Type[] Contracts { get; }
 
     /// <summary>
-    /// The registration call that adds a stage of this family: <c>AddStage</c> or <c>AddStreamStage</c>.
+    /// The registration call that adds a stage of this family.
     /// </summary>
     public string CallName { get; }
 

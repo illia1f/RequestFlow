@@ -19,6 +19,7 @@ services.AddRequestFlow(o => o
 | `RegisterHandlersFromAssembly(assembly)`      | Scans the given assembly                                                        |
 | `RegisterGenericHandler(handlerType, ...)`    | Closes an open generic handler over the declared types                          |
 | `AddStage(stageType, configure?)`             | Wraps applicable handlers in a stage; `configure` narrows its reach and sets its lifetime (see [stages.md](stages.md)) |
+| `AddValueStage(stageType, configure?)`        | The same for ValueTask handlers, on a chain of its own (see [value-tasks.md](value-tasks.md#valuetask-stages)) |
 | `AddStreamStage(stageType, configure?)`       | The same for stream handlers, on a chain of its own (see [streaming.md](streaming.md)) |
 | `DisallowUnusedStages()`                      | Fails startup validation when a stage reaches no request (see [stages.md](stages.md)) |
 | `AllowUnhandledRequests()`                    | Skips the missing-handler check at startup validation                           |
@@ -29,22 +30,22 @@ services.AddRequestFlow(o => o
 | `DisallowUnusedEventHandlers()`               | Fails validation when an event subscription or typed strategy reaches no known event |
 | `AddEventHandler<THandler>()`                 | Registers one event handler without scanning its assembly (see [events.md](events.md)) |
 | `ExcludeEventHandler<THandler>()`             | Keeps one handler's event contracts out of this call's scan (see [events.md](events.md)) |
-| `AddHandler<THandler>()`                      | Registers one request or stream handler without scanning its assembly (see [Manual handlers](#manual-handlers)) |
-| `ExcludeHandler<THandler>()`                  | Keeps one handler's request and stream handler contracts out of this call's scan (see [Manual handlers](#manual-handlers)) |
+| `AddHandler<THandler>()`                      | Registers one Task, ValueTask, or stream handler without scanning its assembly (see [Manual handlers](#manual-handlers)) |
+| `ExcludeHandler<THandler>()`                  | Keeps one handler's Task, ValueTask, and stream handler contracts out of this call's scan (see [Manual handlers](#manual-handlers)) |
 | `WithScopedHandlers()`                        | Registers this call's handlers scoped instead of transient (see [lifetimes.md](lifetimes.md)) |
-| `WithTransientDispatcher()`                   | Registers the dispatcher transient instead of scoped (see [lifetimes.md](lifetimes.md))    |
+| `WithTransientDispatcher()`                   | Registers the Task, ValueTask, and stream dispatchers plus the event publisher as transient instead of scoped (see [lifetimes.md](lifetimes.md)) |
 
 `RegisterHandlersFromCallingAssembly()` scans the assembly containing the `AddRequestFlow` configuration delegate. RequestFlow records the assembly before invoking the delegate, so inlining and tail calls cannot change the target. Outside `AddRequestFlow`, the method falls back to `Assembly.GetCallingAssembly()`. Use `RegisterHandlersFromAssemblyContaining<T>()` or `RegisterHandlersFromAssembly(assembly)` when the target must be explicit.
 
 ## What the scan picks up
 
-The scan looks at every concrete class in the configured assemblies and registers those that implement `IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, `IStreamRequestHandler<TRequest, TItem>`, or `IEventHandler<TEvent>`. A class implementing several request or stream handler interfaces registers once per interface, so one class can handle several request types.
+The scan looks at every concrete class in the configured assemblies and registers those that implement `IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, `IValueRequestHandler<TRequest, TResponse>`, `IValueRequestHandler<TRequest>`, `IStreamRequestHandler<TRequest, TItem>`, or `IEventHandler<TEvent>`. A class implementing several Task, ValueTask, or stream handler interfaces registers once per interface, so one class can handle several request types.
 
 Event handlers differ at the container boundary. Each event handler class is registered once under its concrete type, while every closed `IEventHandler<TEvent>` contract it implements becomes a subscription in the frozen event plan. A class with two applicable contracts is invoked twice for one event, but both scoped resolutions return the same instance. RequestFlow does not register scanned handlers under `IEventHandler<TEvent>`, so `GetServices<IEventHandler<TEvent>>()` is not an event-publication extension point.
 
 The registry records every request and concrete closed event type found by the scan. An exact closed event-handler contract also makes its declared event type known, even when that event's assembly was not scanned. Startup validation uses those lists to report requests and events no handler covers. Abstract event bases and event interfaces can be subscription targets, but do not get publishable plans of their own.
 
-Abstract classes, interfaces, and open generic definitions are skipped. Open generic request and stream handlers need an explicit declaration, covered below. Open generic event handlers are not supported; use a closed `IEventHandler<IEvent>` for a catch-all handler.
+Abstract classes, interfaces, and open generic definitions are skipped. Open generic Task, ValueTask, and stream handlers need an explicit declaration, covered below. Open generic event handlers are not supported; use a closed `IEventHandler<IEvent>` for a catch-all handler.
 
 ## Multiple calls are additive
 
@@ -61,7 +62,7 @@ services.AddRequestFlow(o => o
 
 ## Generic handlers
 
-One handler implementation can serve a family of generic requests. The scan ignores open generics, so each closing is declared with `RegisterGenericHandler`:
+One handler implementation can serve a family of generic Task, ValueTask, or stream requests. The scan ignores open generics, so each closing is declared with `RegisterGenericHandler`:
 
 ```csharp
 public sealed record Audit<T>(string Payload) : IRequest<string>;
@@ -84,13 +85,16 @@ await dispatcher.SendAsync(new Audit<Order>("o1"));   // handled by AuditHandler
 await dispatcher.SendAsync(new Audit<Refund>("r7"));  // HandlerNotFoundException
 ```
 
+Open implementations of `IValueRequestHandler<TRequest, TResponse>` and the void
+`IValueRequestHandler<TRequest>` use the same closing rules.
+
 The undeclared closing surfaces at dispatch rather than at startup, because a generic request definition is not a scannable request type. Declare every closing you dispatch.
 
 The handler type must be a concrete open generic definition with exactly one type parameter that implements a handler interface. Each closing type must be a closed type that satisfies the handler's `where` constraints. A declaration that breaks these rules fails startup validation with a problem naming the type; the full list is in [exceptions.md](exceptions.md). Declaring the same closing twice does nothing: the first declaration wins, the same rule as repeated assemblies.
 
 ## Manual handlers
 
-`AddHandler<THandler>()` registers one handler without scanning its assembly. Every request and stream handler contract the class implements becomes a registration, validated and frozen exactly like a scanned one. `ExcludeHandler<THandler>()` keeps a handler's request and stream handler contracts out of the same call's scan; the type's event handler contracts are unaffected.
+`AddHandler<THandler>()` registers one handler without scanning its assembly. Every Task, ValueTask, and stream handler contract the class implements becomes a registration, validated and frozen exactly like a scanned one. `ExcludeHandler<THandler>()` keeps those contracts out of the same call's scan; the type's event handler contracts are unaffected.
 
 ```csharp
 services.AddRequestFlow(o => o

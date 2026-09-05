@@ -7,8 +7,6 @@ namespace RequestFlow;
 /// </summary>
 public sealed class HandlerModel
 {
-    /// <exception cref="ArgumentNullException"/>
-    /// <exception cref="ArgumentException"/>
     internal HandlerModel(
         Type handlerType,
         Type? responseType = null,
@@ -42,9 +40,8 @@ public sealed class HandlerModel
     /// The lifetime this handler is registered with.
     /// </summary>
     /// <remarks>
-    /// Each <c>AddRequestFlow</c> call decides for the handlers it found, so two handlers in one
-    /// registration can differ. A handler the application registers by hand afterwards wins at
-    /// resolution without changing this.
+    /// Each <c>AddRequestFlow</c> call sets the lifetime of the handlers it discovers.
+    /// Application overrides affect resolution without changing this value.
     /// </remarks>
     public RequestFlowLifetime Lifetime { get; }
 
@@ -52,10 +49,7 @@ public sealed class HandlerModel
     /// The open generic handler contract this handler implements.
     /// </summary>
     /// <remarks>
-    /// A <see cref="Type"/> rather than an enum, so a package the core knows nothing about can
-    /// record its own contract here and its own rule can match on it. Any open generic interface is
-    /// allowed, which is what lets a handler family the core does not name, such as the streaming
-    /// one, be reported honestly.
+    /// Accepts any open generic interface, including ValueTask, stream, and package-defined contracts.
     /// </remarks>
     public Type ContractType { get; }
 }

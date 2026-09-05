@@ -13,7 +13,7 @@ All four RequestFlow packages target `netstandard2.0;net462;net8.0;net10.0`.
 
 ## Package dependencies
 
-- `RequestFlow.Abstractions` has no package dependency on `net8.0` or `net10.0`. Its two downlevel assets depend on `Microsoft.Bcl.AsyncInterfaces` 8.0.0 for `IAsyncEnumerable<T>`.
+- `RequestFlow.Abstractions` has no package dependencies on `net8.0` or `net10.0`. On `netstandard2.0` and `net462`, it depends on `Microsoft.Bcl.AsyncInterfaces` 8.0.0 for streaming contracts, which brings `System.Threading.Tasks.Extensions` 4.5.4 for `ValueTask` transitively.
 - `RequestFlow` depends on `RequestFlow.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
 - `RequestFlow.Cqrs.Abstractions` depends on `RequestFlow.Abstractions`.
 - `RequestFlow.Cqrs` depends on `RequestFlow.Cqrs.Abstractions` and `RequestFlow`.
@@ -34,10 +34,8 @@ The registration and freeze paths need runtime type metadata and dynamic generic
 - `Type.MakeGenericType` closes handlers, stages, and plans.
 - `Activator.CreateInstance` builds frozen plans.
 
-`AddHandler<THandler>()` and `AddEventHandler<THandler>()` can avoid scanning an assembly for those handlers. They do not remove the dynamic construction performed during freeze, so they do not make an application trimming-safe or NativeAOT-compatible.
-
-Do not enable trimmed or NativeAOT publishing for an application that depends on RequestFlow until the library ships an explicitly supported registration and plan-construction path.
+`AddHandler<THandler>()` and `AddEventHandler<THandler>()` avoid assembly scanning, but freeze still uses dynamic construction. Manual registration does not enable trimming or NativeAOT.
 
 ## Runtime execution
 
-Reflection is confined to registration and startup plan construction. Request, stream, and event hot paths use frozen maps and closed plans with no reflection, LINQ, or locking.
+Reflection runs only during registration and startup. Dispatch and event publication use frozen maps with no reflection, LINQ, or locking.

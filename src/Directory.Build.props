@@ -15,7 +15,7 @@
     <Copyright>Copyright Illia Filippov</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/illia1f/RequestFlow</PackageProjectUrl>
-    <PackageTags>mediator;mediatr;cqrs;modular-monolith;architecture;validation;pipeline;events;streaming;dependency-injection;dotnet</PackageTags>
+    <PackageTags>mediator;mediatr;cqrs;modular-monolith;architecture;validation;pipeline;valuetask;events;streaming;dependency-injection;dotnet</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>

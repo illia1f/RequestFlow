@@ -3,25 +3,15 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// One stage in a request's chain: the <c>AddStage</c> or <c>AddStreamStage</c> call it came from
-/// and the type that runs.
+/// One stage in a request's chain, with its declared and closed types.
 /// </summary>
 /// <remarks>
-/// A rule usually needs both, and for a stage registered already closed they are the same type.
-/// Compare <see cref="ClosedType"/> to tell whether two entries are the same stage, since two
-/// separate calls can land on one type. Name <see cref="DeclaredType"/> in the message, because
-/// that is the registering call the reader has to go and change.
-/// <para>
-/// Same class does not mean same <see cref="ClosedType"/>. <c>in TRequest</c> lets a stage closed
-/// over a base request cover the requests under it, so with <c>PlaceOrder : IAudited</c> both
-/// <c>LoggingStage&lt;IAudited, OrderId&gt;</c> and <c>LoggingStage&lt;PlaceOrder, OrderId&gt;</c>
-/// land in the <c>PlaceOrder</c> chain.
-/// </para>
+/// Compare <see cref="ClosedType"/> to identify duplicate stages.
+/// Use <see cref="DeclaredType"/> in diagnostics to identify the registration to change.
+/// Contravariance can put different closed forms of one stage class in the same chain.
 /// </remarks>
 public sealed class ClosedStageModel
 {
-    /// <exception cref="ArgumentNullException"/>
-    /// <exception cref="ArgumentException"/>
     internal ClosedStageModel(Type declaredType, Type closedType, Type? contractType = null)
     {
         DeclaredType = declaredType ?? throw new ArgumentNullException(nameof(declaredType));
@@ -39,17 +29,12 @@ public sealed class ClosedStageModel
     /// The stage type built for this request, always closed.
     /// </summary>
     /// <remarks>
-    /// The type the container resolves. A two-parameter stage over a void request closes over
-    /// <see cref="NoResult"/> here, so read <see cref="HandlerModel.IsVoid"/> rather than these type arguments.
+    /// Use <see cref="HandlerModel.IsVoid"/> to identify void handlers.
     /// </remarks>
     public Type ClosedType { get; }
 
     /// <summary>
     /// The open generic stage contract this closing satisfies.
     /// </summary>
-    /// <remarks>
-    /// <c>IRequestStage</c>, an interface built on one, or the stage contract of another
-    /// family such as <c>IStreamRequestStage</c>.
-    /// </remarks>
     public Type ContractType { get; }
 }

@@ -1,8 +1,8 @@
 namespace RequestFlow;
 
 /// <summary>
-/// Stable codes for every built-in validation problem. Documented in docs/validation-rules.md;
-/// never renumbered. Match <see cref="RequestFlowValidationProblem.Code"/> against these instead of literal strings.
+/// Stable codes for built-in validation problems.
+/// Match <see cref="RequestFlowValidationProblem.Code"/> against these constants.
 /// </summary>
 public static class ProblemCodes
 {
@@ -50,4 +50,10 @@ public static class ProblemCodes
     public const string UnusedEventStrategy = "RF0122";
     public const string EventStrategyRoleLifetime = "RF0123";
     public const string NonConcreteRequest = "RF0124";
+    public const string MultiContractValueRequest = "RF0125";
+    public const string RequestAndValueRequest = "RF0126";
+    public const string StreamRequestAndValueRequest = "RF0127";
+    public const string ValueRequestAndEvent = "RF0128";
+    public const string ValueHandlerResponseMismatch = "RF0129";
+    public const string ValueStageResponseMismatch = "RF0130";
 }

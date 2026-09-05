@@ -33,9 +33,6 @@ internal sealed class RequestFlowRegistry
     /// </summary>
     public bool UnhandledRequestsAllowed { get; private set; }
 
-    /// <summary>
-    /// Opts the whole registry out of the missing-handler check; sticky across calls.
-    /// </summary>
     public void AllowUnhandledRequests()
         => UnhandledRequestsAllowed = true;
 
@@ -44,9 +41,6 @@ internal sealed class RequestFlowRegistry
     /// </summary>
     public bool UnusedStagesDisallowed { get; private set; }
 
-    /// <summary>
-    /// Makes a stage that applies to nothing a validation problem; sticky across calls.
-    /// </summary>
     public void DisallowUnusedStages()
         => UnusedStagesDisallowed = true;
 
@@ -107,8 +101,7 @@ internal sealed class RequestFlowRegistry
     }
 
     /// <summary>
-    /// Records <paramref name="closedStageType"/> unless an earlier call already did, and returns
-    /// whether this call recorded it, so each closed stage gets one descriptor.
+    /// Returns true when this closed stage type is recorded for the first time.
     /// </summary>
     public bool TryAddClosedStageType(Type closedStageType)
         => _registeredClosedStageTypes.Add(closedStageType);
@@ -188,8 +181,6 @@ internal sealed class RequestFlowRegistry
         _requestTypes.AddRange(requestTypes);
         _eventTypes.AddRange(eventTypes);
 
-        // A problem compares by value and is deterministic per declaration, so the same
-        // declaration repeated across calls dedups to one entry.
         foreach (var problem in problems)
         {
             if (_seenProblems.Add(problem))
@@ -198,9 +189,7 @@ internal sealed class RequestFlowRegistry
     }
 
     /// <summary>
-    /// Validates everything accumulated, including any rule registered with
-    /// <c>AddValidationRule</c> and resolved from <paramref name="provider"/>, and builds the
-    /// request and event maps for the resolving provider.
+    /// Runs built-in and registered validation rules, then builds this provider's request and event maps.
     /// </summary>
     /// <exception cref="RequestFlowValidationException"/>
     /// <exception cref="InvalidOperationException"/>
@@ -208,10 +197,15 @@ internal sealed class RequestFlowRegistry
     {
         EventClosureResult eventClosure = EventClosure.Build(
             _eventTypes, BuildEventSubscriptions(), BuildEventStrategies());
+        StageDeclarationFacts stageFacts = new(_stageDeclarations);
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            _handlers, _requestTypes, _stageDeclarations, ClosingCache, eventClosure);
+            _handlers,
+            _requestTypes,
+            _stageDeclarations,
+            ClosingCache,
+            eventClosure,
+            stageFacts);
 
-        // One context for the whole pass, so a built-in rule and a registered one read the same facts.
         RequestFlowValidationContext context = new(
             model,
             UnhandledRequestsAllowed,
@@ -221,7 +215,7 @@ internal sealed class RequestFlowRegistry
 
         List<RequestFlowValidationProblem> problems = ValidationRuleRunner.Run(
             context,
-            BuiltInRules.For(context, _stageDeclarations, eventClosure.StrategyResolution),
+            BuiltInRules.For(context, stageFacts, eventClosure.StrategyResolution),
             provider.GetServices<IRequestFlowValidationRule>(),
             _problems);
 
@@ -230,7 +224,6 @@ internal sealed class RequestFlowRegistry
 
         Dictionary<Type, StageChain> chainsByRequest = BuildStagePlans();
 
-        // Duplicate handlers were reported above, so one plan lands per handler here.
         Dictionary<Type, RequestPlanBase> plans = [];
         foreach (var handler in _handlers)
         {
@@ -307,7 +300,12 @@ internal sealed class RequestFlowRegistry
         if (!handler.IsVoid || stageTypes.Length == 0)
             return [];
 
-        Type typedContract = typeof(IRequestStage<,>).MakeGenericType(handler.RequestType, typeof(NoResult));
+        Type typedStageDefinition = handler.ContractDefinition == typeof(IValueRequestHandler<>)
+            ? typeof(IValueRequestStage<,>)
+            : typeof(IRequestStage<,>);
+        Type typedContract = typedStageDefinition.MakeGenericType(
+            handler.RequestType,
+            typeof(NoResult));
         bool[] typedShapes = new bool[stageTypes.Length];
         for (int i = 0; i < stageTypes.Length; i++)
             typedShapes[i] = typedContract.IsAssignableFrom(stageTypes[i]);
@@ -334,6 +332,20 @@ internal sealed class RequestFlowRegistry
                 : typeof(StreamPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
         }
 
+        if (handler.ContractDefinition == typeof(IValueRequestHandler<,>))
+        {
+            return staged
+                ? typeof(StagedValueRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType)
+                : typeof(ValueRequestPlan<,>).MakeGenericType(handler.RequestType, handler.ResponseType);
+        }
+
+        if (handler.ContractDefinition == typeof(IValueRequestHandler<>))
+        {
+            return staged
+                ? typeof(StagedValueVoidRequestPlan<>).MakeGenericType(handler.RequestType)
+                : typeof(ValueVoidRequestPlan<>).MakeGenericType(handler.RequestType);
+        }
+
         if (handler.IsVoid)
             return staged ? typeof(StagedVoidRequestPlan<>).MakeGenericType(handler.RequestType)
                 : typeof(VoidRequestPlan<>).MakeGenericType(handler.RequestType);
@@ -350,8 +362,8 @@ internal sealed class RequestFlowRegistry
 
 /// <summary>
 /// One request's stages in execution order. <see cref="TypedShapes"/> records, per position,
-/// whether the stage runs as <see cref="IRequestStage{TRequest, TResponse}"/>; it is empty for
-/// a request whose stages can only take that one shape.
+/// whether a void stage runs under its family's two-parameter contract; it is empty for a
+/// request whose stages can only take one shape.
 /// </summary>
 internal sealed class StageChain(Type[] stageTypes, bool[] typedShapes)
 {

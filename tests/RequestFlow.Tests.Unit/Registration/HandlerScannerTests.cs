@@ -109,6 +109,37 @@ public sealed class HandlerScannerTests
     }
 
     [Fact]
+    public void Given_A_Typed_Value_Handler_When_Discovering_Then_Records_The_Value_Contract()
+    {
+        HandlerDiscovery typed = HandlerScanner.Discover(typeof(ScanValueHandler)).ShouldHaveSingleItem();
+
+        typed.RequestType.ShouldBe(typeof(ScanValue));
+        typed.ResponseType.ShouldBe(typeof(int));
+        typed.IsVoid.ShouldBeFalse();
+        typed.ContractDefinition.ShouldBe(typeof(IValueRequestHandler<,>));
+    }
+
+    [Fact]
+    public void Given_A_Plain_Void_Value_Handler_When_Discovering_Then_Records_The_Value_Contract()
+    {
+        HandlerDiscovery plain = HandlerScanner.Discover(typeof(ScanValueVoidHandler)).ShouldHaveSingleItem();
+
+        plain.RequestType.ShouldBe(typeof(ScanValueVoid));
+        plain.ResponseType.ShouldBe(typeof(NoResult));
+        plain.IsVoid.ShouldBeTrue();
+        plain.ContractDefinition.ShouldBe(typeof(IValueRequestHandler<>));
+    }
+
+    [Fact]
+    public void Given_Value_Request_Types_When_Scanning_Then_Request_Types_Are_Collected()
+    {
+        ScanResult result = ScanSelf();
+
+        result.RequestTypes.ShouldContain(typeof(ScanValue));
+        result.RequestTypes.ShouldContain(typeof(ScanValueVoid));
+    }
+
+    [Fact]
     public void Given_A_Stream_Handler_When_Discovering_Then_Records_The_Item_Type_As_The_Response()
     {
         HandlerDiscovery discovery = HandlerScanner.Discover(typeof(TailHandler)).ShouldHaveSingleItem();
@@ -219,6 +250,22 @@ public sealed class HandlerScannerTests
     {
         public Task HandleAsync(ScanVoid request, CancellationToken cancellationToken)
             => Task.CompletedTask;
+    }
+
+    public sealed record ScanValue : IValueRequest<int>;
+
+    public sealed class ScanValueHandler : IValueRequestHandler<ScanValue, int>
+    {
+        public ValueTask<int> HandleAsync(ScanValue request, CancellationToken cancellationToken)
+            => new(1);
+    }
+
+    public sealed record ScanValueVoid : IValueRequest;
+
+    public sealed class ScanValueVoidHandler : IValueRequestHandler<ScanValueVoid>
+    {
+        public ValueTask HandleAsync(ScanValueVoid request, CancellationToken cancellationToken)
+            => default;
     }
 
     public abstract class AbstractHandler : IRequestHandler<ScanPing, int>

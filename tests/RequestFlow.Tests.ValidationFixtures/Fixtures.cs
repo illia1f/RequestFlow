@@ -307,3 +307,114 @@ public sealed class AllMessageContractsEventHandler :
         AllMessageContracts @event, CancellationToken cancellationToken)
         => Task.CompletedTask;
 }
+
+public sealed record ForkedValue : IValueRequest<string>, IValueRequest<int>;
+
+public sealed class ForkedValueHandler : IValueRequestHandler<ForkedValue, string>
+{
+    public ValueTask<string> HandleAsync(
+        ForkedValue request,
+        CancellationToken cancellationToken)
+        => new("forked");
+}
+
+public sealed record WideValue : IValueRequest<string>;
+
+public sealed class WideValueHandler : IValueRequestHandler<WideValue, object>
+{
+    public ValueTask<object> HandleAsync(
+        WideValue request,
+        CancellationToken cancellationToken)
+        => new((object)"wide");
+}
+
+public sealed record MixedRequestValue : IRequest<string>, IValueRequest<int>;
+
+public sealed record MixedStreamValue : IStreamRequest<string>, IValueRequest<int>;
+
+public sealed record ValueEventConflict : IValueRequest<int>, IEvent;
+
+public sealed record AllValueMessageContracts
+    : IRequest<int>, IStreamRequest<int>, IValueRequest<int>, IEvent;
+
+public sealed class MixedRequestValueHandler : IRequestHandler<MixedRequestValue, string>
+{
+    public Task<string> HandleAsync(
+        MixedRequestValue request,
+        CancellationToken cancellationToken)
+        => Task.FromResult("task");
+}
+
+public sealed class MixedStreamValueHandler : IValueRequestHandler<MixedStreamValue, int>
+{
+    public ValueTask<int> HandleAsync(
+        MixedStreamValue request,
+        CancellationToken cancellationToken)
+        => new(1);
+}
+
+public sealed class ValueEventValueHandler : IValueRequestHandler<ValueEventConflict, int>
+{
+    public ValueTask<int> HandleAsync(
+        ValueEventConflict request,
+        CancellationToken cancellationToken)
+        => new(1);
+}
+
+public sealed class ValueEventHandler : IEventHandler<ValueEventConflict>
+{
+    public Task HandleAsync(
+        ValueEventConflict @event,
+        CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+
+public sealed class AllValueMessageContractsHandler
+    : IRequestHandler<AllValueMessageContracts, int>
+{
+    public Task<int> HandleAsync(
+        AllValueMessageContracts request,
+        CancellationToken cancellationToken)
+        => Task.FromResult(1);
+}
+
+public sealed class AllValueMessageContractsEventHandler
+    : IEventHandler<AllValueMessageContracts>
+{
+    public Task HandleAsync(
+        AllValueMessageContracts @event,
+        CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+
+public sealed record StageValue : IValueRequest<string>;
+
+public sealed class StageValueHandler : IValueRequestHandler<StageValue, string>
+{
+    public ValueTask<string> HandleAsync(
+        StageValue request,
+        CancellationToken cancellationToken)
+        => new("stage");
+}
+
+public sealed record MixedTaskQueryValueCommand
+    : IQuery<int>, IValueCommand<int>;
+
+public sealed class MixedTaskQueryValueCommandHandler
+    : IQueryHandler<MixedTaskQueryValueCommand, int>
+{
+    public Task<int> HandleAsync(
+        MixedTaskQueryValueCommand request,
+        CancellationToken cancellationToken)
+        => Task.FromResult(1);
+}
+
+public sealed class WideValueStage<TRequest> : IValueRequestStage<TRequest, object>
+    where TRequest : IValueRequest<object>
+{
+    public ValueTask<object> HandleAsync(
+        TRequest request,
+        ValueContinuation<object> next,
+        CancellationToken cancellationToken)
+        => next.InvokeAsync(cancellationToken);
+}

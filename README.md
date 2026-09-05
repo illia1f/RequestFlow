@@ -1,8 +1,8 @@
 # ![R](https://raw.githubusercontent.com/illia1f/RequestFlow/main/assets/RequestFlowIcon-89x52.png)equestFlow
 
-This is a request/handler mediator for .NET. Built-in validation system checks mediator and application-defined rules at startup. Frozen maps route requests through prebuilt execution plans for extremely fast dispatch with near-zero memory allocations.
+This is a request/handler mediator for .NET. Built-in validation checks mediator and application-defined rules at startup. Frozen maps route requests through prebuilt execution plans.
 
-Supports handlers, stages, streams, events. Additionally,`RequestFlow.Cqrs` adds a type-enforced command/query split. Registration runs at startup without a source generator, analyzer, or other build step.
+Supports Task and ValueTask requests, stages, streams, and events. Additionally, `RequestFlow.Cqrs` adds a type-enforced command/query split. Registration runs at startup without a source generator, analyzer, or other build step.
 
 [![NuGet](https://img.shields.io/nuget/vpre/RequestFlow?label=nuget)](https://www.nuget.org/packages/RequestFlow)
 [![Downloads](https://img.shields.io/nuget/dt/RequestFlow?label=downloads)](https://www.nuget.org/packages/RequestFlow)
@@ -43,9 +43,9 @@ A custom rule can inspect request and response contracts, selected handlers, clo
 ## Why RequestFlow
 
 - Startup validation reports missing and duplicate handlers, invalid stage closures, event problems, CQRS conflicts, and application-defined rule failures in one exception.
-- Request, stream, and event plans freeze once. Dispatch starts with a map lookup and uses no reflection, LINQ, or locking.
+- Task request, ValueTask request, stream, and event plans freeze once. Dispatch starts with a map lookup and uses no reflection, LINQ, or locking.
 - Repeated `AddRequestFlow` calls are additive, so each module can register its assembly into the same application model.
-- Requests, streams, and events use separate dispatch surfaces. The optional CQRS package adds command, query, and stream-query dispatchers. Void handlers return plain `Task`.
+- Task requests, ValueTask requests, streams, and events use separate dispatch surfaces. The optional CQRS package adds Task and ValueTask command/query dispatchers plus stream-query dispatch.
 
 ## Modular monoliths
 
@@ -86,16 +86,17 @@ The [MediatR migration guide](https://github.com/illia1f/RequestFlow/blob/main/d
 
 ## Packages
 
-- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds requests, handlers, dispatchers, stages, streaming, events, publish strategies, validation models, and exceptions. It has no package dependency on `net8.0` or `net10.0`.
-- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** adds dispatch, event publication, assembly and manual registration, startup validation, and frozen execution plans.
-- **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds command, query, stream-query, handler, and typed-dispatcher contracts.
-- **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** adds the typed dispatchers and `AddCqrs()` validation rule on top of the core runtime.
+- **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds Task and ValueTask requests, handlers, dispatchers, stages, streaming, events, publish strategies, validation models, and exceptions. It has no package dependency on `net8.0` or `net10.0`.
+- **[`RequestFlow`](https://www.nuget.org/packages/RequestFlow)** adds Task and ValueTask dispatch, event publication, assembly and manual registration, startup validation, and frozen execution plans.
+- **[`RequestFlow.Cqrs.Abstractions`](https://www.nuget.org/packages/RequestFlow.Cqrs.Abstractions)** holds Task and ValueTask command/query contracts, stream-query contracts, handlers, and typed dispatchers.
+- **[`RequestFlow.Cqrs`](https://www.nuget.org/packages/RequestFlow.Cqrs)** adds the Task and ValueTask command/query dispatchers, stream-query dispatcher, and `AddCqrs()` validation rule on top of the core runtime.
 
 Install a runtime package at the composition root. Reference an abstractions package directly from a domain or application layer that should not depend on runtime registration.
 
 ## Documentation
 
 - [Getting started](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md): install, first request and handler, dispatching
+- [ValueTask requests](https://github.com/illia1f/RequestFlow/blob/main/docs/value-tasks.md): measured opt-in requests, stages, CQRS, and consumption rules
 - [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): scanning, manual registration, generic handlers, additive calls, startup validation
 - [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, filters, and request selection
 - [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests, stream stages, cancellation, and enumeration timing

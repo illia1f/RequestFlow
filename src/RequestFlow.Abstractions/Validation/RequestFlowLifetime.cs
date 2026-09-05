@@ -4,8 +4,8 @@ namespace RequestFlow;
 /// How long a registered handler or stage instance lives.
 /// </summary>
 /// <remarks>
-/// A stage takes any of the three, since <c>AddStage</c> names the lifetime per call. A handler is
-/// transient or scoped, chosen by the <c>AddRequestFlow</c> call that found it.
+/// Stages support all three lifetimes. Handlers are transient or scoped,
+/// selected by the <c>AddRequestFlow</c> call that discovers them.
 /// </remarks>
 public enum RequestFlowLifetime
 {

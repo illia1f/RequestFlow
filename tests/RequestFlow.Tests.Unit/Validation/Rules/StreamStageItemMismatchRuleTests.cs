@@ -148,6 +148,18 @@ public sealed class StreamStageItemMismatchRuleTests
         _sut.Validate(context).ShouldBeEmpty();
     }
 
+    // RF0127 owns a type carrying stream and ValueTask contracts, so there is no sole stream item.
+    [Fact]
+    public void Given_A_Wide_Stream_Stage_On_A_Stream_And_Value_Request_When_Validating_Then_Reports_Nothing()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(typeof(StreamAndValue))
+            .AddStageDeclaration(typeof(StreamAndValueStage), typeof(IStreamRequestStage<,>))
+            .BuildContext();
+
+        _sut.Validate(context).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Given_A_Wide_Item_Stage_Wrapping_Another_Request_When_Validating_Then_Reports_Nothing()
     {
@@ -225,6 +237,68 @@ public sealed class StreamStageItemMismatchRuleTests
         problem.Subject.ShouldBe(typeof(WideNoteStage));
     }
 
+    [Fact]
+    public void Given_A_Filtered_And_Unfiltered_Duplicate_Wide_Item_Stage_When_Freezing_Then_Reports_RF0103_And_RF0111()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options => options
+            .AddHandler<NoteHandler>()
+            .AddStreamStage<WideNoteStage>(stage => stage.WhereHandlerImplements<IUnmatched>())
+            .AddStreamStage<WideNoteStage>());
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => provider.GetRequiredService<IStreamDispatcher>());
+
+        exception.Problems.Count.ShouldBe(2);
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.DuplicateStage
+            && problem.Subject == typeof(WideNoteStage));
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.StreamStageItemMismatch
+            && problem.Subject == typeof(WideNoteStage));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Given_A_Dual_Family_Stage_With_A_Stream_Item_Mismatch_When_Freezing_In_Either_Order_Then_Reports_RF0103_And_RF0111(
+        bool streamFirst)
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options =>
+        {
+            options
+                .AddHandler<DualTaskHandler>()
+                .AddHandler<DualStreamHandler>();
+
+            if (streamFirst)
+            {
+                options
+                    .AddStreamStage<DualFamilyStage>()
+                    .AddStage<DualFamilyStage>();
+            }
+            else
+            {
+                options
+                    .AddStage<DualFamilyStage>()
+                    .AddStreamStage<DualFamilyStage>();
+            }
+        });
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => provider.GetRequiredService<IStreamDispatcher>());
+
+        exception.Problems.Count.ShouldBe(2);
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.DuplicateStage
+            && problem.Subject == typeof(DualFamilyStage));
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.StreamStageItemMismatch
+            && problem.Subject == typeof(DualFamilyStage));
+    }
+
     #region Initialization
 
     private readonly StreamStageItemMismatchRule _sut = new();
@@ -244,6 +318,8 @@ public sealed class StreamStageItemMismatchRuleTests
     private abstract record TwoStreams : IStreamRequest<string>, IStreamRequest<int>;
 
     private abstract record ObjectStream : IStreamRequest<object>;
+
+    private abstract record StreamAndValue : IStreamRequest<string>, IValueRequest<int>;
 
     // Compiles because IStreamRequest<TItem> is covariant: StringStream satisfies
     // IStreamRequest<object>, so the stage constraint closes over the wider item.
@@ -294,6 +370,14 @@ public sealed class StreamStageItemMismatchRuleTests
     {
         public abstract IAsyncEnumerable<string> Handle(
             TwoStreams request, StreamContinuation<string> next, CancellationToken cancellationToken);
+    }
+
+    private abstract class StreamAndValueStage : IStreamRequestStage<StreamAndValue, object>
+    {
+        public abstract IAsyncEnumerable<object> Handle(
+            StreamAndValue request,
+            StreamContinuation<object> next,
+            CancellationToken cancellationToken);
     }
 
     private abstract class TaskStage : IRequestStage<PlainAsk, int>
@@ -364,6 +448,45 @@ public sealed class StreamStageItemMismatchRuleTests
     {
         public IAsyncEnumerable<object> Handle(
             TRequest request, StreamContinuation<object> next, CancellationToken cancellationToken)
+            => next.Invoke(cancellationToken);
+    }
+
+    private sealed record DualTask : IRequest<string>;
+
+    private sealed record DualStream : IStreamRequest<string>;
+
+    private sealed class DualTaskHandler : IRequestHandler<DualTask, string>
+    {
+        public Task<string> HandleAsync(
+            DualTask request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(string.Empty);
+    }
+
+    private sealed class DualStreamHandler : IStreamRequestHandler<DualStream, string>
+    {
+        public async IAsyncEnumerable<string> Handle(
+            DualStream request,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            yield return string.Empty;
+        }
+    }
+
+    private sealed class DualFamilyStage
+        : IRequestStage<DualTask, string>, IStreamRequestStage<DualStream, object>
+    {
+        public Task<string> HandleAsync(
+            DualTask request,
+            Continuation<string> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+
+        public IAsyncEnumerable<object> Handle(
+            DualStream request,
+            StreamContinuation<object> next,
+            CancellationToken cancellationToken)
             => next.Invoke(cancellationToken);
     }
 

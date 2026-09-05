@@ -4,13 +4,13 @@ From an empty project to the first dispatched request.
 
 ## Install
 
-The packages are on NuGet in preview, so installing the runtime package takes the `--prerelease` flag:
+Install the preview runtime package:
 
 ```
 dotnet add package RequestFlow --prerelease
 ```
 
-It pulls in `RequestFlow.Abstractions`, the contracts package. Projects that only define requests and handlers, such as a domain layer, reference `RequestFlow.Abstractions` alone, and that covers stream handlers too ([streaming.md](streaming.md#packages)). On `net8.0` and `net10.0` the contracts package has no dependencies; on `netstandard2.0` and `net462` it carries one Microsoft package, `Microsoft.Bcl.AsyncInterfaces`.
+`RequestFlow` includes `RequestFlow.Abstractions`. Projects that only define requests and handlers can reference the abstractions package alone, including for [ValueTask](value-tasks.md) and [stream](streaming.md#packages) handlers. The package has no dependencies on `net8.0` or `net10.0`; on `netstandard2.0` and `net462`, it depends on `Microsoft.Bcl.AsyncInterfaces`.
 
 All types live in the `RequestFlow` namespace, so one `using RequestFlow;` covers requests, handlers, and the dispatcher. The registration extensions live in `Microsoft.Extensions.DependencyInjection`, which a typical `Program.cs` already imports.
 
@@ -45,6 +45,8 @@ public sealed class ClearCacheHandler : IRequestHandler<ClearCache>
         => Task.CompletedTask;
 }
 ```
+
+Keep `IRequest` as the default. Consider the [ValueTask request family](value-tasks.md) when measurements show that `Task` allocations matter on a path that completes synchronously.
 
 ## Register
 
@@ -97,4 +99,4 @@ var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();
 OrderId id = await dispatcher.SendAsync(new CreateOrder("c42"));
 ```
 
-The scope matters: the dispatcher is registered scoped so that handler dependencies such as a `DbContext` live per unit of work. [lifetimes.md](lifetimes.md) explains the lifetime choices and how to change them; [exceptions.md](exceptions.md) lists every exception RequestFlow throws and how to fix each one.
+Resolve the dispatcher inside a scope so dependencies such as `DbContext` live for one unit of work. See [Service lifetimes](lifetimes.md) for configuration and [Exceptions](exceptions.md) for failures and fixes.

@@ -195,6 +195,135 @@ public sealed class RegistrationSnapshotTests
     }
 
     [Fact]
+    public void Given_A_Typed_Value_Handler_When_Capturing_Then_The_Value_Handler_Contract_Is_Recorded()
+    {
+        HandlerRegistration handler = Handler(
+            typeof(ValuePingHandler),
+            typeof(ValuePing),
+            typeof(string),
+            typeof(IValueRequestHandler<ValuePing, string>));
+
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            [handler], [typeof(ValuePing)], [], new StageClosingCache());
+
+        model.Requests.ShouldHaveSingleItem()
+            .Handlers.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestHandler<,>));
+    }
+
+    [Fact]
+    public void Given_A_Plain_Void_Value_Handler_When_Capturing_Then_The_Value_Handler_Contract_Is_Recorded()
+    {
+        HandlerRegistration handler = Handler(
+            typeof(ValueVoidHandler),
+            typeof(ValueVoid),
+            typeof(NoResult),
+            typeof(IValueRequestHandler<ValueVoid>),
+            isVoid: true);
+
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            [handler], [typeof(ValueVoid)], [], new StageClosingCache());
+
+        HandlerModel captured = model.Requests.ShouldHaveSingleItem()
+            .Handlers.ShouldHaveSingleItem();
+        captured.ContractType.ShouldBe(typeof(IValueRequestHandler<>));
+        captured.ResponseType.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Given_One_Stage_Type_In_Task_And_Value_Families_When_Capturing_Then_Each_Declaration_And_Closing_Retains_Its_Own_Contract()
+    {
+        HandlerRegistration taskHandler = Handler(
+            typeof(TaskMemoHandler),
+            typeof(TaskMemo),
+            typeof(string),
+            typeof(IRequestHandler<TaskMemo, string>));
+        HandlerRegistration valueHandler = Handler(
+            typeof(ValueMemoHandler),
+            typeof(ValueMemo),
+            typeof(string),
+            typeof(IValueRequestHandler<ValueMemo, string>));
+        var taskDeclaration = new StageDeclaration(
+            typeof(DualMemoStage), handlerFilter: null, StageFamily.Request);
+        var valueDeclaration = new StageDeclaration(
+            typeof(DualMemoStage), handlerFilter: null, StageFamily.Value);
+
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            [taskHandler, valueHandler],
+            [typeof(TaskMemo), typeof(ValueMemo)],
+            [taskDeclaration, valueDeclaration],
+            new StageClosingCache());
+
+        model.StageDeclarations[0].ContractType.ShouldBe(typeof(IRequestStage<,>));
+        model.StageDeclarations[1].ContractType.ShouldBe(typeof(IValueRequestStage<,>));
+        model.Requests[0].Stages.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IRequestStage<,>));
+        model.Requests[1].Stages.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestStage<,>));
+    }
+
+    [Fact]
+    public void Given_A_Plain_Void_Value_Stage_When_Capturing_Then_The_Value_Stage_Contract_Is_Recorded()
+    {
+        HandlerRegistration handler = Handler(
+            typeof(ValueVoidHandler),
+            typeof(ValueVoid),
+            typeof(NoResult),
+            typeof(IValueRequestHandler<ValueVoid>),
+            isVoid: true);
+        var declaration = new StageDeclaration(
+            typeof(ValueVoidStage), handlerFilter: null, StageFamily.Value);
+
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            [handler], [typeof(ValueVoid)], [declaration], new StageClosingCache());
+
+        model.StageDeclarations.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestStage<>));
+        model.Requests.ShouldHaveSingleItem().Stages.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestStage<>));
+    }
+
+    [Fact]
+    public void Given_A_Value_Handler_Implementing_A_Package_Contract_When_Capturing_Then_The_Derived_Contract_Wins()
+    {
+        HandlerRegistration handler = Handler(
+            typeof(AuditedValueHandler),
+            typeof(AuditedValue),
+            typeof(string),
+            typeof(IValueRequestHandler<AuditedValue, string>));
+
+        RequestFlowModel model = RegistrationSnapshot.Capture(
+            [handler], [typeof(AuditedValue)], [], new StageClosingCache());
+
+        model.Requests.ShouldHaveSingleItem().Handlers.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IAuditedValueHandler<,>));
+    }
+
+    [Fact]
+    public void Given_A_Custom_Validation_Rule_When_Validating_Value_Registrations_Then_It_Observes_Exact_Value_Contracts()
+    {
+        ValueContractCaptureRule.Captured = null;
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options =>
+            {
+                options.AddHandler<PublicModelValueHandler>();
+                options.AddValueStage<PublicModelValueStage>();
+            })
+            .AddValidationRule<ValueContractCaptureRule>();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        provider.ValidateRequestFlow();
+
+        RequestFlowModel model = ValueContractCaptureRule.Captured.ShouldNotBeNull();
+        model.Requests.ShouldHaveSingleItem().Handlers.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestHandler<,>));
+        model.StageDeclarations.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestStage<,>));
+        model.Requests.ShouldHaveSingleItem().Stages.ShouldHaveSingleItem().ContractType
+            .ShouldBe(typeof(IValueRequestStage<,>));
+    }
+
+    [Fact]
     public void Given_A_Handler_Implementing_A_Derived_Contract_When_Capturing_Then_The_Derived_Contract_Is_Recorded()
     {
         HandlerRegistration handler = Handler(
@@ -266,8 +395,6 @@ public sealed class RegistrationSnapshotTests
         model.Requests[1].Stages.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IRequestStage<,>));
     }
 
-    // The closed type is what the container resolves, so the void request's chain names NoResult
-    // even though the handler reports no response.
     [Fact]
     public void Given_A_Typed_Stage_Over_A_Void_Request_When_Capturing_Then_The_Closing_Closes_Over_No_Result()
     {
@@ -392,9 +519,7 @@ public sealed class RegistrationSnapshotTests
             => Task.FromResult("pong");
     }
 
-    // Not a real IRequestHandler<Ping, string> implementer: the builder only reads the Type off
-    // a manually built HandlerRegistration, and a second live implementer would make the whole
-    // test assembly's scan see a genuine duplicate handler for Ping.
+    // Omitting the handler interface keeps assembly scans from finding a duplicate Ping handler.
     public sealed class SecondPingHandler
     { }
 
@@ -422,7 +547,6 @@ public sealed class RegistrationSnapshotTests
             => next.InvokeAsync();
     }
 
-    // Closed stage declared for Purge only, so it never satisfies the contract for a Ping handler.
     public sealed class PurgeOnlyStage : IRequestStage<Purge>
     {
         public Task HandleAsync(Purge request, Continuation next, CancellationToken cancellationToken)
@@ -439,14 +563,10 @@ public sealed class RegistrationSnapshotTests
             => next.InvokeAsync();
     }
 
-    // Implements two closed IRequest<> instantiations so the same request type can carry
-    // handler registrations with different response types. Abstract, and with no live handler
-    // below, so whole-assembly scans skip it; a scannable multi-contract request would fail
-    // every such scan with RF0106.
+    // Abstract and unhandled so assembly scans skip this invalid multi-contract request.
     public abstract record MultiPing : IRequest<string>, IRequest<int>;
 
-    // Not real IRequestHandler implementers: the builder only reads the Type off a manually
-    // built HandlerRegistration, and a live handler would pull MultiPing into every scan.
+    // Omitting handler interfaces keeps MultiPing out of assembly scans.
     public sealed class MultiPingStringHandler
     { }
 
@@ -467,7 +587,6 @@ public sealed class RegistrationSnapshotTests
             => next.InvokeAsync(cancellationToken);
     }
 
-    // Contracts of the kind a package adds on top of the core ones.
     private interface IAuditedHandler<in TRequest, TResponse> : IRequestHandler<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     { }
@@ -530,7 +649,6 @@ public sealed class RegistrationSnapshotTests
     private sealed class SecondHandler
     { }
 
-    // Implements the package contract for First and only the core contract for Second.
     private abstract class SplitContractStage : IAuditedStage<First, string>, IRequestStage<Second, string>
     {
         public abstract Task<string> HandleAsync(
@@ -538,6 +656,117 @@ public sealed class RegistrationSnapshotTests
 
         public abstract Task<string> HandleAsync(
             Second request, Continuation<string> next, CancellationToken cancellationToken);
+    }
+
+    private sealed record ValuePing : IValueRequest<string>;
+
+    private sealed class ValuePingHandler : IValueRequestHandler<ValuePing, string>
+    {
+        public ValueTask<string> HandleAsync(
+            ValuePing request,
+            CancellationToken cancellationToken)
+            => new("pong");
+    }
+
+    private sealed record ValueVoid : IValueRequest;
+
+    private sealed class ValueVoidHandler : IValueRequestHandler<ValueVoid>
+    {
+        public ValueTask HandleAsync(
+            ValueVoid request,
+            CancellationToken cancellationToken)
+            => default;
+    }
+
+    private sealed record TaskMemo : IRequest<string>;
+
+    private sealed record ValueMemo : IValueRequest<string>;
+
+    private sealed class TaskMemoHandler : IRequestHandler<TaskMemo, string>
+    {
+        public Task<string> HandleAsync(
+            TaskMemo request,
+            CancellationToken cancellationToken)
+            => Task.FromResult("task");
+    }
+
+    private sealed class ValueMemoHandler : IValueRequestHandler<ValueMemo, string>
+    {
+        public ValueTask<string> HandleAsync(
+            ValueMemo request,
+            CancellationToken cancellationToken)
+            => new("value");
+    }
+
+    private sealed class DualMemoStage
+        : IRequestStage<TaskMemo, string>, IValueRequestStage<ValueMemo, string>
+    {
+        public Task<string> HandleAsync(
+            TaskMemo request,
+            Continuation<string> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+
+        public ValueTask<string> HandleAsync(
+            ValueMemo request,
+            ValueContinuation<string> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
+
+    private sealed class ValueVoidStage : IValueRequestStage<ValueVoid>
+    {
+        public ValueTask HandleAsync(
+            ValueVoid request,
+            ValueContinuation next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
+
+    private interface IAuditedValueHandler<in TRequest, TResponse>
+        : IValueRequestHandler<TRequest, TResponse>
+        where TRequest : IValueRequest<TResponse>
+    { }
+
+    private sealed record AuditedValue : IValueRequest<string>;
+
+    private sealed class AuditedValueHandler : IAuditedValueHandler<AuditedValue, string>
+    {
+        public ValueTask<string> HandleAsync(
+            AuditedValue request,
+            CancellationToken cancellationToken)
+            => new("audited");
+    }
+
+    private sealed record PublicModelValue : IValueRequest<string>;
+
+    private sealed class PublicModelValueHandler : IValueRequestHandler<PublicModelValue, string>
+    {
+        public ValueTask<string> HandleAsync(
+            PublicModelValue request,
+            CancellationToken cancellationToken)
+            => new("public");
+    }
+
+    private sealed class PublicModelValueStage : IValueRequestStage<PublicModelValue, string>
+    {
+        public ValueTask<string> HandleAsync(
+            PublicModelValue request,
+            ValueContinuation<string> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
+
+    private sealed class ValueContractCaptureRule : IRequestFlowValidationRule
+    {
+        public static RequestFlowModel? Captured { get; set; }
+
+        public IEnumerable<RequestFlowValidationProblem> Validate(
+            RequestFlowValidationContext context)
+        {
+            Captured = context.Model;
+            return [];
+        }
     }
 
     #endregion

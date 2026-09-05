@@ -3,9 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Thrown by <see cref="IRequestDispatcher.SendAsync{TResponse}"/> and by
-/// <c>IStreamDispatcher.Stream</c> when the dispatched request type has a registered handler,
-/// but the call site's response type argument differs from the one the handler was registered with.
+/// Thrown when the call site's response or item type differs from the registered handler's type.
 /// </summary>
 public sealed class ResponseTypeMismatchException(Type requestType, Type expected, Type actual)
     : InvalidOperationException(

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>CQRS contracts for RequestFlow commands, queries, stream queries, handlers, and typed dispatchers. Reference this from domain and application layers without taking the runtime.</Description>
+    <Description>CQRS contracts for RequestFlow Task and ValueTask commands and queries, stream queries, handlers, and typed dispatchers. Reference this from domain and application layers without taking the runtime.</Description>
   </PropertyGroup>
 
   <ItemGroup>
