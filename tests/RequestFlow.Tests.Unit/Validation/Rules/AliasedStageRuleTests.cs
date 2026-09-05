@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using RequestFlow;
 
 namespace RequestFlow.Tests.Unit.Validation;
@@ -163,6 +164,48 @@ public sealed class AliasedStageRuleTests
         _sut.Validate(context).ShouldBeEmpty();
     }
 
+    [Fact]
+    public void Given_Plain_Void_Value_Stage_Alias_When_Validating_Then_Message_Names_Add_Value_Stage()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(typeof(ValueVoidRequest), request => request
+                .AddStage(
+                    typeof(ValueVoidStage<>),
+                    typeof(ValueVoidStage<ValueVoidRequest>),
+                    typeof(IValueRequestStage<>))
+                .AddStage(
+                    typeof(ValueVoidStage<ValueVoidRequest>),
+                    typeof(ValueVoidStage<ValueVoidRequest>),
+                    typeof(IValueRequestStage<>)))
+            .BuildContext();
+
+        RequestFlowValidationProblem problem = _sut.Validate(context).ShouldHaveSingleItem();
+
+        string advice = problem.Message.Substring(
+            problem.Message.LastIndexOf("; ", StringComparison.Ordinal) + 2);
+        advice.ShouldBe("remove one of the two AddValueStage calls.");
+    }
+
+    [Fact]
+    public void Given_Task_Stage_Aliases_Registered_Through_Add_Stage_When_The_Contract_Also_Derives_From_A_Value_Stage_Then_Message_Names_Add_Stage()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options => options
+            .AddHandler<MultiFamilyAliasHandler>()
+            .AddStage(typeof(MultiFamilyAliasStage<,>))
+            .AddStage<MultiFamilyAliasStage<MultiFamilyAliasRequest, string>>());
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => provider.ValidateRequestFlow());
+
+        RequestFlowValidationProblem problem = exception.Problems
+            .Single(candidate => candidate.Code == ProblemCodes.AliasedStage);
+        string advice = problem.Message.Substring(
+            problem.Message.LastIndexOf("; ", StringComparison.Ordinal) + 2);
+        advice.ShouldBe("remove one of the two AddStage calls.");
+    }
+
     #region Initialization
 
     private readonly AliasedStageRule _sut = new();
@@ -182,6 +225,52 @@ public sealed class AliasedStageRuleTests
 
     private sealed class SecondHandler
     { }
+
+    private abstract record ValueVoidRequest : IValueRequest;
+
+    private sealed class ValueVoidStage<TRequest> : IValueRequestStage<TRequest>
+        where TRequest : IValueRequest
+    {
+        public ValueTask HandleAsync(
+            TRequest request,
+            ValueContinuation next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
+
+    private sealed record MultiFamilyAliasRequest : IRequest<string>;
+
+    private sealed class MultiFamilyAliasHandler
+        : IRequestHandler<MultiFamilyAliasRequest, string>
+    {
+        public Task<string> HandleAsync(
+            MultiFamilyAliasRequest request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(string.Empty);
+    }
+
+    private interface IMultiFamilyStage<in TRequest, TResponse>
+        : IRequestStage<TRequest, TResponse>,
+          IValueRequestStage<IValueRequest<string>, object>
+        where TRequest : IRequest<TResponse>
+    { }
+
+    private sealed class MultiFamilyAliasStage<TRequest, TResponse>
+        : IMultiFamilyStage<TRequest, TResponse>
+        where TRequest : IRequest<TResponse>
+    {
+        public Task<TResponse> HandleAsync(
+            TRequest request,
+            Continuation<TResponse> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+
+        public ValueTask<object> HandleAsync(
+            IValueRequest<string> request,
+            ValueContinuation<object> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
 
     #endregion
 }

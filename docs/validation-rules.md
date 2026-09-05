@@ -22,14 +22,14 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0001` | pass a closed or non-generic type to `RegisterGenericHandler` |
 | `RF0002` | pass an abstract class to `RegisterGenericHandler` |
 | `RF0003` | declare a generic handler with more than one type parameter |
-| `RF0004` | register a handler that implements neither `IRequestHandler` nor `IStreamRequestHandler` |
+| `RF0004` | register a handler that implements none of `IRequestHandler`, `IValueRequestHandler`, or `IStreamRequestHandler` |
 | `RF0005` | declare a generic handler and name no closing types |
 | `RF0006` | close a generic handler with a type that is itself open |
 | `RF0007` | close a generic handler with a type its constraints reject |
 | `RF0008` | pass an interface to `AddStage` |
 | `RF0009` | pass an abstract class to `AddStage` |
 | `RF0010` | pass a partially closed type to `AddStage` |
-| `RF0011` | register a stage that does not implement `IRequestStage` |
+| `RF0011` | register a stage that does not implement the stage contract selected by `AddStage`, `AddValueStage`, or `AddStreamStage` |
 | `RF0012` | write an open generic stage whose contract does not use its own type parameters as the request |
 | `RF0013` | register an interface as an event publish strategy |
 | `RF0014` | register an abstract class as an event publish strategy |
@@ -38,7 +38,7 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0017` | pass a type without an `IEventHandler<TEvent>` contract to `AddEventHandler` |
 | `RF0018` | pass an interface to `AddHandler` |
 | `RF0019` | pass an abstract class to `AddHandler` |
-| `RF0020` | pass a type without a request or stream handler contract to `AddHandler` |
+| `RF0020` | pass a type without a Task, ValueTask, or stream handler contract to `AddHandler` |
 | `RF0101` | cover one request with two handlers |
 | `RF0102` | leave a request unhandled, unless you call `AllowUnhandledRequests` |
 | `RF0103` | register one stage type twice |
@@ -63,14 +63,28 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0122` | keep a per-event strategy declaration that reaches no known event, once you call `DisallowUnusedEventHandlers` |
 | `RF0123` | register one class as a strategy and as a handler or stage under different lifetimes |
 | `RF0124` | give a handler an interface or abstract request type that the target cannot expose as an exact runtime type |
+| `RF0125` | implement `IValueRequest<TResponse>` more than once on one request |
+| `RF0126` | implement `IRequest<TResponse>` and `IValueRequest<TOther>` on one type |
+| `RF0127` | implement `IStreamRequest<TItem>` and `IValueRequest<TResponse>` on one type |
+| `RF0128` | implement `IValueRequest<TResponse>` and `IEvent` on one type |
+| `RF0129` | give a ValueTask handler a response type its request does not declare |
+| `RF0130` | give a ValueTask stage a response type its request does not declare; caught only when the stage wrapped no handler |
 | `CQRS0001` | classify one request as both a command and a query, or as both a command and a stream query; contributed by `AddCqrs` |
 
-Problems come out in fixed rule order: registration shape problems first, then the request and stage built-ins, then the event rules, then `RF0124`. That is ascending code order with two exceptions.
+Problems come out in fixed rule order: registration shape problems first, then the request and stage built-ins, then the event rules, then `RF0124`. Stable code allocation is not run order.
 
 - The stream contract rule reports `RF0108` and `RF0110`, so both precede the `RF0109` conflict from the rule after it.
+- The ValueTask request rule reports `RF0125` and `RF0129` beside the Task and stream contract rules. The pairwise family conflicts then report `RF0109`, `RF0126`, and `RF0127` in that order.
+- ValueTask stage mismatch `RF0130` runs after Task stage mismatch `RF0113`.
+- Event-family conflicts report `RF0116`, `RF0117`, and `RF0128` in that order.
 - `EventStrategyRule` runs after `RF0118` and reports its shape codes `RF0013` and `RF0014` before `RF0119` to `RF0123`.
 
-Four rules can be missing from the pass. `RF0102` runs unless `AllowUnhandledRequests` turns it off, and `RF0114` unless `AllowUnhandledEvents` does. `RF0105` runs only under `DisallowUnusedStages`; `RF0115` and `RF0122` only under `DisallowUnusedEventHandlers`.
+Four rules can be missing from the pass. Registration options control these checks:
+
+- `AllowUnhandledRequests` disables `RF0102`.
+- `AllowUnhandledEvents` disables `RF0114`.
+- `DisallowUnusedStages` enables `RF0105`.
+- `DisallowUnusedEventHandlers` enables `RF0115` and `RF0122`.
 
 Rules registered through DI run afterwards in registration order. Within a rule, request, stage, event, and subscription scan order determines its problems. An `RF0107` takes the place of whatever a DI-resolved rule that threw would have reported, so it lands in that rule's position.
 
@@ -137,7 +151,12 @@ services.TryAddEnumerable(
 
 That trades one problem for another when the rule is or owns an `IDisposable`. The rule resolves from the root provider, which tracks every transient disposable it creates and releases none of them until the provider is disposed, so a start that keeps failing leaves one instance behind per failed freeze attempt. A rule that clears its state at the top of `Validate` stays a singleton and avoids both.
 
-Do not take a dispatch surface in a rule, whether `IRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`, `IQueryDispatcher`, or `IStreamQueryDispatcher`. Resolving one needs the frozen plans that the current pass is still building, so the container waits on a result only that pass can produce. Nothing throws and the stack never overflows. The process never finishes starting.
+Do not take a dispatch surface in a rule, whether `IRequestDispatcher`,
+`IValueRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`,
+`IQueryDispatcher`, `IValueCommandDispatcher`, `IValueQueryDispatcher`, or
+`IStreamQueryDispatcher`. Resolving one needs the frozen plans that the current pass is still
+building, so the container waits on a result only that pass can produce. Nothing throws and the
+stack never overflows. The process never finishes starting.
 
 Most providers reject the rule before it gets that far. The dispatcher is scoped by default and a rule is a singleton, so a provider that validates scopes fails first:
 
@@ -146,7 +165,7 @@ Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton
 'RequestFlow.IRequestFlowValidationRule'.
 ```
 
-That is what ASP.NET Core shows in Development, and `ValidateOnBuild` reports it at `BuildServiceProvider`. The message names `IRequestDispatcher` or `IStreamDispatcher` even when the rule took a CQRS dispatcher, because the typed dispatchers are transient wrappers over those two. The hang is what you get on a provider that does not validate scopes, or after `WithTransientDispatcher` makes the dispatcher resolvable from the root. If startup produces no output and no error while the process stays alive, this is why. The fix either way is to drop the dependency.
+That is what ASP.NET Core shows in Development, and `ValidateOnBuild` reports it at `BuildServiceProvider`. The message names `IRequestDispatcher`, `IValueRequestDispatcher`, or `IStreamDispatcher` even when the rule took a CQRS dispatcher, because the typed dispatchers are transient wrappers over those three. The hang is what you get on a provider that does not validate scopes, or after `WithTransientDispatcher` makes the dispatcher resolvable from the root. If startup produces no output and no error while the process stays alive, this is why. The fix either way is to drop the dependency.
 
 Handlers and stages are a different case. They resolve without touching the map, so a rule taking one starts fine. Event handlers are reached by their concrete class rather than their handler interface, but carry the same lifetime risk. The rule is a singleton resolved from the root provider, so it pins a transient handler for as long as the provider lives, and once the application calls `WithScopedHandlers` the same rule stops resolving on any provider that validates scopes. Read the model instead; it already names every handler, event subscription, and stage type.
 
@@ -207,8 +226,8 @@ Two problems are equal when their code, message, and subject match, so a test ca
 | --- | --- |
 | `RequestFlowModel` | `Requests`, every known request type; `StageDeclarations`, every stage declaration; `Events`, every known event; `EventSubscriptions`, every event handler-contract pair; `EventStrategies`, every publish strategy declaration |
 | `RequestModel` | `RequestType`, the `Handlers` covering it, and `Stages`, its closed stage chain in execution order |
-| `HandlerModel` | `HandlerType`; `ResponseType`, the item type for a stream handler and null for a void one, which `IsVoid` reports as a `bool`; `Lifetime`, what this handler is registered with; and `ContractType`, the handler contract it implements |
-| `StageDeclarationModel` | `StageType`, the type `AddStage` or `AddStreamStage` was given; `ReachedRequests`, the requests that stage type reached; `Lifetime`, what the stage is registered with; and `ContractType`, the stage contract it implements |
+| `HandlerModel` | `HandlerType`; `ResponseType`, the response for a typed Task or ValueTask handler, the item type for a stream handler, and null for a void one, which `IsVoid` reports as a `bool`; `Lifetime`, what this handler is registered with; and `ContractType`, the handler contract it implements |
+| `StageDeclarationModel` | `StageType`, the type `AddStage`, `AddValueStage`, or `AddStreamStage` was given; `ReachedRequests`, the requests that stage type reached; `Lifetime`, what the stage is registered with; and `ContractType`, the stage contract it implements |
 | `ClosedStageModel` | `DeclaredType`, the type the registering call was given; `ClosedType`, the stage that runs for this request; and `ContractType` |
 | `EventModel` | `EventType`, `Handlers` in frozen entry order, and the winning `PublishStrategy`, which is null when no declaration wins: an `RF0120` ambiguity, or an `RF0119` conflict on one target or on the global declaration |
 | `EventHandlerModel` | `HandlerType`, `DeclaredEventType`, and `Lifetime` for one entry |
@@ -243,7 +262,7 @@ Naming the handler is the point of reading it there: the rule can say which one 
 
 - The freeze records the most derived contract the type implements: a handler written against `ICommandHandler<TCommand, TResponse>` comes through as `typeof(ICommandHandler<,>)`, a plain one as `typeof(IRequestHandler<,>)`.
 - When two contracts apply and neither derives from the other, the core contract is recorded rather than one of the two.
-- A handler entry usually names `IRequestHandler<TRequest>`, `IRequestHandler<TRequest, TResponse>`, or an interface deriving from one. A stage entry does the same for `IRequestStage`.
+- A handler entry usually names a Task, ValueTask, or stream handler contract, or an interface deriving from one. A stage entry does the same for its family's stage contract.
 - A contract from another family is recorded as it was given. `RequestFlow.Abstractions` cannot name every contract a package might add, so it does not test membership of a family.
 - The builder takes an open generic interface and throws `ArgumentException` on anything else. A class and a closed interface are rejected, because neither matches a comparison a rule would write.
 

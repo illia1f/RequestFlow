@@ -66,6 +66,43 @@ public sealed class CommandQuerySplitRuleTests
         _sut.Validate(Context(typeof(PlainQuery))).ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(typeof(ValueCommandAndValueQuery))]
+    [InlineData(typeof(TaskCommandAndValueQuery))]
+    [InlineData(typeof(ValueCommandAndTaskQuery))]
+    [InlineData(typeof(ValueCommandAndStreamQuery))]
+    public void Given_A_Command_And_Query_Side_When_Validating_Then_Reports_CQRS0001(
+        Type requestType)
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(requestType)
+            .BuildContext();
+
+        RequestFlowValidationProblem problem = _sut
+            .Validate(context)
+            .ShouldHaveSingleItem();
+
+        problem.Code.ShouldBe(CqrsProblemCodes.CommandQuerySplit);
+    }
+
+    [Fact]
+    public void Given_A_Value_And_Stream_Query_When_Validating_Then_Reports_Nothing()
+    {
+        _sut.Validate(Context(typeof(ValueQueryAndStreamQuery))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Given_A_Plain_Value_Command_When_Validating_Then_Reports_Nothing()
+    {
+        _sut.Validate(Context(typeof(PlainValueCommand))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Given_A_Plain_Value_Query_When_Validating_Then_Reports_Nothing()
+    {
+        _sut.Validate(Context(typeof(PlainValueQuery))).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Given_A_Plain_Request_When_Validating_Then_Reports_Nothing()
     {
@@ -86,7 +123,6 @@ public sealed class CommandQuerySplitRuleTests
         problems.ShouldHaveSingleItem().Subject.ShouldBe(typeof(Confused));
     }
 
-    // The rule reads the model off the context and nothing else, so the registration opt-ins leave its finding alone.
     [Fact]
     public void Given_Both_Registration_Opt_Ins_When_Validating_Then_The_Split_Is_Still_Reported()
     {
@@ -120,6 +156,30 @@ public sealed class CommandQuerySplitRuleTests
 
     private sealed record PlainRequest : IRequest<int>;
 
+    private abstract class ValueCommandAndValueQuery
+        : IValueCommand<int>, IValueQuery<int>
+    { }
+
+    private abstract class TaskCommandAndValueQuery
+        : ICommand<int>, IValueQuery<int>
+    { }
+
+    private abstract class ValueCommandAndTaskQuery
+        : IValueCommand<int>, IQuery<int>
+    { }
+
+    private abstract class ValueCommandAndStreamQuery
+        : IValueCommand<int>, IStreamQuery<int>
+    { }
+
+    private abstract class ValueQueryAndStreamQuery
+        : IValueQuery<int>, IStreamQuery<int>
+    { }
+
+    private sealed record PlainValueCommand : IValueCommand<int>;
+
+    private sealed record PlainValueQuery : IValueQuery<int>;
+
     // Handled because AddCqrsTests freezes this assembly without AllowUnhandledRequests.
     private sealed class PlainCommandHandler : IRequestHandler<PlainCommand, int>
     {
@@ -147,6 +207,22 @@ public sealed class CommandQuerySplitRuleTests
     {
         public Task<int> HandleAsync(PlainRequest request, CancellationToken cancellationToken)
             => Task.FromResult(0);
+    }
+
+    private sealed class PlainValueCommandHandler : IValueCommandHandler<PlainValueCommand, int>
+    {
+        public ValueTask<int> HandleAsync(
+            PlainValueCommand request,
+            CancellationToken cancellationToken)
+            => new(0);
+    }
+
+    private sealed class PlainValueQueryHandler : IValueQueryHandler<PlainValueQuery, int>
+    {
+        public ValueTask<int> HandleAsync(
+            PlainValueQuery request,
+            CancellationToken cancellationToken)
+            => new(0);
     }
 
     #endregion

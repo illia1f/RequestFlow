@@ -62,10 +62,8 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Registers this call's handlers with a scoped lifetime instead of the default transient.
-    /// Applies only to the handlers this call discovers; a later call decides for its own.
-    /// Transient and scoped are the whole set: a singleton handler pins every dependency it
-    /// injects for the life of the process.
+    /// Registers this call's Task, ValueTask, and stream handlers as scoped instead of transient.
+    /// Each later call sets the lifetime of the handlers it discovers.
     /// </summary>
     public RequestFlowOptions WithScopedHandlers()
     {
@@ -76,9 +74,8 @@ public sealed class RequestFlowOptions
     internal bool UnhandledRequestsAllowed { get; private set; }
 
     /// <summary>
-    /// Skips the missing-handler check when the dispatch map freezes.
-    /// Intended for contracts assemblies whose requests are handled elsewhere.
-    /// Applies to all registered assemblies once any call opts in; duplicate-handler validation is unaffected.
+    /// Skips missing-handler validation for all registered assemblies once any call opts in.
+    /// Duplicate-handler validation still runs.
     /// </summary>
     public RequestFlowOptions AllowUnhandledRequests()
     {
@@ -102,9 +99,8 @@ public sealed class RequestFlowOptions
         => PublishEventsWith<TEvent, ParallelPublishStrategy>();
 
     /// <summary>
-    /// Selects <see cref="SequentialPublishStrategy"/> as the global event strategy.
-    /// Sequential publication is already the default; declaring it makes the choice explicit,
-    /// and a conflicting global declaration from any <c>AddRequestFlow</c> call is a startup validation problem.
+    /// Explicitly selects the default <see cref="SequentialPublishStrategy"/> as the global event strategy.
+    /// A conflicting global declaration from any <c>AddRequestFlow</c> call is a startup validation problem.
     /// </summary>
     public RequestFlowOptions PublishEventsSequentially()
         => PublishAllEventsWith<SequentialPublishStrategy>();
@@ -175,9 +171,7 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Registers <typeparamref name="THandler"/> as a handler without scanning its assembly.
-    /// Every request and stream handler contract the class implements becomes a registration,
-    /// validated and frozen exactly like a scanned one.
+    /// Registers every Task, ValueTask, and stream handler contract on <typeparamref name="THandler"/> without scanning its assembly.
     /// </summary>
     public RequestFlowOptions AddHandler<THandler>()
         where THandler : class
@@ -187,9 +181,9 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Keeps <typeparamref name="THandler"/>'s request and stream handler contracts out of this
-    /// call's scan. A later call naming the same assembly does not re-scan it, so the exclusion
-    /// holds until <see cref="AddHandler{THandler}"/> names the handler.
+    /// Keeps <typeparamref name="THandler"/>'s Task, ValueTask, and stream handler contracts out
+    /// of this call's scan. A later call naming the same assembly does not re-scan it, so the
+    /// exclusion holds until <see cref="AddHandler{THandler}"/> names the handler.
     /// </summary>
     public RequestFlowOptions ExcludeHandler<THandler>()
         where THandler : class
@@ -199,9 +193,7 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Registers <typeparamref name="THandler"/> as an event handler without scanning its
-    /// assembly. Every <see cref="IEventHandler{TEvent}"/> contract the class implements becomes
-    /// a subscription, validated and frozen exactly like a scanned one.
+    /// Registers every <see cref="IEventHandler{TEvent}"/> contract on <typeparamref name="THandler"/> without scanning its assembly.
     /// </summary>
     public RequestFlowOptions AddEventHandler<THandler>()
         where THandler : class
@@ -296,19 +288,13 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Registers <paramref name="stageType"/> to run around the handler of every request it
-    /// applies to. Registration order is execution order, outermost first.
+    /// Registers a stage for applicable Task handlers, in execution order, outermost first.
     /// </summary>
     /// <remarks>
-    /// Pass an open generic definition such as <c>typeof(LoggingStage&lt;,&gt;)</c> to let the
-    /// stage's own constraints decide which requests it reaches, or a closed stage class to
-    /// target one request contract. A closed stage is not restricted to the request type it
-    /// names: <c>TRequest</c> is contravariant, so it also wraps every request deriving from
-    /// that one, and <paramref name="configure"/> narrows the set further. A stage type belongs
-    /// to a chain once, so a second call naming it is a duplicate whatever it filters on.
-    /// Each stage carries its own lifetime, transient unless <paramref name="configure"/> says
-    /// otherwise. An invalid stage surfaces as a <see cref="RequestFlowValidationException"/>
-    /// problem when the dispatch map is built.
+    /// Open generic constraints select requests. Closed stages also cover derived requests through contravariance.
+    /// <paramref name="configure"/> can filter handlers and change the default transient lifetime.
+    /// Repeated stage types are duplicates regardless of filters.
+    /// Invalid stages are reported in <see cref="RequestFlowValidationException"/> when validation runs.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="InvalidOperationException"/>
@@ -323,19 +309,38 @@ public sealed class RequestFlowOptions
         => AddStage(typeof(TStage), configure);
 
     /// <summary>
-    /// Registers <paramref name="stageType"/> to run around the handler of every stream request it
-    /// applies to. Registration order is execution order, outermost first.
+    /// Registers a stage for applicable ValueTask handlers, in execution order, outermost first.
     /// </summary>
     /// <remarks>
-    /// The stream counterpart of <see cref="AddStage(Type, Action{StageOptions})"/>, under the same
-    /// rules for open generics, contravariance, handler filters, and lifetimes. A stream stage never
-    /// reaches a task handler and a task stage never reaches a stream handler. A type implementing
-    /// both contracts and declared through both calls is one stage type registered twice, which
-    /// <c>RF0103</c> reports as a duplicate, so there is no way to register a type meant for both families.
-    /// Unlike a request stage, a stream stage written as an async iterator costs once per
-    /// enumeration and once per level: its own state machine and its own enumerator. A stage that
-    /// returns the sequence from <c>next</c> without iterating it costs nothing, and neither cost
-    /// grows with the number of items.
+    /// Uses the registration rules of <see cref="AddStage(Type, Action{StageOptions})"/>.
+    /// Task, ValueTask, and stream stages run in separate chains.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"/>
+    /// <exception cref="InvalidOperationException"/>
+    public RequestFlowOptions AddValueStage(
+        Type stageType,
+        Action<StageOptions>? configure = null)
+        => DeclareStage(stageType, configure, StageFamily.Value);
+
+    /// <summary>
+    /// Registers <typeparamref name="TStage"/> under the same rules as
+    /// <see cref="AddValueStage(Type, Action{StageOptions})"/>.
+    /// </summary>
+    public RequestFlowOptions AddValueStage<TStage>(
+        Action<StageOptions>? configure = null)
+        where TStage : class
+        => AddValueStage(typeof(TStage), configure);
+
+    /// <summary>
+    /// Registers a stage for applicable stream handlers, in execution order, outermost first.
+    /// </summary>
+    /// <remarks>
+    /// Uses the registration rules of <see cref="AddStage(Type, Action{StageOptions})"/>.
+    /// Task, ValueTask, and stream stages run in separate chains.
+    /// Registering one stage type through different family calls is a duplicate (<c>RF0103</c>).
+    /// Async iterator stages allocate per enumeration, per level.
+    /// Stages that return the sequence from <c>next.Invoke()</c> without iterating add no allocation.
+    /// Neither cost grows with item count.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="InvalidOperationException"/>
@@ -349,7 +354,6 @@ public sealed class RequestFlowOptions
         where TStage : class
         => AddStreamStage(typeof(TStage), configure);
 
-    // Registration order is execution order, so a declaration is appended where the call was made.
     private RequestFlowOptions DeclareStage(Type stageType, Action<StageOptions>? configure, StageFamily family)
     {
         if (stageType is null)
@@ -364,8 +368,8 @@ public sealed class RequestFlowOptions
     }
 
     /// <summary>
-    /// Reports a stage that reaches no registered request as a validation problem instead of
-    /// leaving it a silent no-op. Applies to all registered stages once any call opts in.
+    /// Reports stages that reach no registered request.
+    /// Applies to all registered stages once any call opts in.
     /// </summary>
     public RequestFlowOptions DisallowUnusedStages()
     {

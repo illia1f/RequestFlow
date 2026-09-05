@@ -89,6 +89,22 @@ public sealed class HandlerResponseMismatchRuleTests
         _sut.Validate(context).ShouldBeEmpty();
     }
 
+    // RF0126 owns a type carrying Task and ValueTask contracts, so there is no sole Task response.
+    [Fact]
+    public void Given_A_Wide_Task_Handler_On_A_Task_And_Value_Request_When_Validating_Then_Reports_Nothing()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(
+                typeof(TaskAndValue),
+                request => request.AddHandler(
+                    typeof(TaskAndValueHandler),
+                    typeof(object),
+                    typeof(IRequestHandler<,>)))
+            .BuildContext();
+
+        _sut.Validate(context).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Given_A_Scanned_Handler_With_A_Wider_Response_Type_When_Resolving_Dispatcher_Then_The_Problem_Is_In_The_Exception()
     {
@@ -121,6 +137,8 @@ public sealed class HandlerResponseMismatchRuleTests
 
     private abstract record BothFamilies : IRequest<string>, IStreamRequest<int>;
 
+    private abstract record TaskAndValue : IRequest<string>, IValueRequest<int>;
+
     // Compiles because IRequest<TResponse> is covariant: StringAsk satisfies IRequest<object>, so
     // the handler constraint closes over the wider response.
     private abstract class WideResponseHandler : IRequestHandler<StringAsk, object>
@@ -146,7 +164,6 @@ public sealed class HandlerResponseMismatchRuleTests
 
     private abstract record FetchDog : IRequest<Dog>;
 
-    // The shape from the field: the response widens to a base class rather than to object.
     private abstract class BaseResponseHandler : IRequestHandler<FetchDog, Animal>
     {
         public abstract Task<Animal> HandleAsync(FetchDog request, CancellationToken cancellationToken);
@@ -155,6 +172,13 @@ public sealed class HandlerResponseMismatchRuleTests
     private abstract class BothFamiliesStreamHandler : IStreamRequestHandler<BothFamilies, int>
     {
         public abstract IAsyncEnumerable<int> Handle(BothFamilies request, CancellationToken cancellationToken);
+    }
+
+    private abstract class TaskAndValueHandler : IRequestHandler<TaskAndValue, object>
+    {
+        public abstract Task<object> HandleAsync(
+            TaskAndValue request,
+            CancellationToken cancellationToken);
     }
 
     #endregion

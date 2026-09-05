@@ -214,7 +214,8 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
         var lifetimes = new Dictionary<Type, List<RequestFlowLifetime>>();
 
         // Only event handlers and reached stages share the strategy's concrete service key.
-        // Request and stream handlers are keyed on the handler interface, so their lifetimes cannot collide with the strategy's.
+        // Task, ValueTask, and stream handlers use handler-interface keys, so their lifetimes
+        // cannot collide with the strategy's.
         foreach (EventSubscriptionModel subscription in model.EventSubscriptions)
             AddLifetime(lifetimes, subscription.HandlerType, subscription.Lifetime);
 

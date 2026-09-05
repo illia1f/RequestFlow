@@ -3,24 +3,16 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Decides whether one stage declaration applies to one handler registration and, when it
-/// does, produces the closed stage type. The single source of applicability: registration and
-/// the freeze both read their answers from here, cached per pair in
-/// <see cref="StageClosingCache"/>, so the two can never disagree.
+/// Closes stage declarations over handler registrations for registration and freeze.
 /// </summary>
 internal static class StageClosing
 {
-    /// <summary>
-    /// Applicability only, without the reason.
-    /// </summary>
     public static bool TryClose(StageDeclaration declaration, HandlerRegistration handler, out Type closedStageType)
         => TryClose(declaration, handler, out closedStageType, out _);
 
     /// <summary>
-    /// True when <paramref name="declaration"/> applies to <paramref name="handler"/>, with
-    /// <paramref name="closedStageType"/> set to the type to resolve and
-    /// <paramref name="reason"/> to why it applies. Both out parameters are left at their
-    /// defaults when it does not.
+    /// Returns whether the stage applies, with its closed type and matching reason.
+    /// Both output parameters keep their defaults when it does not apply.
     /// </summary>
     public static bool TryClose(
         StageDeclaration declaration,
@@ -31,8 +23,7 @@ internal static class StageClosing
         closedStageType = null!;
         reason = string.Empty;
 
-        // A stream declaration never closes against a task handler, or the reverse. This is what
-        // keeps the two chains separate.
+        // A declaration closes only against its Task, ValueTask, or stream handler family.
         if (!declaration.Family.Handles(handler.ContractDefinition))
             return false;
 
@@ -57,8 +48,7 @@ internal static class StageClosing
             }
             catch (ArgumentException)
             {
-                // Generic constraints are how a stage states which requests it applies to, so
-                // excluding this one is an answer, not a registration problem.
+                // Generic constraints filter requests; a rejected request is not a registration error.
                 return false;
             }
         }

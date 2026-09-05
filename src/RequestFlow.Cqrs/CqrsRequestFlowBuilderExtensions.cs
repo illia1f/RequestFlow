@@ -13,15 +13,9 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class CqrsRequestFlowBuilderExtensions
 {
     /// <summary>
-    /// Registers the typed dispatchers <see cref="ICommandDispatcher"/>,
-    /// <see cref="IQueryDispatcher"/>, and <see cref="IStreamQueryDispatcher"/>. Command, query,
-    /// and stream query handlers need no extra registration; the <c>AddRequestFlow</c> assembly
-    /// scan discovers them.
-    /// <para>
-    /// Also adds a singleton validation rule to the startup pass. A request classified as both a
-    /// command and a query, or as both a command and a stream query, fails the freeze
-    /// with <c>CQRS0001</c>.
-    /// </para>
+    /// Registers command, query, and stream query dispatchers and the CQRS validation rule.
+    /// <c>AddRequestFlow</c> discovers their handlers.
+    /// Requests classified as both commands and queries fail validation with <c>CQRS0001</c>.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     public static RequestFlowBuilder AddCqrs(this RequestFlowBuilder builder)
@@ -31,6 +25,8 @@ public static class CqrsRequestFlowBuilderExtensions
 
         builder.Services.TryAddTransient<ICommandDispatcher, CqrsDispatcher>();
         builder.Services.TryAddTransient<IQueryDispatcher, CqrsDispatcher>();
+        builder.Services.TryAddTransient<IValueCommandDispatcher, CqrsValueDispatcher>();
+        builder.Services.TryAddTransient<IValueQueryDispatcher, CqrsValueDispatcher>();
         builder.Services.TryAddTransient<IStreamQueryDispatcher, CqrsStreamDispatcher>();
 
         builder.Services.TryAddEnumerable(

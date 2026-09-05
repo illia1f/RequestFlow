@@ -4,20 +4,9 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports a handler whose response type is not the one its request declares. The dispatch map holds
-/// one plan per request type, closed over the handler's response, so the pair would only fail
-/// once somebody dispatched it.
+/// Rejects wider handler responses that compile through <c>IRequest&lt;TResponse&gt;</c> covariance.
+/// Separate rules report requests with multiple response contracts or mixed request families.
 /// </summary>
-/// <remarks>
-/// The task twin of the item check in <see cref="StreamRequestContractRule"/>. It exists because
-/// <c>IRequest&lt;TResponse&gt;</c> is covariant: a handler declaring a wider response satisfies its
-/// own constraint and compiles, but closes a plan no inferred <c>SendAsync</c> call can hit.
-/// <para>
-/// A request carrying two response contracts is left to <see cref="MultiContractRequestRule"/>, and
-/// one carrying a stream contract as well to <see cref="StreamRequestContractRule"/>, since neither
-/// names the single response a handler has to match.
-/// </para>
-/// </remarks>
 internal sealed class HandlerResponseMismatchRule : IRequestFlowValidationRule
 {
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)

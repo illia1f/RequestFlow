@@ -82,9 +82,26 @@ public sealed class CancelOrderCommandHandler(OrderStore store)
 }
 ```
 
-Do not put `NoResult` in request or handler signatures. It exists only to keep the internal request machinery uniform.
-
 Request handlers keep `Task` and `Task<T>`, so their await and multiple-await behavior does not change.
+
+### Opt in to ValueTask only after measurement
+
+Keep Task handlers on `IRequest` during migration. If measurements justify ValueTask, convert the request, handler, dispatcher dependency, and stages together:
+
+```csharp
+public sealed record GetOrderQuery(Guid Id) : IValueRequest<Order?>;
+
+public sealed class GetOrderQueryHandler(OrderStore store)
+    : IValueRequestHandler<GetOrderQuery, Order?>
+{
+    public ValueTask<Order?> HandleAsync(
+        GetOrderQuery query,
+        CancellationToken cancellationToken)
+        => new(store.Find(query.Id));
+}
+```
+
+Send through `IValueRequestDispatcher` and register `IValueRequestStage` implementations with `AddValueStage`. Task and ValueTask stages use separate chains. See [ValueTask requests](value-tasks.md) for void handlers, CQRS, and consumption rules.
 
 ## Replace sender injection
 
@@ -98,7 +115,10 @@ public sealed class OrdersEndpoint(IRequestDispatcher requests)
 }
 ```
 
-With `RequestFlow.Cqrs`, use `ICommandDispatcher`, `IQueryDispatcher`, or `IStreamQueryDispatcher`. A query-only caller then cannot send a command through that dependency.
+With `RequestFlow.Cqrs`, use `ICommandDispatcher` or `IQueryDispatcher` for Task requests,
+`IValueCommandDispatcher` or `IValueQueryDispatcher` for ValueTask requests, or
+`IStreamQueryDispatcher` for stream queries. Choose the interface matching the request contract.
+A query-only caller then cannot send a command through that dependency.
 
 RequestFlow has no untyped `Send(object)` overload. If the application relies on untyped dispatch for deserialization or generic endpoints, keep that path on a mediator that supports it or add a typed adapter.
 
@@ -147,7 +167,7 @@ builder.Services.AddRequestFlow(options =>
 });
 ```
 
-The exclusion keeps the scan from registering `ExternalPricingHandler` when the flag is off. The manual add restores it when the flag is on. Use the same exclusion-first pattern with `ExcludeEventHandler<THandler>()` and `AddEventHandler<THandler>()` for conditional event handlers.
+Use the same pattern with `ExcludeEventHandler<THandler>()` and `AddEventHandler<THandler>()` for conditional event handlers.
 
 ## Replace pipeline behaviors with stages
 
@@ -182,7 +202,8 @@ RequestFlow has no separate request pre-processor, post-processor, exception-han
 
 ## Migrate streams
 
-Stream request and handler contracts keep their generic shape. Task and stream handlers use the same assembly scan.
+Stream request and handler contracts keep their generic shape. Task, ValueTask, and stream handlers
+use the same assembly scan.
 
 - Replace stream creation with `IStreamDispatcher.Stream(request, cancellationToken)`.
 - Replace stream pipeline behaviors with `IStreamRequestStage<TRequest, TItem>`.
@@ -236,6 +257,7 @@ Call `ValidateRequestFlow()` during startup, then fix every reported problem:
 
 - every request and stream request has exactly one handler;
 - a request does not declare conflicting response contracts;
+- one message type does not mix Task, ValueTask, stream, and event contract families;
 - every stage declaration is valid; a declaration that reaches no request is reported only under `DisallowUnusedStages()`;
 - every known event has a handler unless unhandled events are explicitly allowed;
 - every event strategy declaration selects an applicable concrete strategy;

@@ -35,6 +35,32 @@ public sealed class AddCqrsTests : IDisposable
     }
 
     [Fact]
+    public async Task Given_Registered_Cqrs_When_Sending_Value_Command_Then_Returns_Value_Command_Handler_Response()
+    {
+        string result = await _valueCommands.SendAsync(new ChangeOrder("book"));
+
+        result.ShouldBe("changed book");
+    }
+
+    [Fact]
+    public async Task Given_Registered_Cqrs_When_Sending_Void_Value_Command_Then_Value_Command_Handler_Is_Invoked()
+    {
+        int before = ArchiveOrderHandler.Calls;
+
+        await _valueCommands.SendAsync(new ArchiveOrder());
+
+        ArchiveOrderHandler.Calls.ShouldBe(before + 1);
+    }
+
+    [Fact]
+    public async Task Given_Registered_Cqrs_When_Sending_Value_Query_Then_Returns_Value_Query_Handler_Response()
+    {
+        string result = await _valueQueries.SendAsync(new FindOrder("42"));
+
+        result.ShouldBe("found 42");
+    }
+
+    [Fact]
     public async Task Given_Registered_Cqrs_When_Streaming_Query_Then_Yields_Query_Handler_Items()
     {
         List<string> items = [];
@@ -62,6 +88,8 @@ public sealed class AddCqrsTests : IDisposable
     private readonly ServiceProvider _provider;
     private readonly ICommandDispatcher _commands;
     private readonly IQueryDispatcher _queries;
+    private readonly IValueCommandDispatcher _valueCommands;
+    private readonly IValueQueryDispatcher _valueQueries;
     private readonly IStreamQueryDispatcher _streamQueries;
 
     public AddCqrsTests()
@@ -73,6 +101,8 @@ public sealed class AddCqrsTests : IDisposable
         _provider = services.BuildServiceProvider();
         _commands = _provider.GetRequiredService<ICommandDispatcher>();
         _queries = _provider.GetRequiredService<IQueryDispatcher>();
+        _valueCommands = _provider.GetRequiredService<IValueCommandDispatcher>();
+        _valueQueries = _provider.GetRequiredService<IValueQueryDispatcher>();
         _streamQueries = _provider.GetRequiredService<IStreamQueryDispatcher>();
     }
 
@@ -88,6 +118,12 @@ public sealed class AddCqrsTests : IDisposable
     public sealed record CancelOrder : ICommand;
 
     public sealed record GetOrder(string Id) : IQuery<string>;
+
+    public sealed record ChangeOrder(string Item) : IValueCommand<string>;
+
+    public sealed record ArchiveOrder : IValueCommand;
+
+    public sealed record FindOrder(string Id) : IValueQuery<string>;
 
     public sealed record ListOrders : IStreamQuery<string>;
 
@@ -112,6 +148,29 @@ public sealed class AddCqrsTests : IDisposable
     {
         public Task<string> HandleAsync(GetOrder request, CancellationToken cancellationToken)
             => Task.FromResult($"order {request.Id}");
+    }
+
+    public sealed class ChangeOrderHandler : IValueCommandHandler<ChangeOrder, string>
+    {
+        public ValueTask<string> HandleAsync(ChangeOrder request, CancellationToken cancellationToken)
+            => new($"changed {request.Item}");
+    }
+
+    public sealed class ArchiveOrderHandler : IValueCommandHandler<ArchiveOrder>
+    {
+        public static int Calls;
+
+        public ValueTask HandleAsync(ArchiveOrder request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return default;
+        }
+    }
+
+    public sealed class FindOrderHandler : IValueQueryHandler<FindOrder, string>
+    {
+        public ValueTask<string> HandleAsync(FindOrder request, CancellationToken cancellationToken)
+            => new($"found {request.Id}");
     }
 
     public sealed class ListOrdersHandler : IStreamQueryHandler<ListOrders, string>
@@ -143,6 +202,18 @@ public sealed class AddCqrsRegistrationTests
             d.ServiceType == typeof(IRequestHandler<AddCqrsTests.CancelOrder>));
         services.ShouldContain(d =>
             d.ServiceType == typeof(IRequestHandler<AddCqrsTests.GetOrder, string>));
+        services.ShouldContain(d =>
+            d.ServiceType == typeof(IValueRequestHandler<AddCqrsTests.ChangeOrder, string>));
+        services.ShouldContain(d =>
+            d.ServiceType == typeof(IValueRequestHandler<AddCqrsTests.ArchiveOrder>));
+        services.ShouldContain(d =>
+            d.ServiceType == typeof(IValueRequestHandler<AddCqrsTests.FindOrder, string>));
+        services.ShouldNotContain(d =>
+            d.ServiceType == typeof(IValueCommandHandler<AddCqrsTests.ChangeOrder, string>));
+        services.ShouldNotContain(d =>
+            d.ServiceType == typeof(IValueCommandHandler<AddCqrsTests.ArchiveOrder>));
+        services.ShouldNotContain(d =>
+            d.ServiceType == typeof(IValueQueryHandler<AddCqrsTests.FindOrder, string>));
     }
 
     [Fact]
@@ -159,6 +230,14 @@ public sealed class AddCqrsRegistrationTests
             d.ServiceType == typeof(IQueryDispatcher) && d.Lifetime == ServiceLifetime.Transient);
         services.ShouldContain(d =>
             d.ServiceType == typeof(IStreamQueryDispatcher) && d.Lifetime == ServiceLifetime.Transient);
+        services.ShouldContain(d =>
+            d.ServiceType == typeof(IValueCommandDispatcher)
+            && d.ImplementationType == typeof(CqrsValueDispatcher)
+            && d.Lifetime == ServiceLifetime.Transient);
+        services.ShouldContain(d =>
+            d.ServiceType == typeof(IValueQueryDispatcher)
+            && d.ImplementationType == typeof(CqrsValueDispatcher)
+            && d.Lifetime == ServiceLifetime.Transient);
     }
 
     [Fact]
@@ -172,6 +251,8 @@ public sealed class AddCqrsRegistrationTests
         services.Count(d => d.ServiceType == typeof(ICommandDispatcher)).ShouldBe(1);
         services.Count(d => d.ServiceType == typeof(IQueryDispatcher)).ShouldBe(1);
         services.Count(d => d.ServiceType == typeof(IStreamQueryDispatcher)).ShouldBe(1);
+        services.Count(d => d.ServiceType == typeof(IValueCommandDispatcher)).ShouldBe(1);
+        services.Count(d => d.ServiceType == typeof(IValueQueryDispatcher)).ShouldBe(1);
     }
 
     [Fact]
@@ -223,9 +304,7 @@ public sealed class AddCqrsRegistrationTests
             p.Code == "CQRS0001" && p.Subject == typeof(RequestFlow.Tests.ValidationFixtures.Confused));
     }
 
-    // A request mixing IQuery with IStreamQuery would fail this assembly's freeze in every test,
-    // so the fixtures assembly's MixedCqrsFamilies carries the two families through the CQRS
-    // contracts alone.
+    // MixedCqrsFamilies lives in the fixtures assembly so other tests can validate this assembly.
     [Fact]
     public void Given_A_Mixed_Cqrs_Families_Request_When_Validating_With_Cqrs_Then_Throws_With_The_Request_And_Stream_Problem()
     {
@@ -271,6 +350,30 @@ public sealed class AddCqrsRegistrationTests
     }
 
     [Fact]
+    public void Given_A_Mixed_Task_Query_And_Value_Command_When_Validating_With_Cqrs_Then_Throws_With_Both_Problems()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o =>
+            {
+                o.RegisterHandlersFromAssembly(
+                    typeof(RequestFlow.Tests.ValidationFixtures.MixedTaskQueryValueCommand).Assembly);
+                o.AllowUnhandledRequests();
+            })
+            .AddCqrs();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception =
+            Should.Throw<RequestFlowValidationException>(() => provider.ValidateRequestFlow());
+
+        exception.Problems.ShouldContain(p =>
+            p.Code == ProblemCodes.RequestAndValueRequest
+            && p.Subject == typeof(RequestFlow.Tests.ValidationFixtures.MixedTaskQueryValueCommand));
+        exception.Problems.ShouldContain(p =>
+            p.Code == CqrsProblemCodes.CommandQuerySplit
+            && p.Subject == typeof(RequestFlow.Tests.ValidationFixtures.MixedTaskQueryValueCommand));
+    }
+
+    [Fact]
     public void Given_Cqrs_Handlers_When_Validating_Then_A_Rule_Sees_The_Command_Contracts()
     {
         var rule = new CapturingRule();
@@ -285,6 +388,9 @@ public sealed class AddCqrsRegistrationTests
         ContractOf(rule, typeof(AddCqrsTests.CancelOrder)).ShouldBe(typeof(ICommandHandler<>));
         ContractOf(rule, typeof(AddCqrsTests.GetOrder)).ShouldBe(typeof(IQueryHandler<,>));
         ContractOf(rule, typeof(AddCqrsTests.ListOrders)).ShouldBe(typeof(IStreamQueryHandler<,>));
+        ContractOf(rule, typeof(AddCqrsTests.ChangeOrder)).ShouldBe(typeof(IValueCommandHandler<,>));
+        ContractOf(rule, typeof(AddCqrsTests.ArchiveOrder)).ShouldBe(typeof(IValueCommandHandler<>));
+        ContractOf(rule, typeof(AddCqrsTests.FindOrder)).ShouldBe(typeof(IValueQueryHandler<,>));
     }
 
     #region Helpers

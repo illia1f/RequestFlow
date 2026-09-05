@@ -4,29 +4,14 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports a stage whose fixed response type is not the one its request declares.
+/// Rejects stages whose fixed response type differs from the request contract.
 /// </summary>
 /// <remarks>
-/// The task twin of <see cref="StreamStageItemMismatchRule"/>. The stage contract's constraint
-/// accepts a wider response because <c>IRequest&lt;TResponse&gt;</c> is covariant, but closing is
-/// invariant in the response, so such a stage compiles and then wraps no handler.
-/// Only <see cref="UnusedStageRule"/> would notice, and only behind <c>DisallowUnusedStages</c>, so
-/// this rule runs unconditionally for a stage that wrapped nothing. A stage that reached any
-/// request is not reported, since skipping the rest can be deliberate scoping.
-/// <para>
-/// A filtered call wraps nothing when its filter admits no handler, which says nothing about its
-/// response type, so only requests with a handler the filter admits are examined. The filter and the
-/// declaration's own family come from <paramref name="facts"/>, since the model holds neither.
-/// </para>
-/// <para>
-/// A void stage names no response and cannot mismatch, so it falls out on its own: nothing it
-/// implements is <c>IRequestStage&lt;TRequest, TResponse&gt;</c>.
-/// </para>
+/// Covariance allows wider responses to compile, but stage closing requires an exact match.
+/// Only stages that reached no handler in this family are checked.
+/// A request is checked when any declaration's filter admits one of its handlers.
+/// <paramref name="facts"/> supplies filters; when null, the model's recorded contract is used.
 /// </remarks>
-/// <param name="facts">
-/// What the calls that registered these stages named. Null for a model built by hand, where the
-/// recorded contract answers instead.
-/// </param>
 internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = null)
     : IRequestFlowValidationRule
 {
@@ -43,24 +28,24 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
         {
             Type stageType = declaration.StageType;
 
-            // A two-parameter definition closes over the handler's own response type, so it cannot
-            // mismatch; the one-parameter form fixes the response in the class, so it can. A stage
-            // that wrapped a handler somewhere is scoped, not trapped.
+            // Two-parameter stages use the handler's response; one-parameter stages can fix a wider type.
+            // A stage that reached any handler in this family is treated as deliberately scoped.
             if ((stageType.IsGenericTypeDefinition && stageType.GetGenericArguments().Length != 1)
-                || _facts.GetFamily(stageType, declaration.ContractType) != StageFamily.Request
-                || declaration.ReachedRequests.Count > 0
+                || !_facts.HasFamily(stageType, StageFamily.Request, declaration.ContractType)
+                || _facts.AnyDeclarationReached(
+                    stageType,
+                    StageFamily.Request,
+                    declaration.ReachedRequests.Count > 0)
                 || !checkedStages.Add(stageType))
                 continue;
 
-            Type? handlerFilter = _facts.GetHandlerFilter(stageType);
-
             foreach (var request in context.Model.Requests)
             {
-                // A filter the request's handlers fail is why this stage skipped it, whatever its response type.
-                if (handlerFilter is not null && !Admits(handlerFilter, request))
+                // A request excluded by every declaration's filter says nothing about the response type.
+                if (!_facts.AnyDeclarationAdmits(stageType, StageFamily.Request, request))
                     continue;
 
-                // No sole contract, no response type to hold the stage to; RF0106 reports the ambiguity.
+                // RF0106 or a pairwise conflict owns a request with no sole Task response.
                 Type? declaredResponse =
                     RequestContracts.GetSoleDeclaredResponse(request.RequestType, declaredResponses);
                 if (declaredResponse is null)
@@ -108,19 +93,7 @@ internal sealed class StageResponseMismatchRule(StageDeclarationFacts? facts = n
         }
     }
 
-    private static bool Admits(Type handlerFilter, RequestModel request)
-    {
-        foreach (var handler in request.Handlers)
-        {
-            if (handlerFilter.IsAssignableFrom(handler.HandlerType))
-                return true;
-        }
-
-        return false;
-    }
-
-    // The closed type the freeze would test, or null when generic constraints exclude the
-    // request; exclusion is an answer, not a mismatch.
+    // Constraint rejection excludes the request; it is not a response mismatch.
     private static Type? CloseOver(Type stageType, Type requestType)
     {
         if (!stageType.IsGenericTypeDefinition)

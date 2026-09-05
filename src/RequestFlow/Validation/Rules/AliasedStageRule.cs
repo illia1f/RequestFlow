@@ -5,25 +5,13 @@ using System.Text;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports declarations that reach one request as the same stage class: an open definition
-/// next to its own closed form, or several closed forms that all apply. One problem names
-/// every declaration in the collision, so one failed start reports the whole group.
+/// Reports declarations that put the same stage class into one request chain, including different closed generic forms.
+/// One problem lists every colliding declaration.
 /// </summary>
-/// <remarks>
-/// The open definition closes to the form declared beside it:
-/// <code>
-/// o.AddStage(typeof(LoggingStage&lt;,&gt;))
-///     .AddStage&lt;LoggingStage&lt;PlaceOrder, OrderId&gt;&gt;();
-/// </code>
-/// Or, with <c>PlaceOrder : IAudited</c>, <c>in TRequest</c> puts both closings in the chain:
-/// <code>
-/// o.AddStage&lt;LoggingStage&lt;IAudited, OrderId&gt;&gt;()
-///     .AddStage&lt;LoggingStage&lt;PlaceOrder, OrderId&gt;&gt;();
-/// </code>
-/// Either way <c>LoggingStage</c> runs twice in <c>PlaceOrder</c>'s chain.
-/// </remarks>
-internal sealed class AliasedStageRule : IRequestFlowValidationRule
+internal sealed class AliasedStageRule(StageDeclarationFacts? facts = null) : IRequestFlowValidationRule
 {
+    private readonly StageDeclarationFacts _facts = facts ?? StageDeclarationFacts.None;
+
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
     {
         // One message per colliding set of declarations, not per request they collide on.
@@ -47,9 +35,6 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
             groupOrder.Clear();
             chainRuns.Clear();
 
-            // One handler is one chain, so every closing in the list shares it. Several handlers
-            // are several chains merged, and only two declarations landing on one closed type
-            // are certain to meet in the same one.
             bool oneChain = request.Handlers.Count <= 1;
 
             foreach (var closing in request.Stages)
@@ -100,10 +85,12 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
 
     // A request with more than one handler has one chain per handler, so the closings the model
     // holds never all run together and only the repeat itself is certain.
-    private static string BuildMessage(
+    private string BuildMessage(
         Type requestType, List<ClosedStageModel> members, int chainRuns, bool oneChain)
     {
-        string callName = StageFamily.FromContract(members[0].ContractType).CallName;
+        string callName = _facts.GetFamily(
+            members[0].DeclaredType,
+            members[0].ContractType).CallName;
 
         string runs;
         string fix = $"keep one of the {callName} calls and remove the rest.";
@@ -162,8 +149,7 @@ internal sealed class AliasedStageRule : IRequestFlowValidationRule
         return false;
     }
 
-    // Colliding declarations reported together once. Not a record struct: array fields would
-    // compare by reference, and this key needs element-wise equality.
+    // Arrays need element-wise equality; a record struct would compare their references.
     private readonly struct DeclarationSet : IEquatable<DeclarationSet>
     {
         private readonly Type[] _declaredTypes;

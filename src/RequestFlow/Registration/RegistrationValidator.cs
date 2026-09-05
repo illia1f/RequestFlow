@@ -47,7 +47,7 @@ internal static class RegistrationValidator
         if (!ImplementsHandlerContract(interfaces))
             return new RequestFlowValidationProblem(
                 ProblemCodes.HandlerMissingContract,
-                $"'{handlerType.FullName}' does not implement IRequestHandler or IStreamRequestHandler.",
+                $"'{handlerType.FullName}' does not implement IRequestHandler, IValueRequestHandler, or IStreamRequestHandler.",
                 handlerType);
 
         if (declaration.ClosingTypes.Length == 0)
@@ -78,6 +78,8 @@ internal static class RegistrationValidator
             Type definition = iface.GetGenericTypeDefinition();
             if (definition == typeof(IRequestHandler<,>)
                 || definition == typeof(IRequestHandler<>)
+                || definition == typeof(IValueRequestHandler<,>)
+                || definition == typeof(IValueRequestHandler<>)
                 || definition == typeof(IStreamRequestHandler<,>))
                 return true;
         }
@@ -190,7 +192,7 @@ internal static class RegistrationValidator
         if (!ImplementsHandlerContract(interfaces))
             return new RequestFlowValidationProblem(
                 ProblemCodes.ManualHandlerMissingContract,
-                $"'{handlerType.FullName}' does not implement IRequestHandler or IStreamRequestHandler.",
+                $"'{handlerType.FullName}' does not implement IRequestHandler, IValueRequestHandler, or IStreamRequestHandler.",
                 handlerType);
 
         return null;
@@ -259,10 +261,7 @@ internal static class RegistrationValidator
         return false;
     }
 
-    // MakeGenericType substitutes positionally and StageClosing closes a one-parameter
-    // definition over the request alone, so the interface's request argument has to be the
-    // stage's own parameter for the closed type to name the dispatched request. A stage that
-    // breaks this closes into a type no request can match.
+    // Generic closing substitutes arguments by position, so the contract must use the stage type parameters in request/response order.
     private static bool ClosesOverItsOwnParameters(Type stageType, StageFamily family)
     {
         Type[] parameters = stageType.GetGenericArguments();

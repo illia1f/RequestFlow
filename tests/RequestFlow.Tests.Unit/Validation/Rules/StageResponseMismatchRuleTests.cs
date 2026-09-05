@@ -158,6 +158,18 @@ public sealed class StageResponseMismatchRuleTests
         _sut.Validate(context).ShouldBeEmpty();
     }
 
+    // RF0126 owns a type carrying Task and ValueTask contracts, so there is no sole Task response.
+    [Fact]
+    public void Given_A_Wide_Task_Stage_On_A_Task_And_Value_Request_When_Validating_Then_Reports_Nothing()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(typeof(TaskAndValue))
+            .AddStageDeclaration(typeof(TaskAndValueStage))
+            .BuildContext();
+
+        _sut.Validate(context).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Given_A_Wide_Response_Stage_Wrapping_Another_Request_When_Validating_Then_Reports_Nothing()
     {
@@ -221,6 +233,68 @@ public sealed class StageResponseMismatchRuleTests
         problem.Subject.ShouldBe(typeof(MarkedWideStage<>));
     }
 
+    [Fact]
+    public void Given_A_Filtered_And_Unfiltered_Duplicate_Wide_Response_Stage_When_Freezing_Then_Reports_RF0103_And_RF0113()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options => options
+            .AddHandler<PingHandler>()
+            .AddStage<WidePingStage>(stage => stage.WhereHandlerImplements<IUnmatched>())
+            .AddStage<WidePingStage>());
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => provider.GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.Count.ShouldBe(2);
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.DuplicateStage
+            && problem.Subject == typeof(WidePingStage));
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.StageResponseMismatch
+            && problem.Subject == typeof(WidePingStage));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Given_A_Dual_Family_Stage_With_A_Task_Response_Mismatch_When_Freezing_In_Either_Order_Then_Reports_RF0103_And_RF0113(
+        bool taskFirst)
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(options =>
+        {
+            options
+                .AddHandler<DualTaskHandler>()
+                .AddHandler<DualValueHandler>();
+
+            if (taskFirst)
+            {
+                options
+                    .AddStage<DualFamilyStage>()
+                    .AddValueStage<DualFamilyStage>();
+            }
+            else
+            {
+                options
+                    .AddValueStage<DualFamilyStage>()
+                    .AddStage<DualFamilyStage>();
+            }
+        });
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(
+            () => provider.GetRequiredService<IRequestDispatcher>());
+
+        exception.Problems.Count.ShouldBe(2);
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.DuplicateStage
+            && problem.Subject == typeof(DualFamilyStage));
+        exception.Problems.ShouldContain(problem =>
+            problem.Code == ProblemCodes.StageResponseMismatch
+            && problem.Subject == typeof(DualFamilyStage));
+    }
+
     #region Initialization
 
     private readonly StageResponseMismatchRule _sut = new();
@@ -242,6 +316,8 @@ public sealed class StageResponseMismatchRuleTests
     private abstract record VoidAsk : IRequest;
 
     private abstract record TwoContracts : IRequest<string>, IRequest<int>;
+
+    private abstract record TaskAndValue : IRequest<string>, IValueRequest<int>;
 
     private abstract record StringStream : IStreamRequest<string>;
 
@@ -294,6 +370,14 @@ public sealed class StageResponseMismatchRuleTests
     {
         public abstract Task<string> HandleAsync(
             TwoContracts request, Continuation<string> next, CancellationToken cancellationToken);
+    }
+
+    private abstract class TaskAndValueStage : IRequestStage<TaskAndValue, object>
+    {
+        public abstract Task<object> HandleAsync(
+            TaskAndValue request,
+            Continuation<object> next,
+            CancellationToken cancellationToken);
     }
 
     private abstract class VoidStage : IRequestStage<VoidAsk>
@@ -353,6 +437,42 @@ public sealed class StageResponseMismatchRuleTests
         where TRequest : IRequest<object>
     {
         public Task<object> HandleAsync(TRequest request, Continuation<object> next, CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
+
+    private sealed record DualTask : IRequest<string>;
+
+    private sealed record DualValue : IValueRequest<string>;
+
+    private sealed class DualTaskHandler : IRequestHandler<DualTask, string>
+    {
+        public Task<string> HandleAsync(
+            DualTask request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(string.Empty);
+    }
+
+    private sealed class DualValueHandler : IValueRequestHandler<DualValue, string>
+    {
+        public ValueTask<string> HandleAsync(
+            DualValue request,
+            CancellationToken cancellationToken)
+            => new(string.Empty);
+    }
+
+    private sealed class DualFamilyStage
+        : IRequestStage<DualTask, object>, IValueRequestStage<DualValue, string>
+    {
+        public Task<object> HandleAsync(
+            DualTask request,
+            Continuation<object> next,
+            CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+
+        public ValueTask<string> HandleAsync(
+            DualValue request,
+            ValueContinuation<string> next,
+            CancellationToken cancellationToken)
             => next.InvokeAsync(cancellationToken);
     }
 

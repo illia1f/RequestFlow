@@ -4,12 +4,10 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Builds a <see cref="RequestFlowModel"/> by hand, which is how a validation rule is unit
-/// tested without a container.
+/// Builds a <see cref="RequestFlowModel"/> for testing validation rules without a container.
 /// </summary>
 /// <remarks>
-/// A partial model is allowed on purpose. A rule that never reads handlers is tested against
-/// requests that have none, so the builder does not require shapes the freeze would always produce.
+/// Partial models are allowed, so tests need only supply the data their rule reads.
 /// </remarks>
 public sealed class RequestFlowModelBuilder
 {
@@ -21,8 +19,7 @@ public sealed class RequestFlowModelBuilder
     private readonly List<EventStrategyInput> _eventStrategies = [];
 
     /// <summary>
-    /// Adds a request type, or configures one already added. Repeated calls for one type
-    /// configure a single entry, the way the freeze groups handlers by request type.
+    /// Adds a request type or configures its existing entry.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     public RequestFlowModelBuilder AddRequest(Type requestType, Action<RequestModelBuilder>? configure = null)
@@ -43,12 +40,11 @@ public sealed class RequestFlowModelBuilder
     }
 
     /// <summary>
-    /// Adds one stage declaration, as a single <c>AddStage</c> call would.
+    /// Adds one stage declaration.
     /// </summary>
     /// <remarks>
-    /// Leaving <paramref name="contractType"/> null records <c>IRequestStage&lt;TRequest, TResponse&gt;</c>, matching
-    /// <see cref="RequestModelBuilder.AddStage"/>. Naming one takes an open generic interface,
-    /// since that is what a rule compares against.
+    /// A null <paramref name="contractType"/> records <c>IRequestStage&lt;TRequest, TResponse&gt;</c>.
+    /// For other contracts, pass the open generic interface used by <see cref="RequestModelBuilder.AddStage"/>.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="ArgumentException"/>
@@ -59,8 +55,7 @@ public sealed class RequestFlowModelBuilder
     /// Adds one stage declaration registered with the named lifetime.
     /// </summary>
     /// <remarks>
-    /// The overload without a lifetime records <see cref="RequestFlowLifetime.Transient"/>, which is
-    /// what <c>AddStage</c> uses unless the application asks for something else.
+    /// The overload without a lifetime uses <see cref="RequestFlowLifetime.Transient"/>.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="ArgumentException"/>
@@ -80,8 +75,7 @@ public sealed class RequestFlowModelBuilder
     }
 
     /// <summary>
-    /// Adds a known event type, which has to be a concrete closed type implementing
-    /// <see cref="IEvent"/>, as only those get a plan at the freeze.
+    /// Adds a concrete, closed event type implementing <see cref="IEvent"/>.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="ArgumentException"/>
@@ -90,8 +84,7 @@ public sealed class RequestFlowModelBuilder
         if (eventType is null)
             throw new ArgumentNullException(nameof(eventType));
 
-        // Rejected here rather than dropped at Build, where the rule under test would see an empty
-        // event list and report nothing.
+        // Reject invalid events here so a rule test cannot silently run against an empty event list.
         if (!EventClosure.IsConcreteClosedEvent(eventType))
         {
             throw new ArgumentException(
@@ -107,9 +100,7 @@ public sealed class RequestFlowModelBuilder
     }
 
     /// <summary>
-    /// Adds one event handler subscription. The declared event type has to implement
-    /// <see cref="IEvent"/> or be <see cref="IEvent"/> itself, the way
-    /// <c>IEventHandler&lt;TEvent&gt;</c> constrains it.
+    /// Adds an event handler subscription for <see cref="IEvent"/> or a type implementing it.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="ArgumentException"/>
@@ -203,19 +194,17 @@ public sealed class RequestFlowModelBuilder
     }
 
     /// <summary>
-    /// Produces the context a rule is given at startup, wrapping a freshly built model.
+    /// Builds a fresh model and its validation context.
     /// </summary>
     /// <remarks>
-    /// The flags default to what registration does unless the application opts out: a request or
-    /// an event with no handler is a problem, a stage or a subscription that reached nothing is not.
+    /// By default, unhandled requests and events are errors; unused stages and subscriptions are allowed.
     /// </remarks>
     public RequestFlowValidationContext BuildContext(
         bool unhandledRequestsAllowed = false, bool unusedStagesDisallowed = false)
         => BuildContext(unhandledRequestsAllowed, unusedStagesDisallowed, false, false);
 
     /// <summary>
-    /// Produces the context with the event flags named as well. All four parameters are required,
-    /// so a call passing only the first two binds the two-flag overload.
+    /// Builds a validation context with request, stage, and event flags.
     /// </summary>
     public RequestFlowValidationContext BuildContext(
         bool unhandledRequestsAllowed,

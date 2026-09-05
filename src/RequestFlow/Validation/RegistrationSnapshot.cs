@@ -19,15 +19,19 @@ internal static class RegistrationSnapshot
             requestTypes,
             stageDeclarations,
             closings,
-            EventClosure.Build([], []));
+            EventClosure.Build([], []),
+            stageFacts: null);
 
     public static RequestFlowModel Capture(
         IReadOnlyList<HandlerRegistration> handlers,
         IReadOnlyList<Type> requestTypes,
         IReadOnlyList<StageDeclaration> stageDeclarations,
         StageClosingCache closings,
-        EventClosureResult eventClosure)
+        EventClosureResult eventClosure,
+        StageDeclarationFacts? stageFacts = null)
     {
+        stageFacts?.BeginReachCapture();
+
         // Scanned requests first in scan order, then requests only a handler covers.
         List<Type> orderedRequests = [];
         HashSet<Type> seen = [];
@@ -56,6 +60,7 @@ internal static class RegistrationSnapshot
         }
 
         Dictionary<Type, Type> memoRequestContracts = [];
+        Dictionary<Type, Type> memoValueContracts = [];
         Dictionary<Type, Type> memoStreamContracts = [];
         Dictionary<Type, Dictionary<Type, Type>> memoClosingContracts = [];
 
@@ -83,7 +88,6 @@ internal static class RegistrationSnapshot
                         ModelLifetime.Of(handler.Lifetime)));
                 }
 
-                // Every handler contributes, so a rule never sees fewer closings than the runtime produces.
                 foreach (var declaration in stageDeclarations)
                 {
                     closedPerDeclaration.Clear();
@@ -92,6 +96,8 @@ internal static class RegistrationSnapshot
                         if (closings.TryClose(declaration, handler, out Type closedStageType)
                             && closedPerDeclaration.Add(closedStageType))
                         {
+                            stageFacts?.RecordReach(declaration);
+
                             chain.Add(new ClosedStageModel(
                                 declaration.StageType,
                                 closedStageType,
@@ -125,7 +131,11 @@ internal static class RegistrationSnapshot
                 StageContract.Of(
                     declaration.StageType,
                     declaration.Family,
-                    SelectMemo(declaration.Family, memoRequestContracts, memoStreamContracts)));
+                    SelectMemo(
+                        declaration.Family,
+                        memoRequestContracts,
+                        memoValueContracts,
+                        memoStreamContracts)));
         }
 
         return new RequestFlowModel(
@@ -137,6 +147,16 @@ internal static class RegistrationSnapshot
     }
 
     private static Dictionary<Type, Type> SelectMemo(
-        StageFamily family, Dictionary<Type, Type> request, Dictionary<Type, Type> stream)
-        => family == StageFamily.Stream ? stream : request;
+        StageFamily family,
+        Dictionary<Type, Type> request,
+        Dictionary<Type, Type> value,
+        Dictionary<Type, Type> stream)
+    {
+        if (family == StageFamily.Stream)
+            return stream;
+        if (family == StageFamily.Value)
+            return value;
+
+        return request;
+    }
 }

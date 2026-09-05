@@ -26,16 +26,16 @@ public sealed class LoggingStage<TRequest, TResponse> : IRequestStage<TRequest, 
 A stage has four ways to use `next`:
 
 - Await `next.InvokeAsync()` once and return its result: the normal pass-through.
-- Return without invoking it to short-circuit. The handler and every stage inside this one never run, and nothing inside is even built. A level resolves from the container only when it runs, the handler included, so a cache stage that answers from memory never pays for the repository behind it.
-- Await it, then invoke it again to run the rest of the chain a second time. That is the shape of a retry stage. Each call resolves the levels below it again, so the lifetime a stage was registered with decides what the second call gets. A transient stage is built fresh for the retry and starts clean. A scoped one is the same instance for the whole scope.
-- Invoke it again without awaiting the first call to run the rest of the chain twice at once. That is the shape of a hedging or shadow-comparison stage. Each call enters the levels below on its own and keeps the token it was handed, so RequestFlow holds no state the two walks can collide over. What they do share is whatever the container hands to both. A transient stage below is resolved again per call, so each walk gets an instance of its own. A scoped or singleton one is a single instance running inside two walks at once, so it has to be thread safe. The handler and any scoped service either walk reaches follow the same rule.
+- Return without invoking `next` to skip the handler and inner stages. None of them are resolved from DI.
+- Await `next.InvokeAsync()`, then invoke it again to retry the rest of the chain. Each call resolves inner stages and the handler again: transient instances are new; scoped instances are reused.
+- Call `next.InvokeAsync()` again before the first call finishes to run two copies of the chain concurrently. Each call keeps its own token. Scoped and singleton stages, handlers, and dependencies can be shared, so they must support concurrent use.
 
-`next` is a value, not an object, so a fan-out stage can copy it freely: into a local, into a closure per walk, into an array of walks to start. Every copy enters the same level. That level is built when the dispatch map freezes and holds nothing belonging to a single walk, which is what makes the copies interchangeable. The value does carry the request, the provider, and the token of the dispatch it was handed to, so do not hold on to it past that call.
+`next` is a struct that can be copied. Every copy enters the same inner chain with the same request, provider, and token. Do not retain it after the dispatch ends.
 
-A stage that fans out owns every call it started. A stage that awaits each call to completion before starting the next never holds two at once. Hold two live calls and there are two ways to lose one. Both end the same way: the abandoned walk keeps going, and its own failure surfaces later as an `UnobservedTaskException`.
+A stage must observe every call it starts. Otherwise, an abandoned call can keep running and leave failures unobserved:
 
-- The second `next.InvokeAsync` throws instead of handing back a task. It resolves the level below and checks what that level returned before there is any task to hand back, so it can fail outright while the first walk is already running.
-- The first walk faults. `await first` throws, and the code never reaches `await second`.
+- A second `next.InvokeAsync` can throw before returning a task while the first call is still running.
+- If `await first` throws, execution never reaches `await second`.
 
 Start the second call inside a `try`, then await both together rather than one after the other:
 
@@ -57,15 +57,23 @@ catch
 TResponse[] responses = await Task.WhenAll(first, second);
 ```
 
-`Task.WhenAll` reads the outcome of every task handed to it, so a fault on one walk leaves the other observed. `return await first + await second` does not: the awaits run in order, and the first one to throw skips the rest.
+`Task.WhenAll` observes both outcomes even if one fails. Sequential awaits can leave the second task unobserved.
 
-`ObserveAsync` is yours to write: await the walk and swallow whatever it threw, since the failure being reported is the one from the second call.
+Implement `ObserveAsync` to await the first task and suppress its exception, preserving the second call's failure.
 
-A hedging stage cannot use `WhenAll`: it waits for the slowest walk, when the point is to return on the fastest. Give the walk whose result you discard the same treatment as above. Cancel it through the token you handed it, await it, and swallow what comes out.
+`WhenAll` waits for the slowest call. For hedging, cancel the unused call through its token and observe its completion and failure.
+
+## ValueTask stages
+
+ValueTask requests use `IValueRequestStage<TRequest, TResponse>` and the void
+`IValueRequestStage<TRequest>` form. Their continuations are `ValueContinuation<TResponse>` and
+`ValueContinuation`, and they register through `AddValueStage`.
+
+`AddStage` wraps Task handlers, `AddValueStage` wraps ValueTask handlers, and `AddStreamStage` wraps stream handlers. See [ValueTask requests](value-tasks.md#valuetask-stages) for examples and consumption rules.
 
 ## Cancellation
 
-`next.InvokeAsync()` continues under the token the stage was handed, so by default the token given to `SendAsync` reaches every stage and the handler. Pass a token to put the rest of the chain on a different one, which is what a timeout needs:
+`next.InvokeAsync()` keeps the stage's token. Pass another token to replace it for the rest of the chain, as in this timeout stage:
 
 ```csharp
 public sealed class TimeoutStage<TRequest, TResponse> : IRequestStage<TRequest, TResponse>
@@ -91,13 +99,13 @@ public sealed class TimeoutStage<TRequest, TResponse> : IRequestStage<TRequest, 
 }
 ```
 
-The substituted token holds for every level below the stage, the handler included, and for inner stages that call `next` without naming a token of their own. Levels above the stage keep the token they had.
+The replacement token applies to all inner stages and the handler unless another stage replaces it. Outer stages keep their original tokens.
 
-`CancellationToken.None` is not a substitution. Passing it reads as omitting the token, and so do `default` and an empty variable, so the rest of the chain continues under the token the stage received. To put the levels below on no cancellation at all, pass the token of a source nobody cancels.
+`CancellationToken.None` and `default` preserve the stage's token. To disable cancellation below a stage, pass a token from a source that nobody cancels.
 
-Awaiting the canceled call is the part to get right. A timeout that starts the chain and walks away leaves the handler running with its connection open. An outer retry then sets a second walk going beside the first rather than replacing it. Cancel the call, wait for it to end, then throw. Written that way, retry around timeout composes.
+After canceling a timed-out call, await its completion before throwing. Otherwise, an outer retry can start while the first handler still holds resources.
 
-A handler that never looks at its token cannot be stopped by any of this. Cancellation is cooperative here as it is everywhere else in .NET.
+Cancellation is cooperative: a handler must observe its token to stop.
 
 ## Registering
 
@@ -135,7 +143,7 @@ public sealed class AuditStage<TRequest, TResponse> : IRequestStage<TRequest, TR
 }
 ```
 
-`AuditStage` wraps every request that implements `IAudited` and no others. There is no list of types to maintain next to the registration. The constraints are checked once, at startup.
+`AuditStage` wraps requests implementing `IAudited`. Its constraints are checked at startup.
 
 A closed stage targets the request contract it names. `TRequest` is contravariant, so a stage closed over a base request type also wraps the requests that derive from it.
 
@@ -161,8 +169,6 @@ public sealed class ErrorTranslationStage<TRequest> : IRequestStage<TRequest, Re
 ```
 
 It wraps every request that returns `Result` and nothing else.
-
-Stream requests are a chain of their own. `IRequestStage` constrains `TRequest` to `IRequest<TResponse>`, so no stage registered with `AddStage` reaches a stream handler. Those stages implement `IStreamRequestStage<TRequest, TItem>` and register with `AddStreamStage` (see [streaming.md](streaming.md)).
 
 ### Filtering on a handler contract
 
@@ -192,7 +198,7 @@ Both forms mix in one chain, in registration order. An open two-parameter stage 
 
 ## Testing a stage on its own
 
-A stage is a unit, and running one needs no container. `Continuation<TResponse>.Over` builds the `next` a stage expects from a delegate standing in for the rest of the chain, and `Continuation.Over` does the same for the void form:
+Use `Continuation<TResponse>.Over` or `Continuation.Over` to test a stage without a container. The delegate stands in for the rest of the chain:
 
 ```csharp
 [Fact]
@@ -208,7 +214,7 @@ public async Task Given_A_Failing_Chain_Then_The_Stage_Retries_Once()
 }
 ```
 
-The delegate is handed whatever token the stage passed to `InvokeAsync`. So a stage that replaces the token for the levels below it is testable through the token the delegate sees. A call to `InvokeAsync()` with no token falls back to the token the stage itself received, and the optional second argument to `Over` is what it falls back to in a test:
+The delegate receives the token passed to `InvokeAsync`, or the optional second argument to `Over` when no token is passed:
 
 ```csharp
 CancellationToken observed = default;
@@ -221,7 +227,7 @@ Continuation<Receipt> next = Continuation<Receipt>.Over(
     ambient);
 ```
 
-The default value of either type has no chain under it. Hand a stage `default(Continuation<TResponse>)` and the first `InvokeAsync` throws an `InvalidOperationException` saying so. Build one with `Over` instead.
+A default continuation has no chain; `InvokeAsync` throws `InvalidOperationException`. Create test continuations with `Over`.
 
 ## Unused stages
 
@@ -238,7 +244,7 @@ The setting is sticky, like `AllowUnhandledRequests`: once any call opts in, eve
 
 ## Lifetime
 
-Each stage declares its own lifetime, because a chain is rarely homogeneous. A logging stage holds nothing and can be a singleton; a unit-of-work stage in the same chain has to be scoped:
+Each stage has its own lifetime. For example, a stateless logging stage can be singleton while a unit-of-work stage is scoped:
 
 ```csharp
 services.AddRequestFlow(o => o
@@ -247,7 +253,9 @@ services.AddRequestFlow(o => o
     .AddStage(typeof(UnitOfWorkStage<,>), s => s.AsScoped()));
 ```
 
-Say nothing and the stage is transient: a fresh instance every time the chain enters its level. It is free to hold state for that one pass. A repeated `next` call from the stage above builds a new instance, so nothing carries from one pass to the next. A stage takes one lifetime, so `AsSingleton().AsScoped()` throws. Naming the same one twice is fine. An open generic stage passes its lifetime to every closed type it produces.
+- Stages are transient by default: each entry, including a retry, gets a new instance.
+- Naming different lifetimes, such as `AsSingleton().AsScoped()`, throws. Repeating the same lifetime is allowed.
+- An open generic stage applies its lifetime to every closed type it produces.
 
 The two lifetime methods sit on the same delegate as `WhereHandlerImplements`, and chain in either order:
 
@@ -264,19 +272,18 @@ Every closed stage type is a registered service, so the container can catch that
 - `ValidateOnBuild` and `ValidateScopes` both on: the captive dependency is reported. ASP.NET Core turns this pair on in Development.
 - `ValidateOnBuild` alone: it builds the constructor graph without comparing lifetimes, and says nothing.
 
-Scoped stages have the mirror-image problem, and it is quieter. A root-resolved dispatcher resolves the stage from the root provider. With scope validation off, one instance sits there for the life of the process. [lifetimes.md](lifetimes.md) covers both.
+A dispatcher resolved from the root provider also resolves stages there. Without scope validation, a scoped stage then lives until provider disposal. See [Service lifetimes](lifetimes.md).
 
-Thread safety is not only a question of separate dispatches. A stage above that overlaps its `next` calls runs the levels below it side by side. So inside one dispatch, a scoped or singleton stage under it is entered twice at once. Only transient stays clear of that, because every call resolves an instance of its own.
+Overlapping `next` calls can enter a scoped or singleton stage concurrently within one dispatch. Transient stages get a separate instance per call.
 
 ### Replacing a stage registration
 
-`AddStage` appends a descriptor for each closed stage type whatever the collection already holds, and the container takes the last descriptor registered for a type. That gives three rules:
+`AddStage` appends a descriptor for each closed stage type. The container uses the last descriptor registered for that type:
 
-- The declared lifetime is the one that applies.
-- The declaration wins over anything registered before it.
-- Anything registered after it wins instead.
+- Stage declarations override earlier registrations.
+- Application registrations added afterwards override the declared lifetime.
 
-Register your own stage after the *last* `AddRequestFlow` call, not the first. Closing runs again on every call. So a stage declared in the first call gains descriptors for the request types the second call scans, and those land after anything you registered between the two.
+Register replacements after the last `AddRequestFlow` call. Later calls can discover requests that produce additional closed stage registrations.
 
 To register a stage on terms the declaration cannot express, a factory or an instance you built yourself, replace it after that call:
 
@@ -290,15 +297,16 @@ services.AddRequestFlow(o => o
 services.Replace(ServiceDescriptor.Singleton(new LoggingStage<Ping, string>(sink)));
 ```
 
-`Replace`, not `AddSingleton`. Both resolve to your instance, since the container takes the last descriptor. The difference shows up under `ServiceProviderOptions.ValidateOnBuild`, which walks every descriptor, including the one `AddStage` left behind. That leftover names the stage's constructor. If the container cannot supply `sink`, startup fails over a stage that never runs, and not having to supply `sink` is usually the reason you built the stage by hand. `Replace` drops that descriptor and leaves nothing to fail on.
+`Replace` removes the old descriptor before adding yours. `AddSingleton` leaves it behind, so `ValidateOnBuild` still checks the old constructor and can fail if a dependency such as `sink` is missing.
 
-`Replace` drops exactly one descriptor. Register the same stage type yourself before `AddRequestFlow` as well and one survives, so `ValidateOnBuild` still walks it. To clear every descriptor for the type, call `services.RemoveAll<LoggingStage<Ping, string>>()` and then `AddSingleton`.
+`Replace` removes one descriptor. If several descriptors exist for the stage type, call `services.RemoveAll<LoggingStage<Ping, string>>()` before adding the replacement.
 
 ## Validation
 
 Stage problems surface with every other registration problem, in the one `RequestFlowValidationException` thrown at first dispatcher resolution or at `ValidateRequestFlow`. The checks:
 
-- The stage type implements `IRequestStage<TRequest, TResponse>` or `IRequestStage<TRequest>` and is a concrete class.
+- The stage type implements the typed or void stage contract for the family selected by
+  `AddStage`, `AddValueStage`, or `AddStreamStage`, and is a concrete class.
 - An open generic stage uses its own type parameters as its contract's request, so it can close over the requests it dispatches with.
 - A partially closed generic is rejected; register the open definition or a fully closed type.
 - No stage type is registered twice, and no two declarations reach one request as the same stage class. A request with more than one handler has one chain per handler, so only declarations resolving to one closed type count as a collision there.

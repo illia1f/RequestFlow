@@ -78,6 +78,22 @@ public sealed class StreamRequestContractRuleTests
         _sut.Validate(context).ShouldBeEmpty();
     }
 
+    // RF0127 owns a type carrying stream and ValueTask contracts, so there is no sole stream item.
+    [Fact]
+    public void Given_A_Wide_Stream_Handler_On_A_Stream_And_Value_Request_When_Validating_Then_Reports_Nothing()
+    {
+        RequestFlowValidationContext context = new RequestFlowModelBuilder()
+            .AddRequest(
+                typeof(StreamAndValue),
+                request => request.AddHandler(
+                    typeof(StreamAndValueHandler),
+                    typeof(object),
+                    typeof(IStreamRequestHandler<,>)))
+            .BuildContext();
+
+        _sut.Validate(context).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Given_A_Scanned_Multi_Contract_Stream_Request_When_Resolving_Dispatcher_Then_The_Problem_Is_In_The_Exception()
     {
@@ -146,6 +162,8 @@ public sealed class StreamRequestContractRuleTests
 
     private abstract record StringStream : IStreamRequest<string>;
 
+    private abstract record StreamAndValue : IStreamRequest<string>, IValueRequest<int>;
+
     // Compiles because IStreamRequest<TItem> is covariant: StringStream satisfies
     // IStreamRequest<object>, so the handler constraint closes over the wider item.
     private abstract class WideItemStreamHandler : IStreamRequestHandler<StringStream, object>
@@ -156,6 +174,13 @@ public sealed class StreamRequestContractRuleTests
     private abstract class MatchingItemStreamHandler : IStreamRequestHandler<SingleStream, int>
     {
         public abstract IAsyncEnumerable<int> Handle(SingleStream request, CancellationToken cancellationToken);
+    }
+
+    private abstract class StreamAndValueHandler : IStreamRequestHandler<StreamAndValue, object>
+    {
+        public abstract IAsyncEnumerable<object> Handle(
+            StreamAndValue request,
+            CancellationToken cancellationToken);
     }
 
     #endregion

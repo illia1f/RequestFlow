@@ -26,6 +26,11 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 
 The RequestFlow types all live in the `RequestFlow` namespace and ship in `RequestFlow.Abstractions`. Most derive from `InvalidOperationException`. `EventPublishException` derives from `AggregateException`, and `EventPublishCanceledException` derives from `OperationCanceledException`. All are sealed except the two abstract bases, `NullTaskException` and `NullStreamException`.
 
+The null-task exceptions apply only to Task handlers, Task stages, event handlers, and event
+strategies. ValueTask is a struct and cannot be null. `default(ValueTask<TResponse>)` succeeds with
+`default(TResponse)`, so the ValueTask request family has no null-task exception counterpart. See
+[ValueTask requests](value-tasks.md#default-is-a-valid-result).
+
 ## RequestFlowValidationException
 
 Thrown when RequestFlow validates the whole registration. The first resolution of a dispatcher or event publisher triggers validation, unless `ValidateRequestFlow` runs earlier at startup (see [lifetimes.md](lifetimes.md) for validation timing). Problems accumulate across every `AddRequestFlow` call and surface as one exception. The message and the `Problems` property list all of them, so one failed start reports everything at once. Failed validation does not stick: a later resolution of either a dispatcher or an event publisher retries validation and throws the same list.
@@ -82,6 +87,12 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0122`](#events) | Events | Event strategy declaration reaches no known event |
 | [`RF0123`](#events) | Events | Strategy class holds an event handler or stage role under a different lifetime |
 | [`RF0124`](#requests-and-handlers) | Requests and handlers | Handler's interface or abstract request type cannot be an exact runtime type |
+| [`RF0125`](#requests-and-handlers) | Requests and handlers | ValueTask request implements more than one response contract |
+| [`RF0126`](#requests-and-handlers) | Requests and handlers | Type implements both Task and ValueTask request contracts |
+| [`RF0127`](#requests-and-handlers) | Requests and handlers | Type implements both stream and ValueTask request contracts |
+| [`RF0128`](#events) | Events | Type implements both ValueTask request and event contracts |
+| [`RF0129`](#requests-and-handlers) | Requests and handlers | ValueTask handler response type does not match the request |
+| [`RF0130`](#stages) | Stages | ValueTask stage response type does not match the request |
 | [`CQRS0001`](#cqrs) | CQRS | Request is a command and a query, or a command and a stream query |
 
 ### Codes by area
@@ -93,7 +104,7 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | `RF0001` | `'...' is not an open generic type definition...` | `RegisterGenericHandler(typeof(AuditHandler<Foo>), ...)` or a non-generic type | Pass the open definition: `typeof(AuditHandler<>)` |
 | `RF0002` | `'...' is abstract...` | An abstract class passed to `RegisterGenericHandler` | Register a concrete handler class |
 | `RF0003` | `'...' has N generic parameters...` | An open generic with more than one type parameter | Only single-parameter generic handlers are supported |
-| `RF0004` | `'...' does not implement IRequestHandler or IStreamRequestHandler.` | The type is not a handler | Implement `IRequestHandler<TRequest, TResponse>`, `IRequestHandler<TRequest>`, or `IStreamRequestHandler<TRequest, TItem>` |
+| `RF0004` | `'...' does not implement IRequestHandler, IValueRequestHandler, or IStreamRequestHandler.` | The type is not a handler | Implement a Task, ValueTask, or stream handler contract |
 | `RF0004` | `'...' has an interface that could not be loaded...` | An interface on the definition passed to `RegisterGenericHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
 | `RF0005` | `Generic handler '...' declares no closing types...` | `RegisterGenericHandler(typeof(AuditHandler<>))` with no closings | Declare at least one closing type |
 | `RF0006` | `Closing type '...' ... is not a closed type.` | An open generic passed as a closing type | Close it first: `typeof(Audit<Order>)`, not `typeof(Audit<>)` |
@@ -101,7 +112,7 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 
 #### Stage registration
 
-Stages registered with `AddStage` bring their own checks (see [stages.md](stages.md)); their problems land in the same exception. Stream stages registered with `AddStreamStage` use the same codes. The stage tables use `IRequestStage` and `AddStage` for brevity, but each message names the contract and call for the family in which the stage was declared. The stream family has no void form, so its messages name one contract where the task family names two (see [streaming.md](streaming.md)).
+Stages registered with `AddStage` bring their own checks (see [stages.md](stages.md)); their problems land in the same exception. ValueTask stages registered with `AddValueStage` and stream stages registered with `AddStreamStage` use the same codes. The stage tables use `IRequestStage` and `AddStage` for brevity, but each message names the contract and call for the selected family. The stream family has no void form, so its messages name one contract where the Task and ValueTask families name two (see [streaming.md](streaming.md)).
 
 | Code | Problem message starts with | Cause | Fix |
 | --- | --- | --- | --- |
@@ -123,16 +134,21 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0110` | `Stream handler '...' produces '...' items for request '...'` | The handler's item type is wider than the one the request declares. `IStreamRequest<TItem>` is covariant, so the pair compiles, but `Stream` infers the declared item type and the plan holds the handler's, so dispatching the request throws | Give the handler the item type the request declares |
 | `RF0112` | `Handler '...' produces '...' for request '...', which declares IRequest<...>...` | The handler's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the pair compiles, but `SendAsync` infers the declared response type and the plan holds the handler's, so dispatching the request throws | Give the handler the response type the request declares |
 | `RF0124` | `Handler '...' handles '...', which is an interface...` | The target cannot produce an instance whose exact runtime type matches the handler's interface or abstract request type. The `net462` asset permits interfaces and abstract `MarshalByRefObject` types because `RealProxy` can expose either through `GetType()` | Use a concrete request type, or a `net462` transparent proxy over an interface or abstract `MarshalByRefObject` request |
+| `RF0125` | `ValueTask request '...' implements more than one ValueTask request contract...` | The type implements two `IValueRequest<TResponse>` contracts; the void marker carries `IValueRequest<NoResult>` | Keep one contract; split the type if both responses are needed |
+| `RF0126` | `Type '...' implements both IRequest and IValueRequest...` | One type belongs to both Task and ValueTask request families | Keep one family; split the type if both are needed |
+| `RF0127` | `Type '...' implements both IStreamRequest and IValueRequest...` | One type belongs to both stream and ValueTask request families | Keep one family; split the type if both are needed |
+| `RF0129` | `ValueTask handler '...' produces '...' for request '...'` | The handler's response type differs from the request's sole `IValueRequest<TResponse>` contract | Give the handler the response type the request declares |
 
 #### Stages
 
 | Code | Problem message starts with | Cause | Fix |
 | --- | --- | --- | --- |
-| `RF0103` | `Stage '...' from assembly '...' is registered more than once...` | The same stage type in two `AddStage` calls, in two `AddStreamStage` calls, or in one of each. A type implementing both families' contracts can still be declared only once, so it serves one chain | Remove the duplicate; a handler filter does not make it distinct. To wrap both families, write a stage class per family |
+| `RF0103` | `Stage '...' from assembly '...' is registered more than once...` | The same stage type appears in any two `AddStage`, `AddValueStage`, or `AddStreamStage` calls. A type implementing several families' contracts can still be declared only once, so it serves one chain | Remove the duplicate; a handler filter does not make it distinct. To wrap several families, write one stage class per family |
 | `RF0104` | `Stages '...' and '...' both resolve to '...'` / `Stages ... are the same stage class...` | An open definition registered next to its own closed form, or several closings of one class reaching the same request; one problem names every declaration in the group. A request with more than one handler has one chain per handler, so only declarations resolving to one closed type collide there | Keep one of the named `AddStage` calls and remove the rest |
 | `RF0105` | `Stage '...' from assembly '...' applies to no registered request...` | `DisallowUnusedStages` is on and the stage reached nothing. A request with no handler gets no stage chain, so a stage aimed only at unhandled requests lands here too | Widen its constraints, scan the assembly holding its requests, add the missing handler, or drop the opt-in |
 | `RF0111` | `Stream stage '...' takes '...' items for request '...'` | The stage's item type is wider than the one the request declares. `IStreamRequest<TItem>` is covariant, so the stage compiles, but closing matches the item type exactly, so the stage would wrap no handler and the chain would run without it | Give the stage the item type the request declares |
 | `RF0113` | `Stage '...' takes '...' for request '...'` | The stage's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the stage compiles, but closing matches the response type exactly, so the stage would wrap no handler and the chain would run without it | Give the stage the response type the request declares |
+| `RF0130` | `ValueTask stage '...' takes '...' for request '...'` | The stage's fixed response type differs from the request's sole `IValueRequest<TResponse>` contract, so the stage would never run | Give the stage the response type the request declares |
 
 #### Validation rules
 
@@ -159,7 +175,8 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0120` | `Event '...' has equally specific strategy declarations...` | Two unrelated assignable targets tie at the winning specificity tier | Declare the strategy on the exact event type |
 | `RF0121` | `Event publish strategy '...' is declared with both...` | One strategy type has different lifetimes across declarations | Use one lifetime for the strategy type |
 | `RF0122` | `Event strategy '...' targets '...', but that declaration applies to no known event...` | `DisallowUnusedEventHandlers` is on and a per-event target reaches no known event | Scan the event assembly, correct the target, remove the declaration, or drop the opt-in |
-| `RF0123` | `Class '...' is registered as a ... event publish strategy and as a ... event handler or stage...` | One class is a publish strategy and also an event handler or reached stage under a different lifetime. Those roles share the concrete service key, so the descriptor registered last decides the lifetime both resolve under. A request or stream handler role is keyed on the handler interface and does not conflict | Use one lifetime or split the roles |
+| `RF0123` | `Class '...' is registered as a ... event publish strategy and as a ... event handler or stage...` | One class is a publish strategy and also an event handler or reached stage under a different lifetime. Those roles share the concrete service key, so the descriptor registered last decides the lifetime both resolve under. A Task, ValueTask, or stream handler role is keyed on the handler interface and does not conflict | Use one lifetime or split the roles |
+| `RF0128` | `Type '...' implements both IValueRequest and IEvent...` | One concrete type belongs to the ValueTask request and event families | Keep one role; split the type when both messages are needed |
 
 `RF0115` and `RF0122` are opt-in and independent of `AllowUnhandledEvents`. The unhandled option suppresses `RF0114`; it never suppresses a dead subscription or strategy declaration requested through `DisallowUnusedEventHandlers`.
 
@@ -169,7 +186,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | --- | --- | --- | --- |
 | `RF0018` | `'...' is an interface; only concrete handler classes...` | An interface passed to `AddHandler` | Register the implementing class |
 | `RF0019` | `'...' is abstract; only concrete handler classes...` | An abstract class passed to `AddHandler` | Register a concrete subclass |
-| `RF0020` | `'...' does not implement IRequestHandler or IStreamRequestHandler.` | The type passed to `AddHandler` is not a request or stream handler | Implement a handler contract, or use `AddEventHandler` for an event handler |
+| `RF0020` | `'...' does not implement IRequestHandler, IValueRequestHandler, or IStreamRequestHandler.` | The type passed to `AddHandler` is not a Task, ValueTask, or stream handler | Implement a handler contract, or use `AddEventHandler` for an event handler |
 | `RF0020` | `'...' has an interface that could not be loaded...` | An interface on the type passed to `AddHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
 
 #### CQRS
@@ -178,8 +195,8 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 
 | Code | Problem message starts with | Cause | Fix |
 | --- | --- | --- | --- |
-| `CQRS0001` | `Request '...' is classified as both a command and a query...` | The request type implements `ICommand<TResponse>` next to `IQuery<TOther>`. The check reads the two contracts, not their response types, so the pair reports even when the responses differ | Keep one side of the split; split the type if it must represent both operations |
-| `CQRS0001` | `Request '...' is classified as both a command and a stream query...` | The request type implements `ICommand<TResponse>` next to `IStreamQuery<TItem>`. The base contracts collide too, so the same freeze also reports the type as `RF0109`, with or without `AddCqrs` | Keep one side of the split; split the type if it must represent both operations |
+| `CQRS0001` | `Request '...' is classified as both a command and a query...` | The request type implements a Task or ValueTask command contract next to a Task or ValueTask query contract. The check reads the two classifications, not their response types | Keep one side of the split; split the type if it must represent both operations |
+| `CQRS0001` | `Request '...' is classified as both a command and a stream query...` | The request type implements a Task or ValueTask command contract next to `IStreamQuery<TItem>`. A cross-family pair also reports its core RF conflict | Keep one side of the split; split the type if it must represent both operations |
 
 Example: a contracts assembly scanned without its handlers fails at startup, not per request.
 
@@ -203,7 +220,11 @@ services.AddRequestFlow(o => o
 
 ## HandlerNotFoundException
 
-Thrown by `SendAsync`, and by `IStreamDispatcher.Stream` or `IStreamQueryDispatcher.Stream`, when the request's runtime type has no registered handler. The `RequestType` property holds the request type that had no handler. Both `Stream` methods throw it from the call rather than from the first enumeration, because the lookup is not part of the sequence they hand back.
+Thrown by `IRequestDispatcher.SendAsync`, `IValueRequestDispatcher.SendAsync`, the typed CQRS
+dispatchers, and `IStreamDispatcher.Stream` or `IStreamQueryDispatcher.Stream` when the request's
+runtime type has no registered handler. The `RequestType` property holds the request type that had
+no handler. Both `Stream` methods throw it from the call rather than from the first enumeration,
+because the lookup is not part of the sequence they hand back.
 
 With default validation a scanned request without a handler already fails at startup, so only three paths lead here:
 
@@ -261,7 +282,11 @@ The task returned by a publisher-acknowledged cancellation has `Status == Cancel
 
 ## ResponseTypeMismatchException
 
-Thrown by `SendAsync` when the request type has a registered handler, but its response type differs from the call site's `TResponse` argument. `RequestType`, `ExpectedResponseType`, and `ActualResponseType` identify the three types involved. The two `Stream` methods throw the same exception, from the call, when the call site's `TItem` differs from the registered item type; the covariant upcast below is the way to reach it there too.
+Thrown by Task or ValueTask `SendAsync` when the request type has a registered handler, but its
+response type differs from the call site's `TResponse` argument. `RequestType`,
+`ExpectedResponseType`, and `ActualResponseType` identify the three types involved. The two
+`Stream` methods throw the same exception, from the call, when the call site's `TItem` differs from
+the registered item type; the covariant upcast below is the way to reach it there too.
 
 The compiler normally infers `TResponse` from the request's `IRequest<TResponse>` interface, so plain call sites never hit this. Two things make it reachable.
 
@@ -285,6 +310,9 @@ await dispatcher.SendAsync(request);               // asks for IReport, register
 ```
 
 Dispatch with the exact response type the handler declares, and cast the response afterwards if you want the base type.
+
+`IValueRequest<out TResponse>` follows the same covariance and exact-response rule. A widened
+`IValueRequest<TResponse>` or ValueTask CQRS contract compiles, then throws this exception when sent.
 
 The second is a request with two response contracts: a request type implementing more than one `IRequest<TResponse>` interface. The void `IRequest` counts, since it is `IRequest<NoResult>`:
 
@@ -357,7 +385,7 @@ Two cases are left with no type of their own. Adding a second `WhereHandlerImple
 
 The second comes from a broken validation rule: a rule that returns null instead of an empty sequence, or a sequence with a null problem in it, throws at the freeze with a message naming the rule. Those two are the only rule failures that come out this way. An exception the rule throws from its own code is reported as `RF0107` in the validation exception instead, and the rules after it still run (see [validation-rules.md](validation-rules.md)).
 
-One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher or publisher needs the plans the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, can reject the rule earlier because the dispatch surface is scoped and a rule is a singleton. Both point at the same fix: take `IRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`, `IQueryDispatcher`, and `IStreamQueryDispatcher` out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
+One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher or publisher needs the plans the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, can reject the rule earlier because the dispatch surface is scoped and a rule is a singleton. Both point at the same fix: take `IRequestDispatcher`, `IValueRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`, `IQueryDispatcher`, `IValueCommandDispatcher`, `IValueQueryDispatcher`, and `IStreamQueryDispatcher` out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
 
 ## Argument validation
 
@@ -366,17 +394,20 @@ Argument checks at the public surface throw immediately at the call site:
 | Member                                | Throws                  | When                                    |
 | ------------------------------------- | ----------------------- | --------------------------------------- |
 | `IRequestDispatcher.SendAsync` (both) | `ArgumentNullException` | `request` is null                       |
+| `IValueRequestDispatcher.SendAsync` (both) | `ArgumentNullException` | `request` is null                  |
 | `IStreamDispatcher.Stream`            | `ArgumentNullException` | `request` is null                       |
 | `ICommandDispatcher.SendAsync` (both) | `ArgumentNullException` | `command` is null                       |
 | `IQueryDispatcher.SendAsync`          | `ArgumentNullException` | `query` is null                         |
+| `IValueCommandDispatcher.SendAsync` (both) | `ArgumentNullException` | `command` is null                 |
+| `IValueQueryDispatcher.SendAsync`     | `ArgumentNullException` | `query` is null                         |
 | `IStreamQueryDispatcher.Stream`       | `ArgumentNullException` | `query` is null                         |
 | `IEventPublisher.PublishAsync`        | `ArgumentNullException` | `event` is null                         |
-| `Continuation<T>.Over`, `Continuation.Over`, `StreamContinuation<T>.Over` | `ArgumentNullException` | `rest` is null      |
+| Task, ValueTask, and stream continuation `Over` methods | `ArgumentNullException` | `rest` is null       |
 | `AddRequestFlow`                      | `ArgumentNullException` | `services` or `configure` is null       |
 | `RegisterHandlersFromAssembly`        | `ArgumentNullException` | `assembly` is null                      |
 | `RegisterGenericHandler`              | `ArgumentNullException` | `handlerType` or `closingTypes` is null |
 | `RegisterGenericHandler`              | `ArgumentException`     | `closingTypes` contains a null element  |
-| `AddStage`, `AddStreamStage`          | `ArgumentNullException` | `stageType` is null                     |
+| `AddStage`, `AddValueStage`, `AddStreamStage` | `ArgumentNullException` | `stageType` is null              |
 | `ValidateRequestFlow`                 | `ArgumentNullException` | `provider` is null                      |
 | `new RequestFlowValidationException`  | `ArgumentNullException` | `problems` is null                      |
 | `RequestFlowModelBuilder`, `RequestModelBuilder` | `ArgumentNullException` | A required `Type` argument is null |
@@ -386,7 +417,10 @@ Argument checks at the public surface throw immediately at the call site:
 
 ## What RequestFlow never wraps
 
-Request handler and stage exceptions propagate unchanged. The request dispatcher and stage chain add no wrapper exception, so `await dispatcher.SendAsync(...)` observes exactly what the failing `HandleAsync` threw. A stage that wants to translate exceptions does so itself, in a try/catch around `next`.
+Task and ValueTask handler and stage exceptions propagate unchanged. Their dispatchers and stage
+chains add no wrapper exception, so `await dispatcher.SendAsync(...)` observes exactly what the
+failing `HandleAsync` threw. A stage that wants to translate exceptions does so itself, in a
+try/catch around `next`.
 
 The stream path is the same rule, observed later. Nothing of the handler's runs until the first `MoveNextAsync`, so what it throws comes out of the `await foreach` rather than out of the `Stream` call.
 

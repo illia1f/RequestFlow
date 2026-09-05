@@ -7,6 +7,7 @@ internal enum MessageContract
 {
     Request,
     StreamRequest,
+    ValueRequest,
     Event,
 }
 
@@ -52,7 +53,6 @@ internal sealed class ContractConflictRule(
             ? BuildRequestAndStreamRequestMessage(messageType)
             : BuildSharedMessage(messageType);
 
-    // RF0109 names what the conflict costs the dispatch map, which the shared wording cannot.
     private static string BuildRequestAndStreamRequestMessage(Type messageType)
         => $"Request '{messageType.FullName}' implements both IRequest and IStreamRequest; " +
             "the map holds one plan per request type, so one would overwrite the other. Keep " +
@@ -68,6 +68,7 @@ internal sealed class ContractConflictRule(
         {
             MessageContract.Request => Implements(messageType, typeof(IRequest<>)),
             MessageContract.StreamRequest => Implements(messageType, typeof(IStreamRequest<>)),
+            MessageContract.ValueRequest => Implements(messageType, typeof(IValueRequest<>)),
             MessageContract.Event => typeof(IEvent).IsAssignableFrom(messageType),
             _ => throw new ArgumentOutOfRangeException(nameof(contract)),
         };
@@ -91,6 +92,7 @@ internal sealed class ContractConflictRule(
         {
             MessageContract.Request => "IRequest",
             MessageContract.StreamRequest => "IStreamRequest",
+            MessageContract.ValueRequest => "IValueRequest",
             MessageContract.Event => "IEvent",
             _ => throw new ArgumentOutOfRangeException(nameof(contract)),
         };

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <Description>Request/handler mediator for .NET with startup validation, application-defined validation rules, stages, streaming, events, and frozen dispatch plans. MIT, with no compiler plugin or generated dispatch code.</Description>
+    <Description>Request/handler mediator for .NET with Task and ValueTask dispatch, startup validation, application-defined validation rules, stages, streaming, events, and frozen dispatch plans. MIT, with no compiler plugin or generated dispatch code.</Description>
   </PropertyGroup>
 
   <ItemGroup>

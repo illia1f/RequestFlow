@@ -4,9 +4,7 @@ using System.Collections.Generic;
 namespace RequestFlow.Cqrs;
 
 /// <summary>
-/// Reports every request classified as both a command and a query; IStreamQuery counts as the
-/// query side. Checks contract assignability, not response shapes, so it also catches
-/// ICommand&lt;A&gt; next to IQuery&lt;B&gt;.
+/// Rejects requests classified as both commands and queries, including stream queries, regardless of response type.
 /// </summary>
 internal sealed class CommandQuerySplitRule : IRequestFlowValidationRule
 {
@@ -14,11 +12,12 @@ internal sealed class CommandQuerySplitRule : IRequestFlowValidationRule
     {
         foreach (var request in context.Model.Requests)
         {
-            if (!ImplementsDefinition(request.RequestType, typeof(ICommand<>)))
-                continue;
-
-            bool isQuery = ImplementsDefinition(request.RequestType, typeof(IQuery<>));
-            if (isQuery || ImplementsDefinition(request.RequestType, typeof(IStreamQuery<>)))
+            bool isCommand = ImplementsDefinition(request.RequestType, typeof(ICommand<>))
+                || ImplementsDefinition(request.RequestType, typeof(IValueCommand<>));
+            bool isQuery = ImplementsDefinition(request.RequestType, typeof(IQuery<>))
+                || ImplementsDefinition(request.RequestType, typeof(IValueQuery<>));
+            bool isStreamQuery = ImplementsDefinition(request.RequestType, typeof(IStreamQuery<>));
+            if (isCommand && (isQuery || isStreamQuery))
             {
                 string querySide = isQuery ? "query" : "stream query";
                 yield return new RequestFlowValidationProblem(

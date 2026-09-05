@@ -4,16 +4,8 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports a request type that carries more than one <c>IStreamRequest&lt;TItem&gt;</c> contract,
-/// or a handler whose item type is not the one its request declares. The dispatch map holds one
-/// plan per request type, so either shape would only fail once somebody dispatched it.
+/// Rejects multiple stream contracts and handler item types widened through <c>IStreamRequest&lt;TItem&gt;</c> covariance.
 /// </summary>
-/// <remarks>
-/// The multi-contract check is the stream twin of <see cref="MultiContractRequestRule"/>. The item
-/// check exists because <c>IStreamRequest&lt;TItem&gt;</c> is covariant: a handler declaring a wider
-/// item type satisfies its own constraint and compiles, but closes a plan no inferred
-/// <c>Stream</c> call can hit.
-/// </remarks>
 internal sealed class StreamRequestContractRule : IRequestFlowValidationRule
 {
     public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
@@ -24,7 +16,7 @@ internal sealed class StreamRequestContractRule : IRequestFlowValidationRule
         foreach (var request in context.Model.Requests)
         {
             streams.Clear();
-            bool isRequest = false;
+            bool hasOtherRequestFamily = false;
 
             foreach (var iface in request.RequestType.GetInterfaces())
             {
@@ -34,8 +26,9 @@ internal sealed class StreamRequestContractRule : IRequestFlowValidationRule
                 Type definition = iface.GetGenericTypeDefinition();
                 if (definition == typeof(IStreamRequest<>))
                     streams.Add(iface);
-                else if (definition == typeof(IRequest<>))
-                    isRequest = true;
+                else if (definition == typeof(IRequest<>)
+                    || definition == typeof(IValueRequest<>))
+                    hasOtherRequestFamily = true;
             }
 
             if (streams.Count == 0)
@@ -52,7 +45,7 @@ internal sealed class StreamRequestContractRule : IRequestFlowValidationRule
             }
 
             // Only a sole, unambiguous contract names the item type a handler has to match.
-            if (streams.Count == 1 && !isRequest)
+            if (streams.Count == 1 && !hasOtherRequestFamily)
             {
                 Type declaredItem = streams[0].GetGenericArguments()[0];
 

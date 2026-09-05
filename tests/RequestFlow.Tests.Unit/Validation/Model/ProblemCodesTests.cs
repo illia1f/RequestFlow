@@ -4,16 +4,12 @@ namespace RequestFlow.Tests.Unit.Validation;
 
 public sealed class ProblemCodesTests
 {
-    // docs/validation-rules.md tells a caller to match ProblemCodes constants instead of
-    // literal strings, which only works while the class stays public.
     [Fact]
     public void Given_The_Problem_Codes_Class_When_Reflecting_Then_It_Is_Public()
     {
         typeof(ProblemCodes).IsPublic.ShouldBeTrue();
     }
 
-    // An assembly referencing only the abstractions catches the exception and reads the codes,
-    // so the constants ship beside the problem they describe.
     [Fact]
     public void Given_The_Problem_Codes_Class_When_Reflecting_Then_It_Ships_With_The_Problem_Type()
     {
@@ -144,5 +140,41 @@ public sealed class ProblemCodesTests
     public void Given_The_Non_Concrete_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
     {
         ProblemCodes.NonConcreteRequest.ShouldBe("RF0124");
+    }
+
+    [Fact]
+    public void Given_The_Multi_Contract_Value_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.MultiContractValueRequest.ShouldBe("RF0125");
+    }
+
+    [Fact]
+    public void Given_The_Request_And_Value_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.RequestAndValueRequest.ShouldBe("RF0126");
+    }
+
+    [Fact]
+    public void Given_The_Stream_Request_And_Value_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.StreamRequestAndValueRequest.ShouldBe("RF0127");
+    }
+
+    [Fact]
+    public void Given_The_Value_Request_And_Event_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.ValueRequestAndEvent.ShouldBe("RF0128");
+    }
+
+    [Fact]
+    public void Given_The_Value_Handler_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.ValueHandlerResponseMismatch.ShouldBe("RF0129");
+    }
+
+    [Fact]
+    public void Given_The_Value_Stage_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    {
+        ProblemCodes.ValueStageResponseMismatch.ShouldBe("RF0130");
     }
 }

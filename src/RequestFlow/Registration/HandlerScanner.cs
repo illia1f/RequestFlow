@@ -90,12 +90,14 @@ internal static class HandlerScanner
 
             Type definition = iface.GetGenericTypeDefinition();
             if (definition == typeof(IRequestHandler<,>)
+                || definition == typeof(IValueRequestHandler<,>)
                 || definition == typeof(IStreamRequestHandler<,>))
             {
                 Type[] args = iface.GetGenericArguments();
                 handlers.Add(new HandlerDiscovery(type, args[0], args[1], isVoid: false, iface));
             }
-            else if (definition == typeof(IRequestHandler<>))
+            else if (definition == typeof(IRequestHandler<>)
+                || definition == typeof(IValueRequestHandler<>))
             {
                 Type[] args = iface.GetGenericArguments();
                 handlers.Add(new HandlerDiscovery(type, args[0], typeof(NoResult), isVoid: true, iface));
@@ -113,7 +115,9 @@ internal static class HandlerScanner
                 continue;
 
             Type definition = iface.GetGenericTypeDefinition();
-            if (definition == typeof(IRequest<>) || definition == typeof(IStreamRequest<>))
+            if (definition == typeof(IRequest<>)
+                || definition == typeof(IValueRequest<>)
+                || definition == typeof(IStreamRequest<>))
                 return true;
         }
 
@@ -151,9 +155,6 @@ internal static class HandlerScanner
     }
 }
 
-/// <summary>
-/// One handler the scan found, before registration decides how it lives.
-/// </summary>
 internal sealed class HandlerDiscovery(
     Type implementationType, Type requestType, Type responseType, bool isVoid, Type contract)
 {
@@ -173,7 +174,8 @@ internal sealed class HandlerDiscovery(
     public Type ResponseType { get; } = responseType;
 
     /// <summary>
-    /// True when the handler implements <see cref="IRequestHandler{TRequest}"/>.
+    /// True when the handler implements the plain <see cref="IRequestHandler{TRequest}"/>
+    /// or <see cref="IValueRequestHandler{TRequest}"/> contract.
     /// </summary>
     public bool IsVoid { get; } = isVoid;
 

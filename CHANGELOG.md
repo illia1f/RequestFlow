@@ -4,14 +4,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 Pre-1.0: the public API can still change between previews.
 
-Releases are cut from this file. The `release` workflow reads the section matching the pushed tag and uses it as the GitHub Release body, so a tag with no matching section fails the build before anything reaches nuget.org. Before tagging, rename `[Unreleased]` to the version you are shipping and give it a date.
+The `release` workflow uses the section matching the pushed tag as the GitHub Release body. A missing section fails the build before publishing. Before tagging, rename `[Unreleased]` to the release version and add its date.
 
 ## [Unreleased]
 
 ### Added
 
 - `RegisterHandlersFromCallingAssembly()` scans the assembly containing the `AddRequestFlow` configuration delegate, so no marker type is needed. Use `RegisterHandlersFromAssemblyContaining<T>()` or `RegisterHandlersFromAssembly(assembly)` when the target assembly must be explicit.
-- `AddHandler<THandler>()` registers one request or stream handler without scanning its assembly, and `ExcludeHandler<THandler>()` keeps one handler's request and stream handler contracts out of the same call's scan, so MediatR's conditional `AddTransient<IRequestHandler<X, Y>, H>()` and scan-filter patterns port directly. A handler both scanned and added manually registers once, and a type that is not a concrete handler class is a startup problem (`RF0018` to `RF0020`).
+- `AddHandler<THandler>()` registers a Task, ValueTask, or stream handler without scanning its assembly. `ExcludeHandler<THandler>()` excludes it from the same call's scan. Scanned and manually added handlers register once. Invalid handler types produce `RF0018` to `RF0020`.
+- ValueTask requests, handlers, and `IValueRequestDispatcher`, with `IValueRequestStage`, `ValueContinuation`, and `AddValueStage` for stages. Task and ValueTask chains stay separate; existing Task contracts are unchanged. See [ValueTask requests](docs/value-tasks.md) for usage and consumption rules.
+- ValueTask commands and queries: `IValueCommand<TResponse>`, `IValueCommand`, `IValueQuery<TResponse>`, and their handlers. `AddCqrs` registers `IValueCommandDispatcher` and `IValueQueryDispatcher`.
+- ValueTask validation codes: `RF0125` rejects more than one `IValueRequest<TResponse>` contract; `RF0126` to `RF0128` reject ValueTask contracts combined with Task, stream, or event contracts; and `RF0129` and `RF0130` reject handler or stage response mismatches.
 - `RF0124`: a handler declared against an interface or abstract request type now fails the freeze, from any registration source, when the target cannot expose the declared type as the request's exact runtime type. The `net462` asset keeps interface and abstract `MarshalByRefObject` handlers valid for `RealProxy` transparent proxies.
 
 ### Fixed

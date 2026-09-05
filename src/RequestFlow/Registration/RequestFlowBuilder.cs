@@ -21,17 +21,11 @@ public sealed class RequestFlowBuilder
     /// Adds a validation rule to the startup pass.
     /// </summary>
     /// <remarks>
-    /// Registered once per rule type however many times it is called, as a singleton, and
-    /// resolved from the container, so constructor dependencies work. A scoped dependency throws
-    /// on a provider that validates scopes, since the rule is resolved from the root provider.
-    /// Register the descriptor yourself for a transient rule.
-    /// <para>
-    /// A rule must not take <see cref="IRequestDispatcher"/> or a typed dispatcher. Resolving one
-    /// needs the dispatch map the freeze has not finished building, and the container blocks on
-    /// itself, so startup hangs with no exception. A provider that validates scopes throws first,
-    /// since the dispatcher is scoped and a rule is a singleton. Handlers and stages resolve
-    /// without touching the map, but a singleton rule holding one keeps that instance for the provider's lifetime.
-    /// </para>
+    /// Registered once per rule type as a singleton resolved from the root provider.
+    /// Register your own descriptor for a transient rule.
+    /// Do not inject dispatchers or <see cref="IEventPublisher"/> into a rule: their resolution waits for validation and hangs startup.
+    /// Scope validation rejects scoped dependencies first.
+    /// A rule retains any injected handler or stage for the provider's lifetime.
     /// </remarks>
     public RequestFlowBuilder AddValidationRule<TRule>()
         where TRule : class, IRequestFlowValidationRule
