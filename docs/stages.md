@@ -303,6 +303,8 @@ services.Replace(ServiceDescriptor.Singleton(new LoggingStage<Ping, string>(sink
 
 ## Validation
 
+`provider.InspectRequestFlow<TRequest>()` shows the stages selected for a request and why other registered stages were excluded. Inspection requires successful validation. See [Pipeline inspection](pipeline-inspection.md).
+
 Stage problems surface with every other registration problem, in the one `RequestFlowValidationException` thrown at first dispatcher resolution or at `ValidateRequestFlow`. The checks:
 
 - The stage type implements the typed or void stage contract for the family selected by

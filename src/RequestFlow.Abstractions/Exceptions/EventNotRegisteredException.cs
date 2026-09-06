@@ -18,9 +18,8 @@ public sealed class EventNotRegisteredException(Type eventType) : InvalidOperati
         if (eventType is null)
             throw new ArgumentNullException(nameof(eventType));
 
-        return $"Event type '{eventType.FullName}' has no entry in the event map. Make sure its " +
-            "assembly is included in RegisterHandlersFromAssembly* during AddRequestFlow; a derived " +
-            "type or proxy that was never scanned stays unknown even when its base event is " +
-            "registered.";
+        return $"Event type '{eventType.FullName}' has no entry in the event map. " +
+            "Register the exact runtime type with AddEvent<TEvent>() or AddEvent(Type) during AddRequestFlow, or include its assembly in RegisterHandlersFromAssembly*. " +
+            "Assembly scanning does not discover closed generic event types; a derived type or proxy also needs its own registration even when its base event is registered";
     }
 }

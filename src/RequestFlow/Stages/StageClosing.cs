@@ -8,7 +8,11 @@ namespace RequestFlow;
 internal static class StageClosing
 {
     public static bool TryClose(StageDeclaration declaration, HandlerRegistration handler, out Type closedStageType)
-        => TryClose(declaration, handler, out closedStageType, out _);
+    {
+        StageClosingResult result = Match(declaration, handler);
+        closedStageType = result.ClosedType!;
+        return result.ClosedType is not null;
+    }
 
     /// <summary>
     /// Returns whether the stage applies, with its closed type and matching reason.
@@ -20,16 +24,29 @@ internal static class StageClosing
         out Type closedStageType,
         out string reason)
     {
-        closedStageType = null!;
         reason = string.Empty;
+        if (!TryClose(declaration, handler, out closedStageType))
+            return false;
 
+        reason = declaration.StageType.IsGenericTypeDefinition
+            ? $"generic constraints admit {Describe(handler)}"
+            : $"closed stage declared for {Describe(handler)}";
+
+        if (declaration.HandlerFilter is not null)
+            reason += $", handler implements {declaration.HandlerFilter.Name}";
+
+        return true;
+    }
+
+    public static StageClosingResult Match(StageDeclaration declaration, HandlerRegistration handler)
+    {
         // A declaration closes only against its Task, ValueTask, or stream handler family.
         if (!declaration.Family.Handles(handler.ContractDefinition))
-            return false;
+            return new StageClosingResult(null, StageExclusionReason.DifferentFamily);
 
         if (declaration.HandlerFilter is not null
             && !declaration.HandlerFilter.IsAssignableFrom(handler.ImplementationType))
-            return false;
+            return new StageClosingResult(null, StageExclusionReason.HandlerFilterNotMatched);
 
         Type stageType = declaration.StageType;
         bool isOpen = stageType.IsGenericTypeDefinition;
@@ -49,7 +66,7 @@ internal static class StageClosing
             catch (ArgumentException)
             {
                 // Generic constraints filter requests; a rejected request is not a registration error.
-                return false;
+                return new StageClosingResult(null, StageExclusionReason.GenericConstraintsNotSatisfied);
             }
         }
         else
@@ -58,17 +75,9 @@ internal static class StageClosing
         }
 
         if (!SatisfiesContract(candidate, declaration.Family, handler))
-            return false;
+            return new StageClosingResult(null, StageExclusionReason.ContractNotCompatible);
 
-        reason = isOpen
-            ? $"generic constraints admit {Describe(handler)}"
-            : $"closed stage declared for {Describe(handler)}";
-
-        if (declaration.HandlerFilter is not null)
-            reason += $", handler implements {declaration.HandlerFilter.Name}";
-
-        closedStageType = candidate;
-        return true;
+        return new StageClosingResult(candidate, null);
     }
 
     // Honors the in TRequest variance, so a closed stage written against a base request type
@@ -88,4 +97,11 @@ internal static class StageClosing
 
     private static string Describe(HandlerRegistration handler)
         => $"{handler.RequestType.Name} -> {handler.ResponseType.Name}";
+}
+
+internal readonly struct StageClosingResult(Type? closedType, StageExclusionReason? exclusionReason)
+{
+    public Type? ClosedType { get; } = closedType;
+
+    public StageExclusionReason? ExclusionReason { get; } = exclusionReason;
 }

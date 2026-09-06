@@ -29,6 +29,7 @@ services.AddRequestFlow(o => o
 | `AllowUnhandledEvents()`                      | Permits a known event to have no applicable handler                            |
 | `DisallowUnusedEventHandlers()`               | Fails validation when an event subscription or typed strategy reaches no known event |
 | `AddEventHandler<THandler>()`                 | Registers one event handler without scanning its assembly (see [events.md](events.md)) |
+| `AddEvent<TEvent>()`, `AddEvent(eventType)`    | Registers a concrete, closed event type without adding a handler (see [events.md](events.md)) |
 | `ExcludeEventHandler<THandler>()`             | Keeps one handler's event contracts out of this call's scan (see [events.md](events.md)) |
 | `AddHandler<THandler>()`                      | Registers one Task, ValueTask, or stream handler without scanning its assembly (see [Manual handlers](#manual-handlers)) |
 | `ExcludeHandler<THandler>()`                  | Keeps one handler's Task, ValueTask, and stream handler contracts out of this call's scan (see [Manual handlers](#manual-handlers)) |
@@ -43,7 +44,7 @@ The scan looks at every concrete class in the configured assemblies and register
 
 Event handlers differ at the container boundary. Each event handler class is registered once under its concrete type, while every closed `IEventHandler<TEvent>` contract it implements becomes a subscription in the frozen event plan. A class with two applicable contracts is invoked twice for one event, but both scoped resolutions return the same instance. RequestFlow does not register scanned handlers under `IEventHandler<TEvent>`, so `GetServices<IEventHandler<TEvent>>()` is not an event-publication extension point.
 
-The registry records every request and concrete closed event type found by the scan. An exact closed event-handler contract also makes its declared event type known, even when that event's assembly was not scanned. Startup validation uses those lists to report requests and events no handler covers. Abstract event bases and event interfaces can be subscription targets, but do not get publishable plans of their own.
+The registry records every request and concrete closed event type found by the scan. An exact closed event-handler contract or an `AddEvent` call also makes an event type known, even when its assembly was not scanned. Startup validation uses those lists to report requests and events no handler covers. Abstract event bases and event interfaces can be subscription targets, but do not get publishable plans of their own.
 
 Abstract classes, interfaces, and open generic definitions are skipped. Open generic Task, ValueTask, and stream handlers need an explicit declaration, covered below. Open generic event handlers are not supported; use a closed `IEventHandler<IEvent>` for a catch-all handler.
 
@@ -164,6 +165,8 @@ IServiceProvider provider = services.BuildServiceProvider().ValidateRequestFlow(
 ```
 
 All problems are reported in one `RequestFlowValidationException`, not one at a time (see [exceptions.md](exceptions.md)). The container's own `ValidateOnBuild` cannot catch these problems; [lifetimes.md](lifetimes.md) explains why and covers validation timing in detail.
+
+`provider.InspectRequestFlow<TRequest>()` runs the same validation and returns the request's declared handler, ordered stages, and stage exclusion reasons. See [Pipeline inspection](pipeline-inspection.md).
 
 ## Checks of your own
 

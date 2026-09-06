@@ -21,6 +21,15 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "inspect-pipelines": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "commandLineArgs": "--inspect-pipelines",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
     "break-rules": {
       "commandName": "Project",
       "dotnetRunMessages": true,

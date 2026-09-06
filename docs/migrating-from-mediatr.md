@@ -127,19 +127,24 @@ RequestFlow has no untyped `Send(object)` overload. If the application relies on
 Register every assembly that contributes request handlers, stream handlers, event handlers, or known event types:
 
 ```csharp
-builder.Services
+RequestFlowBuilder requestFlow = builder.Services
     .AddRequestFlow(options =>
     {
         options.RegisterHandlersFromCallingAssembly();
         options.RegisterHandlersFromAssemblyContaining<OrdersModuleMarker>();
-    })
-    .AddCqrs();
+    });
+```
+
+If you installed `RequestFlow.Cqrs`, register its typed dispatchers separately:
+
+```csharp
+requestFlow.AddCqrs();
 ```
 
 Repeated `AddRequestFlow` calls are additive. A modular monolith can keep one registration method per module:
 
 ```csharp
-builder.Services.AddOrdersModule().AddCqrs();
+builder.Services.AddOrdersModule();
 builder.Services.AddAuditModule();
 ```
 
@@ -161,13 +166,18 @@ builder.Services.AddRequestFlow(options =>
 {
     options.RegisterHandlersFromCallingAssembly();
     options.ExcludeHandler<ExternalPricingHandler>();
+    options.ExcludeHandler<LocalPricingHandler>();
 
     if (features.UseExternalPricing)
         options.AddHandler<ExternalPricingHandler>();
+    else
+        options.AddHandler<LocalPricingHandler>();
 });
 ```
 
-Use the same pattern with `ExcludeEventHandler<THandler>()` and `AddEventHandler<THandler>()` for conditional event handlers.
+- `ExternalPricingHandler` and `LocalPricingHandler` implement the same request handler contract. The flag selects exactly one; the disabled path uses local pricing.
+- Excluding a handler leaves its request discovered. Without a fallback, validation reports `RF0102`. To disable the request entirely, keep its requests and handlers in a separate feature assembly and scan that assembly only when enabled.
+- Use `ExcludeEventHandler<THandler>()` and `AddEventHandler<THandler>()` for conditional event handlers. If disabling one leaves a known event unhandled, supply another handler or opt in to `AllowUnhandledEvents()`.
 
 ## Replace pipeline behaviors with stages
 
@@ -250,6 +260,8 @@ Tier order is part of the contract. Same-tier handler order is not a compatibili
 RequestFlow does not have event stages. Put event-wide policy in an event publish strategy or put handler-specific policy in the handler.
 
 Open generic event handler classes are not discovered automatically. Register each closed handler with `AddEventHandler<THandler>()`, use a closed `IEventHandler<IEvent>` catch-all, or keep an application adapter.
+
+A catch-all receives only known event types. For a closed generic event such as `EntitySaved<int>`, call `options.AddEvent<EntitySaved<int>>()`; scanning its assembly finds the open definition, not that constructed type.
 
 ## Validate the migrated application
 

@@ -124,9 +124,11 @@ Give your own codes a prefix that names where they come from, the way `CQRS0001`
 
 Return an empty sequence when nothing is wrong. Returning null, or a sequence with a null in it, throws an `InvalidOperationException` naming the rule.
 
-An exception out of a rule becomes a problem of its own. The pass records it as `RF0107`, naming the rule and the exception, drops that rule's findings, and runs the rules after it, so a rule that throws while validating cannot hide what the others found. Startup still fails, because `RF0107` counts like any other problem. What goes missing is the stack trace, so catch inside the rule and report a problem yourself: your message can name the registration you were checking, and `RF0107` cannot.
+- An exception out of a rule becomes `RF0107`, naming the rule and exception. The pass drops that rule's findings and runs the remaining rules. Startup still fails.
+- `RequestFlowValidationException.InnerException` is an `AggregateException` containing the original rule exceptions in rule order, with their stack traces. Log the validation exception to include those details.
+- Catch inside a rule and report a problem when its message needs to name the registration being checked.
 
-Two failures stay outside that net. A rule whose constructor throws fails while the container builds the rule list, before any rule validates, and takes the pass down with it. A rule that resolves a dispatcher inside `Validate` never reaches `RF0107` either, because the resolution never returns: see [Registering a rule](#registering-a-rule) below.
+A rule whose constructor throws fails while the container builds the rule list, before any rule validates. That exception escapes the pass directly. With scope validation disabled, synchronous dispatcher resolution inside `Validate` triggers the re-entry guard and becomes `RF0107`, with the original exception preserved: see [Registering a rule](#registering-a-rule) below.
 
 ## Registering a rule
 
@@ -155,8 +157,11 @@ Do not take a dispatch surface in a rule, whether `IRequestDispatcher`,
 `IValueRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`,
 `IQueryDispatcher`, `IValueCommandDispatcher`, `IValueQueryDispatcher`, or
 `IStreamQueryDispatcher`. Resolving one needs the frozen plans that the current pass is still
-building, so the container waits on a result only that pass can produce. Nothing throws and the
-stack never overflows. The process never finishes starting.
+building. RequestFlow detects synchronous validation re-entry and throws `InvalidOperationException` with
+guidance to remove the dependency and read `context.Model` instead.
+
+- `ValidateRequestFlow` and `InspectRequestFlow` check for re-entry before resolving the frozen plans. The check also covers worker threads that inherit the validation pass's execution context, including calls through another scope of the same provider.
+- Direct dispatcher or publisher resolution on another thread can block on DI locks before the guard runs. Suppressing execution-context flow also prevents the validation and inspection checks from identifying re-entry.
 
 Most providers reject the rule before it gets that far. The dispatcher is scoped by default and a rule is a singleton, so a provider that validates scopes fails first:
 
@@ -165,7 +170,7 @@ Cannot consume scoped service 'RequestFlow.IRequestDispatcher' from singleton
 'RequestFlow.IRequestFlowValidationRule'.
 ```
 
-That is what ASP.NET Core shows in Development, and `ValidateOnBuild` reports it at `BuildServiceProvider`. The message names `IRequestDispatcher`, `IValueRequestDispatcher`, or `IStreamDispatcher` even when the rule took a CQRS dispatcher, because the typed dispatchers are transient wrappers over those three. The hang is what you get on a provider that does not validate scopes, or after `WithTransientDispatcher` makes the dispatcher resolvable from the root. If startup produces no output and no error while the process stays alive, this is why. The fix either way is to drop the dependency.
+That is what ASP.NET Core shows in Development, and `ValidateOnBuild` reports it at `BuildServiceProvider`. The message names `IRequestDispatcher`, `IValueRequestDispatcher`, or `IStreamDispatcher` even when the rule took a CQRS dispatcher, because the typed dispatchers are transient wrappers over those three. With scope validation disabled or `WithTransientDispatcher` enabled, RequestFlow's re-entry guard reports the synchronous cycle instead. Remove the dispatch dependency in either case.
 
 Handlers and stages are a different case. They resolve without touching the map, so a rule taking one starts fine. Event handlers are reached by their concrete class rather than their handler interface, but carry the same lifetime risk. The rule is a singleton resolved from the root provider, so it pins a transient handler for as long as the provider lives, and once the application calls `WithScopedHandlers` the same rule stops resolving on any provider that validates scopes. Read the model instead; it already names every handler, event subscription, and stage type.
 
@@ -220,7 +225,7 @@ Two problems are equal when their code, message, and subject match, so a test ca
 
 ## The model
 
-`context.Model` is the registration as recorded, minus what the shape checks threw out. A declaration reported under `RF0001` to `RF0012` or `RF0015` to `RF0020` never reaches a rule, so a rule auditing every registered stage type sees only the ones that could run. Past that nothing is cleaned up: a request no handler covers is in the list with an empty `Handlers`, and a stage registered twice appears twice. Every rule reads the same snapshot, and every list on it is read-only, so one rule cannot change what the next one reads.
+`context.Model` is the registration as recorded, minus what the shape checks threw out. A declaration reported under `RF0001` to `RF0012` or `RF0015` to `RF0021` never reaches a rule, so a rule auditing every registered stage type sees only the ones that could run. Past that nothing is cleaned up: a request no handler covers is in the list with an empty `Handlers`, and a stage registered twice appears twice. Every rule reads the same snapshot, and every list on it is read-only, so one rule cannot change what the next one reads.
 
 | Type | Carries |
 | --- | --- |

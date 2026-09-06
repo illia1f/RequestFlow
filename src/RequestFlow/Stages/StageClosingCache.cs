@@ -4,31 +4,36 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Remembers each <see cref="StageClosing"/> answer per declaration and handler pair; null
-/// records "does not apply".
+/// Remembers each declaration and handler pair's closed type or exclusion reason.
 /// </summary>
 internal sealed class StageClosingCache
 {
-    private readonly Dictionary<ClosingKey, Type?> _closings = [];
+    private readonly Dictionary<ClosingKey, StageClosingResult> _closings = [];
 
     /// <summary>
     /// <see cref="StageClosing"/>'s TryClose with the answer cached per pair.
     /// </summary>
     public bool TryClose(StageDeclaration declaration, HandlerRegistration handler, out Type closedStageType)
     {
+        StageClosingResult result = GetResult(declaration, handler);
+        closedStageType = result.ClosedType!;
+        return result.ClosedType is not null;
+    }
+
+    public StageClosingResult GetResult(StageDeclaration declaration, HandlerRegistration handler)
+    {
         var key = new ClosingKey(declaration, handler);
 
         // Locked because two providers built from the same collection can freeze at once.
         lock (_closings)
         {
-            if (!_closings.TryGetValue(key, out Type? closed))
+            if (!_closings.TryGetValue(key, out StageClosingResult result))
             {
-                closed = StageClosing.TryClose(declaration, handler, out Type type) ? type : null;
-                _closings[key] = closed;
+                result = StageClosing.Match(declaration, handler);
+                _closings[key] = result;
             }
 
-            closedStageType = closed!;
-            return closed is not null;
+            return result;
         }
     }
 

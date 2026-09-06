@@ -5,11 +5,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace RequestFlow;
 
 /// <summary>
-/// Reshapes the registry's raw accumulations into the frozen snapshot every validation rule reads.
+/// The validation model and stage declaration facts captured from one registry.
 /// </summary>
-internal static class RegistrationSnapshot
+internal sealed class RegistrationSnapshot
 {
-    public static RequestFlowModel Capture(
+    private RegistrationSnapshot(RequestFlowModel model, StageDeclarationFacts stageFacts)
+    {
+        Model = model;
+        StageFacts = stageFacts;
+    }
+
+    public RequestFlowModel Model { get; }
+
+    public StageDeclarationFacts StageFacts { get; }
+
+    public static RegistrationSnapshot Capture(
         IReadOnlyList<HandlerRegistration> handlers,
         IReadOnlyList<Type> requestTypes,
         IReadOnlyList<StageDeclaration> stageDeclarations,
@@ -19,18 +29,16 @@ internal static class RegistrationSnapshot
             requestTypes,
             stageDeclarations,
             closings,
-            EventClosure.Build([], []),
-            stageFacts: null);
+            EventClosure.Build([], []));
 
-    public static RequestFlowModel Capture(
+    public static RegistrationSnapshot Capture(
         IReadOnlyList<HandlerRegistration> handlers,
         IReadOnlyList<Type> requestTypes,
         IReadOnlyList<StageDeclaration> stageDeclarations,
         StageClosingCache closings,
-        EventClosureResult eventClosure,
-        StageDeclarationFacts? stageFacts = null)
+        EventClosureResult eventClosure)
     {
-        stageFacts?.BeginReachCapture();
+        HashSet<StageDeclaration> reachedDeclarations = [];
 
         // Scanned requests first in scan order, then requests only a handler covers.
         List<Type> orderedRequests = [];
@@ -96,7 +104,7 @@ internal static class RegistrationSnapshot
                         if (closings.TryClose(declaration, handler, out Type closedStageType)
                             && closedPerDeclaration.Add(closedStageType))
                         {
-                            stageFacts?.RecordReach(declaration);
+                            reachedDeclarations.Add(declaration);
 
                             chain.Add(new ClosedStageModel(
                                 declaration.StageType,
@@ -138,12 +146,14 @@ internal static class RegistrationSnapshot
                         memoStreamContracts)));
         }
 
-        return new RequestFlowModel(
+        var model = new RequestFlowModel(
             capturedRequests,
             declaredStages,
             eventClosure.Events,
             eventClosure.EventSubscriptions,
             eventClosure.EventStrategies);
+        return new RegistrationSnapshot(
+            model, new StageDeclarationFacts(stageDeclarations, reachedDeclarations));
     }
 
     private static Dictionary<Type, Type> SelectMemo(

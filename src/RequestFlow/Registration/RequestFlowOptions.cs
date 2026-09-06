@@ -25,6 +25,8 @@ public sealed class RequestFlowOptions
 
     internal List<Type> ManualEventHandlers { get; } = [];
 
+    internal List<Type> ManualEvents { get; } = [];
+
     internal HashSet<Type> ExcludedEventHandlers { get; } = [];
 
     internal bool UnusedStagesDisallowed { get; private set; }
@@ -189,6 +191,26 @@ public sealed class RequestFlowOptions
         where THandler : class
     {
         ExcludedHandlers.Add(typeof(THandler));
+        return this;
+    }
+
+    /// <summary>
+    /// Registers a concrete, closed event type without scanning its assembly or adding a handler.
+    /// </summary>
+    public RequestFlowOptions AddEvent<TEvent>()
+        where TEvent : IEvent
+        => AddEvent(typeof(TEvent));
+
+    /// <summary>
+    /// Registers a concrete, closed event type without scanning its assembly or adding a handler.
+    /// </summary>
+    /// <exception cref="ArgumentNullException"/>
+    public RequestFlowOptions AddEvent(Type eventType)
+    {
+        if (eventType is null)
+            throw new ArgumentNullException(nameof(eventType));
+
+        ManualEvents.Add(eventType);
         return this;
     }
 

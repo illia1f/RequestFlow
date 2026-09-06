@@ -100,18 +100,58 @@ public sealed class EventStrategyRuleTests
         problem.Subject.ShouldBe(typeof(IUnreachedEvent));
     }
 
-    [Fact]
-    public void Given_A_Shadowed_Family_Declaration_When_Unused_Declarations_Are_Disallowed_Then_Reports_Nothing()
+    [Theory]
+    [InlineData(typeof(IFirstEvent), typeof(MultiInterfaceEvent), false)]
+    [InlineData(typeof(IFirstEvent), typeof(MultiInterfaceEvent), true)]
+    [InlineData(typeof(IEvent), typeof(IFirstEvent), false)]
+    [InlineData(typeof(IEvent), typeof(IFirstEvent), true)]
+    [InlineData(typeof(IFirstEvent), typeof(IDerivedEvent), false)]
+    [InlineData(typeof(IFirstEvent), typeof(IDerivedEvent), true)]
+    public void Given_A_Shadowed_Family_Declaration_When_Unused_Declarations_Are_Disallowed_Then_Reports_Nothing(
+        Type shadowedTarget,
+        Type winningTarget,
+        bool winnerFirst)
     {
+        EventStrategyInput[] strategies =
+        [
+            Strategy(shadowedTarget, typeof(StrategyA)),
+            Strategy(winningTarget, typeof(StrategyB)),
+        ];
+        if (winnerFirst)
+            Array.Reverse(strategies);
+
         IReadOnlyList<RequestFlowValidationProblem> problems = Validate(
             [typeof(MultiInterfaceEvent)],
-            [
-                Strategy(typeof(IFirstEvent), typeof(StrategyA)),
-                Strategy(typeof(MultiInterfaceEvent), typeof(StrategyB)),
-            ],
+            strategies,
             unusedStrategiesDisallowed: true);
 
         problems.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Given_Several_Events_With_Ambiguous_Strategies_When_Validating_Then_Reports_Each_Event_And_Only_Unmatched_Declarations_As_Unused()
+    {
+        IReadOnlyList<RequestFlowValidationProblem> problems = Validate(
+            [typeof(MultiInterfaceEvent), typeof(TestEvent), typeof(AnotherMultiInterfaceEvent)],
+            [
+                Strategy(typeof(IFirstEvent), typeof(StrategyA)),
+                Strategy(typeof(ISecondEvent), typeof(StrategyB)),
+                Strategy(typeof(IEvent), typeof(StrategyA)),
+                Strategy(typeof(IUnreachedEvent), typeof(StrategyA)),
+            ],
+            unusedStrategiesDisallowed: true);
+
+        problems.Select(problem => problem.Code).ShouldBe(["RF0120", "RF0120", "RF0122"]);
+        problems.Select(problem => problem.Subject).ShouldBe([
+            typeof(MultiInterfaceEvent),
+            typeof(AnotherMultiInterfaceEvent),
+            typeof(IUnreachedEvent),
+        ]);
+        foreach (RequestFlowValidationProblem problem in problems.Take(2))
+        {
+            problem.Message.ShouldContain(typeof(IFirstEvent).FullName!);
+            problem.Message.ShouldContain(typeof(ISecondEvent).FullName!);
+        }
     }
 
     [Fact]
@@ -254,10 +294,15 @@ public sealed class EventStrategyRuleTests
     private interface ISecondEvent : IEvent
     { }
 
+    private interface IDerivedEvent : IFirstEvent
+    { }
+
     private interface IUnreachedEvent : IEvent
     { }
 
-    private sealed record MultiInterfaceEvent : IFirstEvent, ISecondEvent;
+    private sealed record MultiInterfaceEvent : IDerivedEvent, ISecondEvent;
+
+    private sealed record AnotherMultiInterfaceEvent : IFirstEvent, ISecondEvent;
 
     private interface IInvalidStrategy : IEventPublishStrategy
     { }

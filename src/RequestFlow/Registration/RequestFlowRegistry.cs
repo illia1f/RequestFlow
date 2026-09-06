@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow;
@@ -27,6 +28,7 @@ internal sealed class RequestFlowRegistry
     private readonly HashSet<GenericHandlerClosing> _closings = [];
     private readonly List<StageDeclaration> _stageDeclarations = [];
     private readonly HashSet<Type> _registeredClosedStageTypes = [];
+    private readonly AsyncLocal<FreezeEntry?> _activeFreeze = new();
 
     /// <summary>
     /// True once any <c>AddRequestFlow</c> call opted out of the missing-handler check.
@@ -195,16 +197,52 @@ internal sealed class RequestFlowRegistry
     /// <exception cref="InvalidOperationException"/>
     public FrozenPlans Freeze(IServiceProvider provider)
     {
+        ThrowIfFreezing(provider);
+        FreezeEntry? previous = _activeFreeze.Value;
+        var current = new FreezeEntry(provider.GetRequiredService<IServiceScopeFactory>(), previous);
+        _activeFreeze.Value = current;
+        try
+        {
+            return FreezeCore(provider);
+        }
+        finally
+        {
+            Volatile.Write(ref current.ScopeFactory, null);
+            _activeFreeze.Value = previous;
+        }
+    }
+
+    public void ThrowIfFreezing(IServiceProvider provider)
+    {
+        FreezeEntry? entry = _activeFreeze.Value;
+        if (entry is null)
+            return;
+
+        // The scope factory identifies the provider across its root and child scopes.
+        IServiceScopeFactory scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+        for (; entry is not null; entry = entry.Previous)
+        {
+            if (ReferenceEquals(Volatile.Read(ref entry.ScopeFactory), scopeFactory))
+            {
+                throw new InvalidOperationException(
+                    "RequestFlow validation cannot be re-entered through a dispatcher, IEventPublisher, " +
+                    "ValidateRequestFlow, or InspectRequestFlow while validation is running. " +
+                    "Remove that dependency from the validation rule and its dependencies; use context.Model instead.");
+            }
+        }
+    }
+
+    private FrozenPlans FreezeCore(IServiceProvider provider)
+    {
         EventClosureResult eventClosure = EventClosure.Build(
             _eventTypes, BuildEventSubscriptions(), BuildEventStrategies());
-        StageDeclarationFacts stageFacts = new(_stageDeclarations);
-        RequestFlowModel model = RegistrationSnapshot.Capture(
+        RegistrationSnapshot snapshot = RegistrationSnapshot.Capture(
             _handlers,
             _requestTypes,
             _stageDeclarations,
             ClosingCache,
-            eventClosure,
-            stageFacts);
+            eventClosure);
+        RequestFlowModel model = snapshot.Model;
 
         RequestFlowValidationContext context = new(
             model,
@@ -213,21 +251,20 @@ internal sealed class RequestFlowRegistry
             UnhandledEventsAllowed,
             UnusedEventHandlersDisallowed);
 
-        List<RequestFlowValidationProblem> problems = ValidationRuleRunner.Run(
+        ValidationRuleRunner.Validate(
             context,
-            BuiltInRules.For(context, stageFacts, eventClosure.StrategyResolution),
+            BuiltInRules.For(context, snapshot.StageFacts, eventClosure.StrategyResolution),
             provider.GetServices<IRequestFlowValidationRule>(),
             _problems);
 
-        if (problems.Count > 0)
-            throw new RequestFlowValidationException(problems);
-
-        Dictionary<Type, StageChain> chainsByRequest = BuildStagePlans();
+        Dictionary<Type, RequestPipeline> pipelines = PipelineInspection.Capture(
+            model, _handlers, _stageDeclarations, ClosingCache);
 
         Dictionary<Type, RequestPlanBase> plans = [];
         foreach (var handler in _handlers)
         {
-            plans[handler.RequestType] = CreatePlan(handler, chainsByRequest[handler.RequestType]);
+            StageChain chain = BuildStageChain(handler, pipelines[handler.RequestType].Stages);
+            plans[handler.RequestType] = CreatePlan(handler, chain);
         }
 
         var dispatch = new DispatchMap(plans);
@@ -235,7 +272,7 @@ internal sealed class RequestFlowRegistry
             eventClosure.Events,
             eventClosure.StrategyResolution);
 
-        return new FrozenPlans(dispatch, events);
+        return new FrozenPlans(dispatch, events, pipelines);
     }
 
     private EventStrategyInput[] BuildEventStrategies()
@@ -268,29 +305,14 @@ internal sealed class RequestFlowRegistry
         return subscriptions;
     }
 
-    private Dictionary<Type, StageChain> BuildStagePlans()
+    private static StageChain BuildStageChain(
+        HandlerRegistration handler, IReadOnlyList<RequestPipelineStage> stages)
     {
-        Dictionary<Type, StageChain> chainsByRequest = [];
-        List<Type> ordered = [];
+        Type[] stageTypes = new Type[stages.Count];
+        for (int i = 0; i < stages.Count; i++)
+            stageTypes[i] = stages[i].ClosedType;
 
-        foreach (var handler in _handlers)
-        {
-            ordered.Clear();
-            foreach (var declaration in _stageDeclarations)
-            {
-                if (!ClosingCache.TryClose(declaration, handler, out Type closedStageType))
-                    continue;
-
-                ordered.Add(closedStageType);
-            }
-
-            Type[] stageTypes = ordered.ToArray();
-
-            chainsByRequest[handler.RequestType] =
-                new StageChain(stageTypes, BuildTypedShapes(handler, stageTypes));
-        }
-
-        return chainsByRequest;
+        return new StageChain(stageTypes, BuildTypedShapes(handler, stageTypes));
     }
 
     // Only a void request can take stages of either contract shape, so only its chain records
@@ -358,6 +380,13 @@ internal sealed class RequestFlowRegistry
     private readonly record struct HandlerContractKey(Type ImplementationType, Type Contract);
 
     private readonly record struct EventSubscriptionKey(Type HandlerType, Type DeclaredEventType);
+
+    private sealed class FreezeEntry(IServiceScopeFactory scopeFactory, FreezeEntry? previous)
+    {
+        public IServiceScopeFactory? ScopeFactory = scopeFactory;
+
+        public FreezeEntry? Previous { get; } = previous;
+    }
 }
 
 /// <summary>

@@ -115,6 +115,44 @@ public sealed class AddValidationRuleTests
     }
 
     [Fact]
+    public void Given_A_Rule_Throwing_From_A_Helper_When_Validating_Then_The_Original_Exception_Is_Preserved()
+    {
+        var rule = new HelperThrowingRule();
+        var services = new ServiceCollection();
+        services.AddRequestFlow(_ => { });
+        services.AddSingleton<IRequestFlowValidationRule>(rule);
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception =
+            Should.Throw<RequestFlowValidationException>(() => provider.ValidateRequestFlow());
+
+        AggregateException failures = exception.InnerException.ShouldBeOfType<AggregateException>();
+        failures.InnerExceptions.ShouldHaveSingleItem().ShouldBeSameAs(rule.Failure);
+        exception.ToString().ShouldContain(nameof(HelperThrowingRule.ThrowFromHelper));
+        exception.ToString().ShouldContain("helper blew up");
+    }
+
+    [Fact]
+    public void Given_Two_Throwing_Rules_When_Validating_Then_Both_Original_Exceptions_Are_Preserved_In_Order()
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(_ => { })
+            .AddValidationRule<ThrowingRule>()
+            .AddValidationRule<PartiallyThrowingRule>();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception =
+            Should.Throw<RequestFlowValidationException>(() => provider.ValidateRequestFlow());
+
+        AggregateException failures = exception.InnerException.ShouldBeOfType<AggregateException>();
+        failures.InnerExceptions.Count.ShouldBe(2);
+        failures.InnerExceptions[0].ShouldBeOfType<FormatException>().Message.ShouldBe("rule blew up");
+        failures.InnerExceptions[1].ShouldBeOfType<NotSupportedException>().Message.ShouldBe("enumeration blew up");
+        failures.InnerExceptions[1].StackTrace.ShouldNotBeNullOrEmpty();
+        exception.Problems.ShouldNotContain(p => p.Code == "TEST0004");
+    }
+
+    [Fact]
     public void Given_A_Throwing_Rule_Beside_A_Built_In_Failure_When_Validating_Then_Both_Are_Reported()
     {
         var services = new ServiceCollection();
@@ -297,6 +335,18 @@ public sealed class AddValidationRuleTests
     {
         public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
             => [new RequestFlowValidationProblem(source.Code, "from dependency")];
+    }
+
+    private sealed class HelperThrowingRule : IRequestFlowValidationRule
+    {
+        public FormatException Failure { get; } = new("helper blew up");
+
+        public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
+            => ThrowFromHelper();
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        public IEnumerable<RequestFlowValidationProblem> ThrowFromHelper()
+            => throw Failure;
     }
 
     private sealed class ThrowingRule : IRequestFlowValidationRule

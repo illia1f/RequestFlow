@@ -23,7 +23,7 @@ public sealed class RequestFlowBuilder
     /// <remarks>
     /// Registered once per rule type as a singleton resolved from the root provider.
     /// Register your own descriptor for a transient rule.
-    /// Do not inject dispatchers or <see cref="IEventPublisher"/> into a rule: their resolution waits for validation and hangs startup.
+    /// Injecting a dispatcher or <see cref="IEventPublisher"/> into a rule causes a validation dependency cycle and throws <see cref="InvalidOperationException"/>.
     /// Scope validation rejects scoped dependencies first.
     /// A rule retains any injected handler or stage for the provider's lifetime.
     /// </remarks>
