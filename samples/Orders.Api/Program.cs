@@ -21,6 +21,13 @@ WebApplication app = builder.Build();
 
 app.Services.ValidateRequestFlow();
 
+if (args.Contains("--inspect-pipelines"))
+{
+    PipelineInspectionExample.Print(app.Services);
+    await app.DisposeAsync();
+    return;
+}
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

@@ -26,6 +26,7 @@ public static class ProblemCodes
     public const string ManualHandlerIsInterface = "RF0018";
     public const string ManualHandlerAbstract = "RF0019";
     public const string ManualHandlerMissingContract = "RF0020";
+    public const string EventTypeNotConcreteClosed = "RF0021";
     public const string DuplicateHandler = "RF0101";
     public const string UnhandledRequest = "RF0102";
     public const string DuplicateStage = "RF0103";

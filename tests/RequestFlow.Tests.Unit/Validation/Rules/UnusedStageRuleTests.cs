@@ -5,6 +5,33 @@ namespace RequestFlow.Tests.Unit.Validation;
 
 public sealed class UnusedStageRuleTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Given_A_Filter_Excluding_Every_Handler_When_Freezing_Then_The_Message_Names_Handler_Filters(
+        bool inspect)
+    {
+        var services = new ServiceCollection();
+        services.AddRequestFlow(o => o
+            .AddHandler<FilteredRequestHandler>()
+            .AddStage<FilteredStage>(s => s.WhereHandlerImplements<IExcludedHandler>())
+            .DisallowUnusedStages());
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
+        {
+            if (inspect)
+                provider.InspectRequestFlow<FilteredRequest>();
+            else
+                provider.ValidateRequestFlow();
+        });
+
+        RequestFlowValidationProblem problem = exception.Problems.ShouldHaveSingleItem();
+        problem.Code.ShouldBe("RF0105");
+        problem.Message.ShouldContain("handler filter");
+        problem.Message.ShouldContain("WhereHandlerImplements");
+    }
+
     [Fact]
     public void Given_Stage_Reaching_No_Request_When_Validating_Then_Reports_The_Stage()
     {
@@ -123,11 +150,29 @@ public sealed class UnusedStageRuleTests
 
     #region Helpers
 
+    public sealed record FilteredRequest : IRequest;
+
+    public sealed class FilteredRequestHandler : IRequestHandler<FilteredRequest>
+    {
+        public Task HandleAsync(FilteredRequest request, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    private interface IExcludedHandler
+    { }
+
+    private sealed class FilteredStage : IRequestStage<FilteredRequest>
+    {
+        public Task HandleAsync(FilteredRequest request, Continuation next, CancellationToken cancellationToken)
+            => next.InvokeAsync(cancellationToken);
+    }
+
     // The assembly name is part of the message and differs per target framework, so it is read off
     // the type rather than written out.
     private static string BaseMessage(Type stageType)
         => $"Stage '{stageType.FullName}' from assembly '{stageType.Assembly.GetName().Name}' applies to no "
-            + "registered request; widen its generic constraints, scan the assembly holding the requests it "
+            + "registered request; widen its generic constraints, check its WhereHandlerImplements handler filter, "
+            + "scan the assembly holding the requests it "
             + "targets, or drop DisallowUnusedStages.";
 
     #endregion

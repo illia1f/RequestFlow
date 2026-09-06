@@ -3,7 +3,7 @@ using System;
 namespace RequestFlow;
 
 /// <summary>
-/// Thrown when the dispatched request type has no registered handler.
+/// Thrown when a request type has no registered handler.
 /// </summary>
 /// <exception cref="ArgumentNullException"/>
 public sealed class HandlerNotFoundException(Type requestType) : InvalidOperationException(BuildMessage(requestType))

@@ -13,14 +13,15 @@ namespace RequestFlow;
 /// </remarks>
 internal sealed class StageDeclarationFacts
 {
-    public static readonly StageDeclarationFacts None = new();
+    public static readonly StageDeclarationFacts None = new([]);
 
     private readonly Dictionary<Type, List<StageDeclaration>> _declarations = [];
     private readonly Dictionary<Type, List<StageFamily>> _families = [];
-    private readonly Dictionary<Type, List<StageFamily>> _reachedFamilies = [];
-    private bool _reachCaptured;
+    private readonly Dictionary<Type, HashSet<StageFamily>>? _reachedFamilies;
 
-    public StageDeclarationFacts(IReadOnlyList<StageDeclaration> declarations)
+    public StageDeclarationFacts(
+        IReadOnlyList<StageDeclaration> declarations,
+        IReadOnlyCollection<StageDeclaration>? reachedDeclarations = null)
     {
         foreach (var declaration in declarations)
         {
@@ -56,10 +57,24 @@ internal sealed class StageDeclarationFacts
 
             _families.Add(declaration.StageType, [declaration.Family]);
         }
-    }
 
-    private StageDeclarationFacts()
-    { }
+        if (reachedDeclarations is null)
+            return;
+
+        Dictionary<Type, HashSet<StageFamily>> reachedFamilies = [];
+        foreach (StageDeclaration declaration in reachedDeclarations)
+        {
+            if (!reachedFamilies.TryGetValue(declaration.StageType, out HashSet<StageFamily>? families))
+            {
+                families = [];
+                reachedFamilies.Add(declaration.StageType, families);
+            }
+
+            families.Add(declaration.Family);
+        }
+
+        _reachedFamilies = reachedFamilies;
+    }
 
     /// <summary>
     /// The first registered family, falling back to what <paramref name="contractType"/> implies.
@@ -114,57 +129,19 @@ internal sealed class StageDeclarationFacts
     }
 
     /// <summary>
-    /// Starts recording the stage families that produced a closing in the frozen model.
-    /// </summary>
-    public void BeginReachCapture()
-    {
-        _reachedFamilies.Clear();
-        _reachCaptured = true;
-    }
-
-    /// <summary>
-    /// Records one declaration that produced a closing in the frozen model.
-    /// </summary>
-    public void RecordReach(StageDeclaration declaration)
-    {
-        if (!_reachedFamilies.TryGetValue(
-            declaration.StageType,
-            out List<StageFamily>? families))
-        {
-            families = [];
-            _reachedFamilies.Add(declaration.StageType, families);
-        }
-
-        foreach (StageFamily family in families)
-        {
-            if (family == declaration.Family)
-                return;
-        }
-
-        families.Add(declaration.Family);
-    }
-
-    /// <summary>
     /// True when any declaration in <paramref name="family"/> produced a closing.
+    /// Uses <paramref name="modelFallback"/> only when reach information is unavailable.
     /// </summary>
     public bool AnyDeclarationReached(
         Type stageType,
         StageFamily family,
         bool modelFallback)
     {
-        if (!_reachCaptured)
+        if (_reachedFamilies is null)
             return modelFallback;
 
-        if (!_reachedFamilies.TryGetValue(stageType, out List<StageFamily>? families))
-            return false;
-
-        foreach (StageFamily reachedFamily in families)
-        {
-            if (reachedFamily == family)
-                return true;
-        }
-
-        return false;
+        return _reachedFamilies.TryGetValue(stageType, out HashSet<StageFamily>? families)
+            && families.Contains(family);
     }
 
     /// <summary>

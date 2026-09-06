@@ -9,7 +9,7 @@ public sealed class RegistrationSnapshotTests
     public void Given_Scanned_Request_Without_Handler_When_Building_Model_Then_Request_Has_No_Handlers()
     {
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [], requestTypes: [typeof(Ping)], stageDeclarations: [], closings: new StageClosingCache());
+            handlers: [], requestTypes: [typeof(Ping)], stageDeclarations: [], closings: new StageClosingCache()).Model;
 
         RequestModel request = model.Requests.ShouldHaveSingleItem();
         request.RequestType.ShouldBe(typeof(Ping));
@@ -24,7 +24,7 @@ public sealed class RegistrationSnapshotTests
             typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [registration], requestTypes: [], stageDeclarations: [], closings: new StageClosingCache());
+            handlers: [registration], requestTypes: [], stageDeclarations: [], closings: new StageClosingCache()).Model;
 
         RequestModel request = model.Requests.ShouldHaveSingleItem();
         HandlerModel handler = request.Handlers.ShouldHaveSingleItem();
@@ -41,7 +41,7 @@ public sealed class RegistrationSnapshotTests
             typeof(SecondPingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [first, second], requestTypes: [typeof(Ping)], stageDeclarations: [], closings: new StageClosingCache());
+            handlers: [first, second], requestTypes: [typeof(Ping)], stageDeclarations: [], closings: new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem().Handlers.Count.ShouldBe(2);
     }
@@ -55,7 +55,7 @@ public sealed class RegistrationSnapshotTests
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [registration], requestTypes: [typeof(Ping)], stageDeclarations: [declaration],
-            closings: new StageClosingCache());
+            closings: new StageClosingCache()).Model;
 
         ClosedStageModel closing = model.Requests.ShouldHaveSingleItem().Stages.ShouldHaveSingleItem();
         closing.DeclaredType.ShouldBe(typeof(WrapStage<,>));
@@ -69,7 +69,7 @@ public sealed class RegistrationSnapshotTests
         var second = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [], requestTypes: [], stageDeclarations: [first, second], closings: new StageClosingCache());
+            handlers: [], requestTypes: [], stageDeclarations: [first, second], closings: new StageClosingCache()).Model;
 
         model.StageDeclarations.Count.ShouldBe(2);
         model.StageDeclarations[0].StageType.ShouldBe(typeof(WrapStage<,>));
@@ -82,7 +82,7 @@ public sealed class RegistrationSnapshotTests
             typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [registration], requestTypes: [typeof(Purge)], stageDeclarations: [], closings: new StageClosingCache());
+            handlers: [registration], requestTypes: [typeof(Purge)], stageDeclarations: [], closings: new StageClosingCache()).Model;
 
         model.Requests.Count.ShouldBe(2);
         model.Requests[0].RequestType.ShouldBe(typeof(Purge));
@@ -100,7 +100,7 @@ public sealed class RegistrationSnapshotTests
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [first, second], requestTypes: [typeof(MultiPing)], stageDeclarations: [declaration],
-            closings: new StageClosingCache());
+            closings: new StageClosingCache()).Model;
 
         IReadOnlyList<ClosedStageModel> chain = model.Requests.ShouldHaveSingleItem().Stages;
         chain.Count.ShouldBe(2);
@@ -119,7 +119,7 @@ public sealed class RegistrationSnapshotTests
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [first, second], requestTypes: [typeof(MultiPing)], stageDeclarations: [declaration],
-            closings: new StageClosingCache());
+            closings: new StageClosingCache()).Model;
 
         ClosedStageModel closing = model.Requests.ShouldHaveSingleItem().Stages.ShouldHaveSingleItem();
         closing.ClosedType.ShouldBe(typeof(IntResultStage<MultiPing>));
@@ -131,7 +131,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [], requestTypes: [typeof(Ping)], stageDeclarations: [declaration], closings: new StageClosingCache());
+            handlers: [], requestTypes: [typeof(Ping)], stageDeclarations: [declaration], closings: new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem().Stages.ShouldBeEmpty();
     }
@@ -143,7 +143,7 @@ public sealed class RegistrationSnapshotTests
         var second = new StageDeclaration(typeof(ExtraStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            handlers: [], requestTypes: [], stageDeclarations: [first, second], closings: new StageClosingCache());
+            handlers: [], requestTypes: [], stageDeclarations: [first, second], closings: new StageClosingCache()).Model;
 
         model.StageDeclarations.Count.ShouldBe(2);
         model.StageDeclarations[0].StageType.ShouldBe(typeof(WrapStage<,>));
@@ -159,7 +159,7 @@ public sealed class RegistrationSnapshotTests
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [registration], requestTypes: [typeof(Ping)], stageDeclarations: [declaration],
-            closings: new StageClosingCache());
+            closings: new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem().Stages.ShouldBeEmpty();
     }
@@ -172,7 +172,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(VoidStage), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(VoidRequest)], [declaration], new StageClosingCache());
+            [handler], [typeof(VoidRequest)], [declaration], new StageClosingCache()).Model;
 
         model.StageDeclarations.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IRequestStage<>));
         model.Requests.ShouldHaveSingleItem()
@@ -187,7 +187,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Ping)], [declaration], new StageClosingCache());
+            [handler], [typeof(Ping)], [declaration], new StageClosingCache()).Model;
 
         model.StageDeclarations.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IRequestStage<,>));
         model.Requests.ShouldHaveSingleItem()
@@ -204,7 +204,7 @@ public sealed class RegistrationSnapshotTests
             typeof(IValueRequestHandler<ValuePing, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(ValuePing)], [], new StageClosingCache());
+            [handler], [typeof(ValuePing)], [], new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem()
             .Handlers.ShouldHaveSingleItem().ContractType
@@ -222,7 +222,7 @@ public sealed class RegistrationSnapshotTests
             isVoid: true);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(ValueVoid)], [], new StageClosingCache());
+            [handler], [typeof(ValueVoid)], [], new StageClosingCache()).Model;
 
         HandlerModel captured = model.Requests.ShouldHaveSingleItem()
             .Handlers.ShouldHaveSingleItem();
@@ -252,7 +252,7 @@ public sealed class RegistrationSnapshotTests
             [taskHandler, valueHandler],
             [typeof(TaskMemo), typeof(ValueMemo)],
             [taskDeclaration, valueDeclaration],
-            new StageClosingCache());
+            new StageClosingCache()).Model;
 
         model.StageDeclarations[0].ContractType.ShouldBe(typeof(IRequestStage<,>));
         model.StageDeclarations[1].ContractType.ShouldBe(typeof(IValueRequestStage<,>));
@@ -275,7 +275,7 @@ public sealed class RegistrationSnapshotTests
             typeof(ValueVoidStage), handlerFilter: null, StageFamily.Value);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(ValueVoid)], [declaration], new StageClosingCache());
+            [handler], [typeof(ValueVoid)], [declaration], new StageClosingCache()).Model;
 
         model.StageDeclarations.ShouldHaveSingleItem().ContractType
             .ShouldBe(typeof(IValueRequestStage<>));
@@ -293,7 +293,7 @@ public sealed class RegistrationSnapshotTests
             typeof(IValueRequestHandler<AuditedValue, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(AuditedValue)], [], new StageClosingCache());
+            [handler], [typeof(AuditedValue)], [], new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem().Handlers.ShouldHaveSingleItem().ContractType
             .ShouldBe(typeof(IAuditedValueHandler<,>));
@@ -330,7 +330,7 @@ public sealed class RegistrationSnapshotTests
             typeof(AuditedHandler), typeof(Audited), typeof(string), typeof(IRequestHandler<Audited, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Audited)], [], new StageClosingCache());
+            [handler], [typeof(Audited)], [], new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem()
             .Handlers.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IAuditedHandler<,>));
@@ -343,7 +343,7 @@ public sealed class RegistrationSnapshotTests
             typeof(AuditedVoidHandler), typeof(AuditedVoid), typeof(NoResult), typeof(IRequestHandler<AuditedVoid>), isVoid: true);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(AuditedVoid)], [], new StageClosingCache());
+            [handler], [typeof(AuditedVoid)], [], new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem()
             .Handlers.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IAuditedHandler<>));
@@ -356,7 +356,7 @@ public sealed class RegistrationSnapshotTests
             typeof(TwiceDerivedHandler), typeof(TwiceDerived), typeof(string), typeof(IRequestHandler<TwiceDerived, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(TwiceDerived)], [], new StageClosingCache());
+            [handler], [typeof(TwiceDerived)], [], new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem()
             .Handlers.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IRequestHandler<,>));
@@ -370,7 +370,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(AuditedStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Ping)], [declaration], new StageClosingCache());
+            [handler], [typeof(Ping)], [declaration], new StageClosingCache()).Model;
 
         model.StageDeclarations.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IAuditedStage<,>));
         model.Requests.ShouldHaveSingleItem()
@@ -389,7 +389,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(SplitContractStage), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [first, second], [typeof(First), typeof(Second)], [declaration], new StageClosingCache());
+            [first, second], [typeof(First), typeof(Second)], [declaration], new StageClosingCache()).Model;
 
         model.Requests[0].Stages.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IAuditedStage<,>));
         model.Requests[1].Stages.ShouldHaveSingleItem().ContractType.ShouldBe(typeof(IRequestStage<,>));
@@ -403,7 +403,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Purge)], [declaration], new StageClosingCache());
+            [handler], [typeof(Purge)], [declaration], new StageClosingCache()).Model;
 
         RequestModel request = model.Requests.ShouldHaveSingleItem();
         request.Handlers.ShouldHaveSingleItem().ResponseType.ShouldBeNull();
@@ -423,7 +423,7 @@ public sealed class RegistrationSnapshotTests
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [handler], requestTypes: [typeof(Ping)], stageDeclarations: [],
-            closings: new StageClosingCache());
+            closings: new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem().Handlers.ShouldHaveSingleItem().Lifetime.ShouldBe(expected);
     }
@@ -440,7 +440,7 @@ public sealed class RegistrationSnapshotTests
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
             handlers: [scoped, transient], requestTypes: [typeof(Ping), typeof(Purge)], stageDeclarations: [],
-            closings: new StageClosingCache());
+            closings: new StageClosingCache()).Model;
 
         model.Requests[0].Handlers.ShouldHaveSingleItem().Lifetime.ShouldBe(RequestFlowLifetime.Scoped);
         model.Requests[1].Handlers.ShouldHaveSingleItem().Lifetime.ShouldBe(RequestFlowLifetime.Transient);
@@ -456,7 +456,7 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request, registered);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [], [], [declaration], new StageClosingCache());
+            [], [], [declaration], new StageClosingCache()).Model;
 
         model.StageDeclarations.ShouldHaveSingleItem().Lifetime.ShouldBe(expected);
     }
@@ -468,7 +468,7 @@ public sealed class RegistrationSnapshotTests
             typeof(PurgeHandler), typeof(Purge), typeof(NoResult), typeof(IRequestHandler<Purge>), isVoid: true);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Purge)], [], new StageClosingCache());
+            [handler], [typeof(Purge)], [], new StageClosingCache()).Model;
 
         HandlerModel captured = model.Requests.ShouldHaveSingleItem().Handlers.ShouldHaveSingleItem();
         captured.IsVoid.ShouldBeTrue();
@@ -482,7 +482,7 @@ public sealed class RegistrationSnapshotTests
             typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Ping)], [], new StageClosingCache());
+            [handler], [typeof(Ping)], [], new StageClosingCache()).Model;
 
         model.Requests.ShouldHaveSingleItem().Handlers.ShouldHaveSingleItem().IsVoid.ShouldBeFalse();
     }
@@ -496,10 +496,88 @@ public sealed class RegistrationSnapshotTests
         var declaration = new StageDeclaration(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request);
 
         RequestFlowModel model = RegistrationSnapshot.Capture(
-            [handler], [typeof(Ping), typeof(Purge)], [declaration], new StageClosingCache());
+            [handler], [typeof(Ping), typeof(Purge)], [declaration], new StageClosingCache()).Model;
 
         model.Requests.Count.ShouldBe(2);
         model.StageDeclarations.ShouldHaveSingleItem().ReachedRequests.ShouldBe([typeof(Ping)]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Given_One_Stage_Type_With_Only_Task_Reach_When_Capturing_Then_Facts_Keep_Reach_Per_Family(
+        bool valueFirst)
+    {
+        HandlerRegistration handler = Handler(
+            typeof(TaskMemoHandler), typeof(TaskMemo), typeof(string), typeof(IRequestHandler<TaskMemo, string>));
+        StageDeclaration[] declarations =
+        [
+            new(typeof(DualMemoStage), handlerFilter: null, StageFamily.Request),
+            new(typeof(DualMemoStage), handlerFilter: null, StageFamily.Value),
+        ];
+        if (valueFirst)
+            Array.Reverse(declarations);
+
+        RegistrationSnapshot snapshot = RegistrationSnapshot.Capture(
+            [handler], [typeof(TaskMemo)], declarations, new StageClosingCache());
+
+        snapshot.Model.StageDeclarations.ShouldAllBe(declaration => declaration.ReachedRequests.Count == 1);
+        snapshot.StageFacts.AnyDeclarationReached(typeof(DualMemoStage), StageFamily.Request, modelFallback: false)
+            .ShouldBeTrue();
+        snapshot.StageFacts.AnyDeclarationReached(typeof(DualMemoStage), StageFamily.Value, modelFallback: true)
+            .ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Given_No_Stage_Reach_When_Capturing_Then_Completed_Reach_Differs_From_Unavailable_Reach(
+        bool hasDeclaration)
+    {
+        StageDeclaration[] declarations = hasDeclaration
+            ? [new(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request)]
+            : [];
+        var facts = new StageDeclarationFacts(declarations);
+
+        facts.AnyDeclarationReached(typeof(WrapStage<,>), StageFamily.Request, modelFallback: true)
+            .ShouldBeTrue();
+        facts.AnyDeclarationReached(typeof(WrapStage<,>), StageFamily.Request, modelFallback: false)
+            .ShouldBeFalse();
+        StageDeclarationFacts.None.AnyDeclarationReached(
+            typeof(WrapStage<,>), StageFamily.Request, modelFallback: true).ShouldBeTrue();
+
+        RegistrationSnapshot snapshot = RegistrationSnapshot.Capture(
+            [], [], declarations, new StageClosingCache());
+
+        snapshot.StageFacts.AnyDeclarationReached(typeof(WrapStage<,>), StageFamily.Request, modelFallback: true)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Given_Captured_Registrations_When_Inputs_Are_Cleared_And_Captured_Again_Then_The_First_Snapshot_Is_Unchanged()
+    {
+        HandlerRegistration handler = Handler(
+            typeof(PingHandler), typeof(Ping), typeof(string), typeof(IRequestHandler<Ping, string>));
+        List<StageDeclaration> declarations =
+        [
+            new(typeof(WrapStage<,>), handlerFilter: null, StageFamily.Request),
+        ];
+        var closings = new StageClosingCache();
+        RegistrationSnapshot first = RegistrationSnapshot.Capture(
+            [handler], [typeof(Ping)], declarations, closings);
+
+        declarations.Clear();
+        RegistrationSnapshot second = RegistrationSnapshot.Capture(
+            [handler], [typeof(Ping)], declarations, closings);
+
+        first.Model.StageDeclarations.ShouldHaveSingleItem().ReachedRequests.ShouldBe([typeof(Ping)]);
+        first.StageFacts.GetFamily(typeof(WrapStage<,>), typeof(IValueRequestStage<,>))
+            .ShouldBe(StageFamily.Request);
+        first.StageFacts.AnyDeclarationReached(typeof(WrapStage<,>), StageFamily.Request, modelFallback: false)
+            .ShouldBeTrue();
+        second.Model.StageDeclarations.ShouldBeEmpty();
+        second.StageFacts.AnyDeclarationReached(typeof(WrapStage<,>), StageFamily.Request, modelFallback: true)
+            .ShouldBeFalse();
     }
 
     #region Helpers

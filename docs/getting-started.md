@@ -10,6 +10,12 @@ Install the preview runtime package:
 dotnet add package RequestFlow --prerelease
 ```
 
+For the console example, also install the DI container that provides `BuildServiceProvider()`:
+
+```
+dotnet add package Microsoft.Extensions.DependencyInjection
+```
+
 `RequestFlow` includes `RequestFlow.Abstractions`. Projects that only define requests and handlers can reference the abstractions package alone, including for [ValueTask](value-tasks.md) and [stream](streaming.md#packages) handlers. The package has no dependencies on `net8.0` or `net10.0`; on `netstandard2.0` and `net462`, it depends on `Microsoft.Bcl.AsyncInterfaces`.
 
 All types live in the `RequestFlow` namespace, so one `using RequestFlow;` covers requests, handlers, and the dispatcher. The registration extensions live in `Microsoft.Extensions.DependencyInjection`, which a typical `Program.cs` already imports.
@@ -84,14 +90,18 @@ Void requests dispatch the same way and return `Task`:
 await dispatcher.SendAsync(new ClearCache(), ct);
 ```
 
-Outside a web host, the same flow works with a plain `ServiceCollection`:
+Outside a web host, use a plain `ServiceCollection`.
 
 ```csharp
+using Microsoft.Extensions.DependencyInjection;
+using RequestFlow;
+
 var services = new ServiceCollection();
 services.AddRequestFlow(o => o
     .RegisterHandlersFromCallingAssembly());
 
-IServiceProvider provider = services.BuildServiceProvider().ValidateRequestFlow();
+using ServiceProvider provider = services.BuildServiceProvider();
+provider.ValidateRequestFlow();
 
 using IServiceScope scope = provider.CreateScope();
 var dispatcher = scope.ServiceProvider.GetRequiredService<IRequestDispatcher>();

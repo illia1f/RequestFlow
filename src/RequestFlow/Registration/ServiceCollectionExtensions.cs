@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers handlers, dispatchers, and the event publisher.
     /// Calls are additive; previously registered assemblies and generic closings are skipped.
-    /// First dispatcher or publisher resolution, or <c>ValidateRequestFlow</c>, validates and freezes the maps once per provider.
+    /// First dispatcher or publisher resolution, <c>ValidateRequestFlow</c>, or <c>InspectRequestFlow</c> validates and freezes the maps once per provider.
     /// Invalid registrations produce one <see cref="RequestFlowValidationException"/> listing every problem.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
@@ -62,12 +62,15 @@ public static class ServiceCollectionExtensions
         Validated<StageDeclaration> stages = RegistrationValidator.ValidateStageDeclarations(options.StageDeclarations);
         registry.AddStageDeclarations(stages.Valid);
 
+        Validated<Type> manualEvents = RegistrationValidator.ValidateEventDeclarations(options.ManualEvents);
+
         List<RequestFlowValidationProblem> problems =
             [.. declarations.Problems, .. closed.Problems, .. stages.Problems,
-             .. manualEventHandlers.Problems, .. manualHandlers.Problems];
+             .. manualEventHandlers.Problems, .. manualHandlers.Problems, .. manualEvents.Problems];
         List<Type> requestTypes =
             [.. scan.RequestTypes, .. scan.GetRequestTypesHandledBy(options.ExcludedHandlers)];
-        registry.Add(requestTypes, scan.EventTypes, problems);
+        List<Type> eventTypes = [.. scan.EventTypes, .. manualEvents.Valid];
+        registry.Add(requestTypes, eventTypes, problems);
 
         RegisterHandlers(services, newHandlers);
         RegisterEventHandlers(services, newEventHandlers);

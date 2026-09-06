@@ -11,7 +11,14 @@ public sealed class RequestFlowValidationException : InvalidOperationException
 {
     /// <exception cref="ArgumentNullException"/>
     public RequestFlowValidationException(IReadOnlyList<RequestFlowValidationProblem> problems)
-        : base(BuildMessage(problems))
+        : this(problems, null)
+    { }
+
+    /// <exception cref="ArgumentNullException"/>
+    public RequestFlowValidationException(
+        IReadOnlyList<RequestFlowValidationProblem> problems,
+        Exception? innerException)
+        : base(BuildMessage(problems), innerException)
     {
         Problems = problems;
     }

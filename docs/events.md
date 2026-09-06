@@ -59,6 +59,28 @@ services.AddRequestFlow(options =>
 
 Bare `services.AddTransient<IEventHandler<X>, H>()` stays inert either way: resolution is concrete-keyed, so an interface-keyed container registration never joins delivery.
 
+### Register an event without an exact handler
+
+Use `AddEvent<TEvent>()` or `AddEvent(Type)` when a base or catch-all handler covers an event that scanning cannot discover:
+
+```csharp
+services.AddRequestFlow(options => options
+    .AddEvent<EntitySaved<int>>()
+    .AddEventHandler<AuditAllEvents>());
+
+public sealed record EntitySaved<T>(T Entity) : IEvent;
+
+public sealed class AuditAllEvents : IEventHandler<IEvent>
+{
+    public Task HandleAsync(IEvent @event, CancellationToken cancellationToken)
+        => Task.CompletedTask;
+}
+```
+
+- Scanning sees `EntitySaved<>`, not constructed types such as `EntitySaved<int>`. Register each closed event type that the application publishes.
+- `AddEvent` registers the event type only. Existing handler contracts and publish strategies apply during startup validation.
+- Repeated declarations collapse across `AddRequestFlow` calls. Invalid event types report `RF0021`; valid events without a handler report `RF0114` unless `AllowUnhandledEvents()` is enabled.
+
 ## Select a publish strategy
 
 The built-in strategies are public and stateless:
@@ -97,12 +119,15 @@ Custom strategies resolve from DI for each publish. They are singleton by defaul
 
 ```csharp
 options.PublishEventsWith<OrderEvent, ThrottledStrategy>(strategy =>
-    strategy.AsScoped());
+    strategy.AsTransient());
 ```
 
 `AsSingleton`, `AsScoped`, and `AsTransient` configure a custom strategy. Built-ins are selected directly and reject lifetime configuration. If the application registered its own descriptor for a custom strategy, that descriptor wins over RequestFlow's default registration.
 
-The default singleton instance is shared by concurrent publishes. Keep per-publish state such as a failure list in method locals. Keep only genuinely shared state, such as a semaphore or meter, in fields. Use a scoped or transient lifetime when the strategy needs instance fields per publish.
+- Keep per-publication state, such as a failure list, in method locals. A singleton is shared across publications; a scoped instance is shared by every publication in that scope, including concurrent ones.
+- Use `AsScoped()` when a strategy needs scoped dependencies. It does not isolate publications in the same scope.
+- Use `AsTransient()` when fields must belong to one publication. DI must create a new instance on each resolution.
+- Keep shared state, such as a semaphore or meter, in fields only when its lifetime matches the intended sharing.
 
 The strategy owns the publish outcome:
 
@@ -250,7 +275,7 @@ Only two errors come out of `PublishAsync` before it returns a task: an `Argumen
 
 A known event with no applicable handler is an `RF0114` at startup unless `AllowUnhandledEvents()` is called, in which case an empty plan is frozen. A built-in strategy completes without resolving a service. A custom strategy still resolves and runs with `delivery.Count == 0`.
 
-For an event to count as known it must be concrete and closed, implement `IEvent`, and have been either found by the scan or named by an exact closed handler contract. Abstract event bases, event interfaces, and open generic definitions may be handler targets but do not get plans of their own.
+For an event to count as known it must be concrete and closed, implement `IEvent`, and have been found by the scan, named by an exact closed handler contract, or registered with `AddEvent`. Abstract event bases, event interfaces, and open generic definitions may be handler targets but do not get plans of their own.
 
 Even with `AllowUnhandledEvents()` enabled, an unknown runtime type always raises `EventNotRegisteredException`. That includes an unscanned derived type or proxy whose base event is known. The opt-out covers a known event with no handler. It does not let the publisher work out a closure for a type that was absent at startup.
 

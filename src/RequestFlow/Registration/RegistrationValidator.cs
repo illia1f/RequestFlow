@@ -121,6 +121,14 @@ internal static class RegistrationValidator
     public static Validated<Type> ValidateEventHandlerDeclarations(IReadOnlyList<Type> handlerTypes)
         => Partition(handlerTypes, ValidateEventHandlerDeclaration);
 
+    public static Validated<Type> ValidateEventDeclarations(IReadOnlyList<Type> eventTypes)
+        => Partition(eventTypes, eventType => EventClosure.IsConcreteClosedEvent(eventType)
+            ? null
+            : new RequestFlowValidationProblem(
+                ProblemCodes.EventTypeNotConcreteClosed,
+                $"'{eventType.FullName}' is not a concrete closed type implementing IEvent; pass a concrete event type to AddEvent.",
+                eventType));
+
     private static RequestFlowValidationProblem? ValidateEventHandlerDeclaration(Type handlerType)
     {
         if (handlerType.IsInterface)

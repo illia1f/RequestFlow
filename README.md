@@ -17,6 +17,8 @@ Supports Task and ValueTask requests, stages, streams, and events. Additionally,
 > dotnet add package RequestFlow --prerelease
 > ```
 
+**[Getting started: define a request, register its handler, and send it](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md).**
+
 ## Startup validation
 
 `AddRequestFlow` collects registrations. `ValidateRequestFlow()` closes the stage chains and runs every built-in and application-defined rule. If all validations pass, it freezes the valid model. Otherwise, it reports all problems in a single `RequestFlowValidationException`.
@@ -99,6 +101,7 @@ Install a runtime package at the composition root. Reference an abstractions pac
 - [ValueTask requests](https://github.com/illia1f/RequestFlow/blob/main/docs/value-tasks.md): measured opt-in requests, stages, CQRS, and consumption rules
 - [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): scanning, manual registration, generic handlers, additive calls, startup validation
 - [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, filters, and request selection
+- [Pipeline inspection](https://github.com/illia1f/RequestFlow/blob/main/docs/pipeline-inspection.md): declared handlers, ordered stages, and stage exclusion reasons
 - [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests, stream stages, cancellation, and enumeration timing
 - [Events](https://github.com/illia1f/RequestFlow/blob/main/docs/events.md): polymorphic delivery, strategies, ordering, failures, and cancellation
 - [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): application-defined checks over the frozen registration model

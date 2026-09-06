@@ -112,18 +112,18 @@ internal static class EventClosure
         for (int i = 0; i < eventTypes.Count; i++)
         {
             Type eventType = eventTypes[i];
-            int winner = FindStrategyWinner(
-                eventType,
-                strategies,
-                applicableDeclarations,
-                ambiguities);
+            StrategyMatch match = FindStrategyWinner(eventType, strategies);
+            foreach (int declarationIndex in match.ApplicableDeclarationIndexes)
+                applicableDeclarations[declarationIndex] = true;
+            if (match.Ambiguity is not null)
+                ambiguities.Add(match.Ambiguity);
 
-            if (winner >= 0)
+            if (match.SelectedDeclarationIndex is int winner)
             {
                 selected.Add(eventType, strategies[winner].StrategyType);
                 reachedEvents[winner].Add(eventType);
             }
-            else if (winner == EventStrategyResolution.Ambiguous)
+            else if (match.Outcome == StrategyMatchOutcome.Ambiguous)
             {
                 selected.Add(eventType, null);
             }
@@ -182,13 +182,12 @@ internal static class EventClosure
         return winner;
     }
 
-    private static int FindStrategyWinner(
+    private static StrategyMatch FindStrategyWinner(
         Type eventType,
-        IReadOnlyList<EventStrategyInput> strategies,
-        bool[] applicableDeclarations,
-        List<EventStrategyAmbiguity> ambiguities)
+        IReadOnlyList<EventStrategyInput> strategies)
     {
         var applicable = new List<int>();
+        var candidates = new List<int>();
         int bestTier = int.MaxValue;
         for (int i = 0; i < strategies.Count; i++)
         {
@@ -196,32 +195,32 @@ internal static class EventClosure
             if (declaredEventType is null || !declaredEventType.IsAssignableFrom(eventType))
                 continue;
 
-            applicableDeclarations[i] = true;
+            applicable.Add(i);
             int tier = EventTypeSpecificity.GetTier(eventType, declaredEventType);
             if (tier < bestTier)
             {
                 bestTier = tier;
-                applicable.Clear();
+                candidates.Clear();
             }
 
             if (tier == bestTier)
-                applicable.Add(i);
+                candidates.Add(i);
         }
 
         if (applicable.Count == 0)
-            return EventStrategyResolution.None;
+            return new StrategyMatch(StrategyMatchOutcome.None, null, []);
 
         List<int> winners = bestTier == EventTypeSpecificity.EventInterfaceTier
-            ? FindMostDerivedInterfaces(applicable, strategies)
-            : FindClosestDeclarations(eventType, applicable, strategies);
+            ? FindMostDerivedInterfaces(candidates, strategies)
+            : FindClosestDeclarations(eventType, candidates, strategies);
 
         if (winners.Count == 1 || SameTargetAndStrategy(winners, strategies))
-            return winners[0];
+            return new StrategyMatch(StrategyMatchOutcome.Selected, winners[0], [.. applicable]);
 
-        if (!SameTarget(winners, strategies))
-            ambiguities.Add(new EventStrategyAmbiguity(eventType, [.. winners]));
-
-        return EventStrategyResolution.Ambiguous;
+        EventStrategyAmbiguity? ambiguity = SameTarget(winners, strategies)
+            ? null
+            : new EventStrategyAmbiguity(eventType, [.. winners]);
+        return new StrategyMatch(StrategyMatchOutcome.Ambiguous, null, [.. applicable], ambiguity);
     }
 
     private static List<int> FindClosestDeclarations(
@@ -382,6 +381,36 @@ internal static class EventClosure
             left.Subscription.DeclaredEventType.AssemblyQualifiedName,
             right.Subscription.DeclaredEventType.AssemblyQualifiedName,
             StringComparison.Ordinal);
+    }
+
+    private enum StrategyMatchOutcome
+    {
+        None,
+        Selected,
+        Ambiguous,
+    }
+
+    private readonly struct StrategyMatch
+    {
+        public StrategyMatch(
+            StrategyMatchOutcome outcome,
+            int? selectedDeclarationIndex,
+            int[] applicableDeclarationIndexes,
+            EventStrategyAmbiguity? ambiguity = null)
+        {
+            Outcome = outcome;
+            SelectedDeclarationIndex = selectedDeclarationIndex;
+            ApplicableDeclarationIndexes = applicableDeclarationIndexes;
+            Ambiguity = ambiguity;
+        }
+
+        public StrategyMatchOutcome Outcome { get; }
+
+        public int? SelectedDeclarationIndex { get; }
+
+        public int[] ApplicableDeclarationIndexes { get; }
+
+        public EventStrategyAmbiguity? Ambiguity { get; }
     }
 
     private readonly struct ApplicableSubscription

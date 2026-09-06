@@ -58,6 +58,34 @@ curl http://localhost:5113/orders/activity
 
 An empty customer or a total of zero returns 400 because `ValidationStage` stops the chain before the handler. Cancelling an unknown id returns 404.
 
+## Inspect the pipelines
+
+```bash
+dotnet run --project samples/Orders.Api -- --inspect-pipelines
+```
+
+The flag validates both modules, prints their declared pipelines, and exits. The `inspect-pipelines` launch profile runs the same example from an IDE.
+
+- `CreateOrderCommand` includes `LoggingStage` followed by `ValidationStage`.
+- `GetOrderQuery` includes `LoggingStage`. `ValidationStage` is excluded with `HandlerFilterNotMatched` because its handler does not implement `IOrdersCommandHandler`.
+- `GetOrderActivityQuery` shows that the Orders logging stage also reaches the Audit module's query through additive registration. Its validation stage is excluded by the same handler filter.
+
+The example calls the public inspection API directly:
+
+```csharp
+RequestPipeline pipeline = services.InspectRequestFlow<GetOrderQuery>();
+
+foreach (RequestPipelineStage stage in pipeline.Stages)
+    Console.WriteLine(stage.ClosedType);
+
+foreach (ExcludedStageModel stage in pipeline.ExcludedStages)
+    Console.WriteLine($"{stage.DeclaredType}: {stage.ReasonCode}");
+```
+
+`Orders.Api/PipelineInspectionExample.cs` prints the handler, service contract, declared lifetimes, and stage details. Inspection does not send requests or invoke their handlers. Handler and lifetime information describes RequestFlow registration; application DI replacements and factories can resolve different instances.
+
+Combining `--inspect-pipelines` with `--break-rules` still fails validation before printing any pipelines. See [Pipeline inspection](../docs/pipeline-inspection.md) for the API and exclusion codes.
+
 ## Run the validation failures
 
 ```bash

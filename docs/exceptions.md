@@ -7,7 +7,7 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 | Exception                        | Thrown from              | When                                                          |
 | -------------------------------- | ------------------------ | -------------------------------------------------------------- |
 | [`RequestFlowValidationException`](#requestflowvalidationexception) | Startup validation | Any registration problem, or a validation rule that threw; one throw lists all of them |
-| [`HandlerNotFoundException`](#handlernotfoundexception) | `SendAsync`, `Stream` | The dispatched request type has no registered handler |
+| [`HandlerNotFoundException`](#handlernotfoundexception) | `SendAsync`, `Stream`, `InspectRequestFlow` | The request type has no registered handler |
 | [`ResponseTypeMismatchException`](#responsetypemismatchexception) | `SendAsync`, `Stream` | The call site's response or item type differs from the registered one |
 | [`HandlerNullTaskException`](#handlernulltaskexception) | `SendAsync` | A handler returned a null task from `HandleAsync` |
 | [`StageNullTaskException`](#stagenulltaskexception) | `SendAsync` | A stage returned a null task from `HandleAsync` |
@@ -20,7 +20,7 @@ Every exception RequestFlow throws, when it surfaces, and how to fix it.
 | [`EventStrategyNullTaskException`](#eventstrategynulltaskexception) | Returned publish task | An event publish strategy returned a null task from `PublishAsync` |
 | [`InvalidOperationException`](#plain-invalidoperationexception) | `WhereHandlerImplements` | A second handler filter added to one stage |
 | [`InvalidOperationException`](#plain-invalidoperationexception) | Startup validation | A validation rule returned null, or a null problem |
-| [The container's `InvalidOperationException`](#plain-invalidoperationexception) | Startup validation | A validation rule depends on a RequestFlow dispatcher or publisher and the provider validates scopes; without that check nothing throws and startup hangs |
+| [`InvalidOperationException`](#plain-invalidoperationexception) | Startup validation | A validation rule depends on a RequestFlow dispatcher or publisher; scope validation or RequestFlow's validation re-entry guard rejects the dependency |
 | [`ArgumentNullException`](#argument-validation) | All public entry points | A required argument is null |
 | [`ArgumentException`](#argument-validation) | `RegisterGenericHandler` | `closingTypes` contains a null element |
 
@@ -33,7 +33,7 @@ strategies. ValueTask is a struct and cannot be null. `default(ValueTask<TRespon
 
 ## RequestFlowValidationException
 
-Thrown when RequestFlow validates the whole registration. The first resolution of a dispatcher or event publisher triggers validation, unless `ValidateRequestFlow` runs earlier at startup (see [lifetimes.md](lifetimes.md) for validation timing). Problems accumulate across every `AddRequestFlow` call and surface as one exception. The message and the `Problems` property list all of them, so one failed start reports everything at once. Failed validation does not stick: a later resolution of either a dispatcher or an event publisher retries validation and throws the same list.
+Thrown when RequestFlow validates the whole registration. The first resolution of a dispatcher or event publisher triggers validation, unless `ValidateRequestFlow` or `InspectRequestFlow` runs earlier (see [lifetimes.md](lifetimes.md) for validation timing). Problems accumulate across every `AddRequestFlow` call and surface as one exception. The message and the `Problems` property list all of them, so one failed start reports everything at once. Failed validation does not stick: a later resolution retries validation.
 
 `Problems` holds `RequestFlowValidationProblem` values: a stable `Code`, a `Message` saying what to fix, and the `Subject` type at fault where the problem has one. Each line of the exception message is one problem, printed as `CODE: message`. A rule of your own reports into the same list, and [validation-rules.md](validation-rules.md) covers writing one.
 
@@ -63,6 +63,7 @@ Scan by code, or use the Area column when you only remember what failed. Each co
 | [`RF0018`](#manual-handler-registration) | Manual handler registration | Manually added handler type is an interface |
 | [`RF0019`](#manual-handler-registration) | Manual handler registration | Manually added handler type is abstract |
 | [`RF0020`](#manual-handler-registration) | Manual handler registration | Manually added type does not implement a handler contract |
+| [`RF0021`](#events) | Events | Manually added event type is not concrete, closed, and implementing IEvent |
 | [`RF0101`](#requests-and-handlers) | Requests and handlers | Request has more than one handler |
 | [`RF0102`](#requests-and-handlers) | Requests and handlers | Request has no handler |
 | [`RF0103`](#stages) | Stages | Stage type is registered more than once |
@@ -145,7 +146,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | --- | --- | --- | --- |
 | `RF0103` | `Stage '...' from assembly '...' is registered more than once...` | The same stage type appears in any two `AddStage`, `AddValueStage`, or `AddStreamStage` calls. A type implementing several families' contracts can still be declared only once, so it serves one chain | Remove the duplicate; a handler filter does not make it distinct. To wrap several families, write one stage class per family |
 | `RF0104` | `Stages '...' and '...' both resolve to '...'` / `Stages ... are the same stage class...` | An open definition registered next to its own closed form, or several closings of one class reaching the same request; one problem names every declaration in the group. A request with more than one handler has one chain per handler, so only declarations resolving to one closed type collide there | Keep one of the named `AddStage` calls and remove the rest |
-| `RF0105` | `Stage '...' from assembly '...' applies to no registered request...` | `DisallowUnusedStages` is on and the stage reached nothing. A request with no handler gets no stage chain, so a stage aimed only at unhandled requests lands here too | Widen its constraints, scan the assembly holding its requests, add the missing handler, or drop the opt-in |
+| `RF0105` | `Stage '...' from assembly '...' applies to no registered request...` | `DisallowUnusedStages` is on and the stage reached nothing. A request with no handler gets no stage chain, so a stage aimed only at unhandled requests lands here too | Check its WhereHandlerImplements handler filter, widen its constraints, scan the assembly holding its requests, add the missing handler, or drop the opt-in |
 | `RF0111` | `Stream stage '...' takes '...' items for request '...'` | The stage's item type is wider than the one the request declares. `IStreamRequest<TItem>` is covariant, so the stage compiles, but closing matches the item type exactly, so the stage would wrap no handler and the chain would run without it | Give the stage the item type the request declares |
 | `RF0113` | `Stage '...' takes '...' for request '...'` | The stage's response type is wider than the one the request declares. `IRequest<TResponse>` is covariant, so the stage compiles, but closing matches the response type exactly, so the stage would wrap no handler and the chain would run without it | Give the stage the response type the request declares |
 | `RF0130` | `ValueTask stage '...' takes '...' for request '...'` | The stage's fixed response type differs from the request's sole `IValueRequest<TResponse>` contract, so the stage would never run | Give the stage the response type the request declares |
@@ -166,6 +167,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0016` | `'...' is abstract; only concrete event handler classes...` | An abstract class passed to `AddEventHandler` | Register a concrete subclass |
 | `RF0017` | `'...' does not implement IEventHandler.` | The type passed to `AddEventHandler` is not an event handler | Implement `IEventHandler<TEvent>` |
 | `RF0017` | `'...' has an interface that could not be loaded...` | An interface on the type passed to `AddEventHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
+| `RF0021` | `'...' is not a concrete closed type implementing IEvent...` | The type passed to `AddEvent` is abstract, open, an interface, or outside the event family | Register a concrete closed event type |
 | `RF0114` | `Event '...' has no handler.` | A known concrete event has no applicable exact, base, interface, or `IEvent` handler | Add or scan a handler, or call `AllowUnhandledEvents` when a known empty plan is intentional |
 | `RF0115` | `Event subscription '...' declared for '...' reaches no known event...` | `DisallowUnusedEventHandlers` is on and one handler contract reaches no known concrete event | Scan the targeted event assembly, remove the dead contract, or drop the opt-in |
 | `RF0116` | `Type '...' implements both IRequest and IEvent...` | One concrete type belongs to the request and event contract families | Keep one role; split the type when both messages are needed |
@@ -226,6 +228,8 @@ runtime type has no registered handler. The `RequestType` property holds the req
 no handler. Both `Stream` methods throw it from the call rather than from the first enumeration,
 because the lookup is not part of the sequence they hand back.
 
+`InspectRequestFlow<TRequest>()` and its `Type` overload throw it when the requested type has no frozen pipeline, including requests permitted by `AllowUnhandledRequests()`. Inspection uses the exact supplied type.
+
 With default validation a scanned request without a handler already fails at startup, so only three paths lead here:
 
 1. The request's assembly was never scanned. RequestFlow never saw the type, so startup validation could not flag it. Include the assembly in a `RegisterHandlersFromAssembly*` call.
@@ -252,7 +256,7 @@ The second call compiles because `ExpressCreateOrder` is an `IRequest<OrderId>`,
 
 Thrown directly from `PublishAsync` when the event's exact runtime type has no entry in the frozen `EventMap`. `EventType` holds that runtime type. The call throws before it returns a task and before any handler runs.
 
-This is an unknown event, not a known event with an empty plan. `AllowUnhandledEvents` permits the latter and has no effect on a map miss. Include the event's assembly in a `RegisterHandlersFromAssembly*` call. An unscanned derived type or runtime proxy remains unknown even when its base event is registered, because closure is computed at freeze rather than at publication.
+`AllowUnhandledEvents` permits a known event with an empty plan and has no effect on a map miss. Register the exact runtime type with `AddEvent<TEvent>()` or `AddEvent(Type)`, or scan the assembly declaring it. Scanning does not discover closed generic types such as `EntitySaved<int>`. A derived type or runtime proxy needs its own registration even when its base event is registered.
 
 ## Event publication failures
 
@@ -381,11 +385,11 @@ The two bases are separate types with no common base of their own beyond `Invali
 
 ## Plain InvalidOperationException
 
-Two cases are left with no type of their own. Adding a second `WhereHandlerImplements` to one stage throws from the `AddStage` configure delegate, with a message starting `This stage already filters on '...'`. A stage takes one handler filter, so give the target handlers one shared contract instead.
+Adding a second `WhereHandlerImplements` to one stage throws from the `AddStage` configure delegate, with a message starting `This stage already filters on '...'`. A stage takes one handler filter, so give the target handlers one shared contract instead.
 
-The second comes from a broken validation rule: a rule that returns null instead of an empty sequence, or a sequence with a null problem in it, throws at the freeze with a message naming the rule. Those two are the only rule failures that come out this way. An exception the rule throws from its own code is reported as `RF0107` in the validation exception instead, and the rules after it still run (see [validation-rules.md](validation-rules.md)).
+A rule that returns null instead of an empty sequence, or a sequence with a null problem in it, throws at the freeze with a message naming the rule. An exception the rule throws from its own code is reported as `RF0107` in the validation exception instead, and the rules after it still run (see [validation-rules.md](validation-rules.md)).
 
-One case that looks like it belongs here throws nothing at all. A rule that takes a dispatcher or publisher needs the plans the freeze is still building, so the container waits on a result only that freeze can produce and startup hangs. A provider that validates scopes, which is what ASP.NET Core does in Development, can reject the rule earlier because the dispatch surface is scoped and a rule is a singleton. Both point at the same fix: take `IRequestDispatcher`, `IValueRequestDispatcher`, `IStreamDispatcher`, `IEventPublisher`, `ICommandDispatcher`, `IQueryDispatcher`, `IValueCommandDispatcher`, `IValueQueryDispatcher`, and `IStreamQueryDispatcher` out of the rule's constructor. A handler or a stage in there triggers neither, though [validation-rules.md](validation-rules.md) covers why it is still the wrong dependency.
+A rule that injects a dispatcher or publisher causes a validation dependency cycle. RequestFlow throws `InvalidOperationException` when the dependency re-enters validation. Scope validation can reject the dependency earlier because rules are singletons and dispatchers are scoped by default. Remove the dispatch dependency, including any CQRS dispatcher wrapper, from the rule and its dependencies; use `context.Model` instead. A rule that calls validation or inspection from `Validate` reports the re-entry exception as `RF0107`.
 
 ## Argument validation
 

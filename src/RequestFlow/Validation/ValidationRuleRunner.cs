@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Runs one freeze's validation rules and collects what they report.
+/// Runs one freeze's validation rules and throws if any report a problem.
 /// </summary>
 /// <remarks>
 /// A built-in rule runs unguarded, so a bug in RequestFlow surfaces as the exception it threw.
@@ -13,41 +13,38 @@ namespace RequestFlow;
 internal static class ValidationRuleRunner
 {
     /// <summary>
-    /// Collects <paramref name="seeded"/> plus everything the rules report, in that order.
+    /// Reports <paramref name="seeded"/> followed by built-in and registered rule findings.
     /// </summary>
     /// <exception cref="InvalidOperationException"/>
-    public static List<RequestFlowValidationProblem> Run(
+    /// <exception cref="RequestFlowValidationException"/>
+    public static void Validate(
         RequestFlowValidationContext context,
         IEnumerable<IRequestFlowValidationRule> builtInRules,
         IEnumerable<IRequestFlowValidationRule> registeredRules,
         IReadOnlyList<RequestFlowValidationProblem> seeded)
     {
-        // Copied, not appended to: the registry keeps its scan-time problems for the next provider
-        // built from the same service collection.
-        List<RequestFlowValidationProblem> problems = [.. seeded];
+        List<ValidationFinding> findings = [];
+        foreach (var problem in seeded)
+            findings.Add(new ValidationFinding(problem));
 
         foreach (var rule in builtInRules)
-            Collect(rule, context, problems);
+            findings.AddRange(Collect(rule, context));
 
-        // Last, so a third-party finding never sits between two of RequestFlow's own.
         foreach (var rule in registeredRules)
-            RunGuarded(rule, context, problems);
+            findings.AddRange(RunGuarded(rule, context));
 
-        return problems;
+        ThrowIfInvalid(findings);
     }
 
     // Guards a registered rule. Returning null, or a null problem, is a bug in the rule and still
     // throws. An exception from its own code becomes one more problem, so the pass keeps going.
-    private static void RunGuarded(
+    private static IReadOnlyList<ValidationFinding> RunGuarded(
         IRequestFlowValidationRule rule,
-        RequestFlowValidationContext context,
-        List<RequestFlowValidationProblem> problems)
+        RequestFlowValidationContext context)
     {
-        // Findings reach the report only once the rule finishes, so a rule that throws halfway leaves none behind.
-        List<RequestFlowValidationProblem> reported = [];
         try
         {
-            Collect(rule, context, reported);
+            return Collect(rule, context);
         }
         catch (RuleContractException contract)
         {
@@ -55,24 +52,19 @@ internal static class ValidationRuleRunner
         }
         catch (Exception exception)
         {
-            // The stack trace goes, every other finding stays.
-            problems.Add(new RequestFlowValidationProblem(
+            var problem = new RequestFlowValidationProblem(
                 ProblemCodes.RuleFailed,
-                $"Validation rule '{rule.GetType().FullName}' threw {exception.GetType().FullName}: " +
-                $"'{exception.Message}'. Its findings were dropped and the other rules still ran; " +
-                "catch inside the rule and report a problem instead.",
-                rule.GetType()));
+                $"Validation rule '{rule.GetType().FullName}' threw {exception.GetType().FullName}: '{exception.Message}'. " +
+                "Its findings were dropped and the other rules still ran; catch inside the rule and report a problem instead.",
+                rule.GetType());
 
-            return;
+            return [new ValidationFinding(problem, exception)];
         }
-
-        problems.AddRange(reported);
     }
 
-    private static void Collect(
+    private static IReadOnlyList<ValidationFinding> Collect(
         IRequestFlowValidationRule rule,
-        RequestFlowValidationContext context,
-        List<RequestFlowValidationProblem> reported)
+        RequestFlowValidationContext context)
     {
         IEnumerable<RequestFlowValidationProblem>? sequence = rule.Validate(context);
         if (sequence is null)
@@ -81,6 +73,7 @@ internal static class ValidationRuleRunner
                 $"Validation rule '{rule.GetType().FullName}' returned null instead of an empty sequence.");
         }
 
+        List<ValidationFinding> findings = [];
         foreach (var problem in sequence)
         {
             if (problem is null)
@@ -89,9 +82,34 @@ internal static class ValidationRuleRunner
                     $"Validation rule '{rule.GetType().FullName}' returned a null problem.");
             }
 
-            reported.Add(problem);
+            findings.Add(new ValidationFinding(problem));
         }
+
+        return findings;
     }
+
+    private static void ThrowIfInvalid(IReadOnlyList<ValidationFinding> findings)
+    {
+        if (findings.Count == 0)
+            return;
+
+        List<RequestFlowValidationProblem> problems = [];
+        List<Exception> exceptions = [];
+        foreach (var finding in findings)
+        {
+            problems.Add(finding.Problem);
+            if (finding.Cause is not null)
+                exceptions.Add(finding.Cause);
+        }
+
+        AggregateException? innerException = exceptions.Count == 0
+            ? null
+            : new AggregateException("RequestFlow validation rules threw exceptions.", exceptions);
+
+        throw new RequestFlowValidationException(problems, innerException);
+    }
+
+    private readonly record struct ValidationFinding(RequestFlowValidationProblem Problem, Exception? Cause = null);
 
     /// <summary>
     /// Marks the two diagnostics RequestFlow raises about a validation rule that returns null,
