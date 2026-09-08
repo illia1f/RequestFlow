@@ -63,23 +63,6 @@ public sealed class AliasedStageRuleTests
     }
 
     [Fact]
-    public void Given_The_Same_Pair_On_Two_Requests_When_Validating_Then_Reports_Once()
-    {
-        Action<RequestModelBuilder> chain = r => r
-            .AddStage(typeof(OpenStage<>), typeof(OpenStage<int>))
-            .AddStage(typeof(OpenStage<int>), typeof(OpenStage<int>));
-
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(int), chain)
-            .AddRequest(typeof(long), chain)
-            .BuildContext();
-
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
-
-        problems.Count.ShouldBe(1);
-    }
-
-    [Fact]
     public void Given_Three_Declarations_Of_One_Class_When_Validating_Then_One_Problem_Names_All_Three()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()

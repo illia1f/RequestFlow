@@ -22,11 +22,15 @@ services.AddRequestFlow(o => o
 | `AddValueStage(stageType, configure?)`        | The same for ValueTask handlers, on a chain of its own (see [value-tasks.md](value-tasks.md#valuetask-stages)) |
 | `AddStreamStage(stageType, configure?)`       | The same for stream handlers, on a chain of its own (see [streaming.md](streaming.md)) |
 | `DisallowUnusedStages()`                      | Fails startup validation when a stage reaches no request (see [stages.md](stages.md)) |
-| `AllowUnhandledRequests()`                    | Skips the missing-handler check at startup validation                           |
+| `AllowUnhandledRequest<TRequest>()`, `AllowUnhandledRequest(type)` | Permits one exact request type to have no handler |
+| `AllowUnhandledRequestsFromAssembly(assembly)` | Permits requests declared in one assembly to have no handler |
+| `AllowAllUnhandledRequests()`                  | Skips missing-handler validation for every module |
 | `PublishAllEventsWith<TStrategy>(configure?)` | Selects the global event strategy and configures a custom strategy lifetime |
 | `PublishEventsWith<TEvent, TStrategy>(configure?)` | Selects a strategy for an assignable event target |
 | `PublishEventsInParallel()`, `PublishEventsSequentially()`, `PublishEventsFailFast()` | Select a built-in strategy globally; each has a `<TEvent>` overload for an assignable event target (see [events.md](events.md)) |
-| `AllowUnhandledEvents()`                      | Permits a known event to have no applicable handler                            |
+| `AllowUnhandledEvent<TEvent>()`, `AllowUnhandledEvent(type)` | Permits one exact known event type to have no handler |
+| `AllowUnhandledEventsFromAssembly(assembly)` | Permits known events declared in one assembly to have no handler |
+| `AllowAllUnhandledEvents()`                    | Permits known events in every module to have no handler |
 | `DisallowUnusedEventHandlers()`               | Fails validation when an event subscription or typed strategy reaches no known event |
 | `AddEventHandler<THandler>()`                 | Registers one event handler without scanning its assembly (see [events.md](events.md)) |
 | `AddEvent<TEvent>()`, `AddEvent(eventType)`    | Registers a concrete, closed event type without adding a handler (see [events.md](events.md)) |
@@ -60,6 +64,12 @@ services.AddRequestFlow(o => o
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Reporting.Module>());
 ```
+
+- Handler lifetime applies to handlers added by that call.
+- The first dispatcher registration sets its lifetime for the application. Set it in the composition root before registering modules.
+- [Missing-handler exemptions](#missing-handler-exemptions) accumulate across calls, regardless of order.
+- `DisallowUnusedStages()` and `DisallowUnusedEventHandlers()` apply to every module once enabled.
+- Conflicting event strategies fail startup validation.
 
 ## Generic handlers
 
@@ -105,23 +115,33 @@ services.AddRequestFlow(o => o
 ```
 
 - A handler both scanned and added manually registers once, and the first registration decides the lifetime. `WithScopedHandlers()` covers the same call's manual adds wherever it appears in the delegate.
-- Excluding a request's only handler leaves it unhandled: `RF0102` at startup validation unless `AllowUnhandledRequests()`.
+- Excluding a request's only handler produces `RF0102` at startup unless the request is exempt from missing-handler validation.
 - A second handler type for the same request is still `RF0101`, whichever source registered it.
 - A closed generic such as `AddHandler<AuditHandler<Order>>()` registers one closing without `RegisterGenericHandler`.
 - An exclusion filters the scan only. A closing declared with `RegisterGenericHandler` registers either way, and a closed generic never comes from a scan, so `ExcludeHandler` on one is a no-op; drop the closing type from the declaration instead.
 - An exclusion applies only to the call that declares it, but an assembly is never re-scanned, so the handler stays out until `AddHandler` names it.
 
-## AllowUnhandledRequests
+## Missing-handler exemptions
 
-By default every scanned request type must have a handler, checked at startup validation. `AllowUnhandledRequests` skips that check. The intended case is a contracts assembly whose requests are handled in a different application:
+Every discovered request and known event must have a handler by default. Exempt messages that this application deliberately leaves unhandled:
 
 ```csharp
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Contracts.CreateOrder>()
-    .AllowUnhandledRequests());
+    .AllowUnhandledRequestsFromAssembly(typeof(Contracts.CreateOrder).Assembly));
 ```
 
-The setting is sticky: once any call opts in, the check is off for every registered assembly, not only that call's. The safety net also moves: a request that reaches `SendAsync` without a handler throws `HandlerNotFoundException` at dispatch instead of failing at startup. The duplicate-handler check stays on either way.
+- `AllowUnhandledRequest<TRequest>()` and `AllowUnhandledRequest(type)` exempt one exact Task, ValueTask, or stream request type.
+- `AllowUnhandledEvent<TEvent>()` and `AllowUnhandledEvent(type)` exempt one exact event type. Derived request and event types remain checked.
+- `AllowUnhandledRequestsFromAssembly(assembly)` and `AllowUnhandledEventsFromAssembly(assembly)` exempt messages declared in that assembly. Other assemblies remain checked, even within the same registration call.
+- Exemptions do not register messages or scan assemblies. An event still needs registration through `AddEvent`, a scan, or an exact closed handler contract before it can be published.
+- Type exemptions require concrete, closed message types. Invalid types throw `ArgumentException`; null types or assemblies throw `ArgumentNullException`.
+- Repeated exemptions register once. Only missing-handler checks change; all other enabled checks still run.
+- An exempt request without a handler throws `HandlerNotFoundException` at dispatch or inspection. An exempt known event gets an empty publication plan. An unknown event throws `EventNotRegisteredException`.
+
+`AllowAllUnhandledRequests()` and `AllowAllUnhandledEvents()` disable the respective missing-handler check for every module in the service collection. Use them when the application accepts missing handlers everywhere.
+
+Replace calls to the former `AllowUnhandledRequests()` and `AllowUnhandledEvents()` with these `AllowAll...` names to keep their global behavior, or choose type or assembly exemptions to narrow it.
 
 ## Event options
 
@@ -133,7 +153,7 @@ services.AddRequestFlow(o => o
     .PublishAllEventsWith<ParallelPublishStrategy>()
     .PublishEventsWith<IAuditEvent, ThrottledStrategy>(strategy => strategy.AsScoped())
     .PublishEventsWith<OrderPlaced, FailFastPublishStrategy>()
-    .AllowUnhandledEvents()
+    .AllowAllUnhandledEvents()
     .DisallowUnusedEventHandlers());
 ```
 
@@ -145,9 +165,9 @@ Custom strategies are singleton by default. The configure delegate accepts `AsSi
 
 `PublishEventsInParallel` starts handlers serially in frozen plan order on the publishing thread, then overlaps only incomplete asynchronous work. It does not use `Task.Run`, and it waits for every handler. See [events.md](events.md#parallel-publication-and-scopes) before enabling it for scoped handlers.
 
-`AllowUnhandledEvents` suppresses `RF0114` and permits a known event to freeze with an empty plan. A built-in strategy then does no work. A custom strategy still resolves and receives a delivery with zero entries. The option does not permit an event type that the scan never saw; an unknown runtime type still throws `EventNotRegisteredException`.
+For an exempt event with no handlers, built-in strategies do no work. A custom strategy still resolves and receives an empty delivery. See [Missing-handler exemptions](#missing-handler-exemptions).
 
-`DisallowUnusedEventHandlers` enables `RF0115` for a handler contract and `RF0122` for a per-event strategy declaration that reaches no known event. It is off by default and independent of `AllowUnhandledEvents`. Global strategy declarations never produce `RF0122`.
+`DisallowUnusedEventHandlers` enables `RF0115` for handler contracts and `RF0122` for per-event strategies that reach no known event, even when missing handlers are allowed. It is off by default. Global strategy declarations never produce `RF0122`.
 
 ## ValidateRequestFlow
 

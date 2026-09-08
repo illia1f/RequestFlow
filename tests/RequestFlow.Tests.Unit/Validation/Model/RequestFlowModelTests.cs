@@ -226,58 +226,36 @@ public sealed class RequestFlowModelTests
         closing.ContractType.ShouldBe(typeof(IEnumerable<>));
     }
 
-    [Fact]
-    public void Given_A_Closed_Interface_When_Creating_Handler_Model_Then_Throws_Naming_The_Contract()
+    [Theory]
+    [InlineData(typeof(IEquatable<int>))]
+    [InlineData(typeof(string))]
+    public void Given_An_Invalid_Contract_When_Creating_Handler_Model_Then_Throws_Naming_The_Contract(Type contractType)
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new HandlerModel(typeof(object), typeof(int), typeof(IEquatable<int>)));
+            () => new HandlerModel(typeof(object), typeof(int), contractType));
 
         exception.ParamName.ShouldBe("contractType");
     }
 
-    [Fact]
-    public void Given_A_Class_When_Creating_Handler_Model_Then_Throws_Naming_The_Contract()
-    {
-        ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new HandlerModel(typeof(object), typeof(int), typeof(string)));
-
-        exception.ParamName.ShouldBe("contractType");
-    }
-
-    [Fact]
-    public void Given_A_Closed_Interface_When_Creating_Stage_Declaration_Model_Then_Throws_Naming_The_Contract()
+    [Theory]
+    [InlineData(typeof(IEquatable<int>))]
+    [InlineData(typeof(string))]
+    public void Given_An_Invalid_Contract_When_Creating_Stage_Declaration_Model_Then_Throws_Naming_The_Contract(Type contractType)
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
             () => new StageDeclarationModel(
-                typeof(object), RequestFlowLifetime.Transient, [], typeof(IEquatable<int>)));
+                typeof(object), RequestFlowLifetime.Transient, [], contractType));
 
         exception.ParamName.ShouldBe("contractType");
     }
 
-    [Fact]
-    public void Given_A_Class_When_Creating_Stage_Declaration_Model_Then_Throws_Naming_The_Contract()
+    [Theory]
+    [InlineData(typeof(IEquatable<int>))]
+    [InlineData(typeof(string))]
+    public void Given_An_Invalid_Contract_When_Creating_Closed_Stage_Model_Then_Throws_Naming_The_Contract(Type contractType)
     {
         ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new StageDeclarationModel(
-                typeof(object), RequestFlowLifetime.Transient, [], typeof(string)));
-
-        exception.ParamName.ShouldBe("contractType");
-    }
-
-    [Fact]
-    public void Given_A_Closed_Interface_When_Creating_Closed_Stage_Model_Then_Throws_Naming_The_Contract()
-    {
-        ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new ClosedStageModel(typeof(object), typeof(string), typeof(IEquatable<int>)));
-
-        exception.ParamName.ShouldBe("contractType");
-    }
-
-    [Fact]
-    public void Given_A_Class_When_Creating_Closed_Stage_Model_Then_Throws_Naming_The_Contract()
-    {
-        ArgumentException exception = Should.Throw<ArgumentException>(
-            () => new ClosedStageModel(typeof(object), typeof(string), typeof(string)));
+            () => new ClosedStageModel(typeof(object), typeof(string), contractType));
 
         exception.ParamName.ShouldBe("contractType");
     }

@@ -102,58 +102,44 @@ public sealed class ValueHandlerRegistrationTests
         ValueNotifyHandler<Order>.Calls.ShouldBe(before + 1);
     }
 
-    [Fact]
-    public void Given_Default_Options_When_Registering_A_Value_Handler_Then_Descriptor_Is_Transient()
+    [Theory]
+    [InlineData(false, ServiceLifetime.Transient)]
+    [InlineData(true, ServiceLifetime.Scoped)]
+    public void Given_A_Handler_Lifetime_When_Registering_A_Value_Handler_Then_Descriptor_Uses_That_Lifetime(
+        bool scoped, ServiceLifetime expectedLifetime)
     {
         var services = new ServiceCollection();
 
         services.AddRequestFlow(o =>
-            o.RegisterHandlersFromAssemblyContaining<ValueHandlerRegistrationTests>());
+        {
+            o.RegisterHandlersFromAssemblyContaining<ValueHandlerRegistrationTests>();
+            if (scoped)
+                o.WithScopedHandlers();
+        });
 
         ServiceDescriptor descriptor = services.Single(candidate =>
             candidate.ServiceType == typeof(IValueRequestHandler<ScannedValue, string>));
-        descriptor.Lifetime.ShouldBe(ServiceLifetime.Transient);
+        descriptor.Lifetime.ShouldBe(expectedLifetime);
     }
 
-    [Fact]
-    public void Given_Scoped_Handlers_When_Registering_A_Value_Handler_Then_Descriptor_Is_Scoped()
-    {
-        var services = new ServiceCollection();
-
-        services.AddRequestFlow(o => o
-            .RegisterHandlersFromAssemblyContaining<ValueHandlerRegistrationTests>()
-            .WithScopedHandlers());
-
-        ServiceDescriptor descriptor = services.Single(candidate =>
-            candidate.ServiceType == typeof(IValueRequestHandler<ScannedValue, string>));
-        descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped);
-    }
-
-    [Fact]
-    public void Given_Default_Options_When_Registering_Request_Flow_Then_Value_Dispatcher_Is_Scoped()
+    [Theory]
+    [InlineData(false, ServiceLifetime.Scoped)]
+    [InlineData(true, ServiceLifetime.Transient)]
+    public void Given_A_Dispatcher_Lifetime_When_Registering_Request_Flow_Then_Value_Dispatcher_Uses_That_Lifetime(
+        bool transient, ServiceLifetime expectedLifetime)
     {
         var services = new ServiceCollection();
 
         services.AddRequestFlow(o =>
-            o.RegisterHandlersFromAssemblyContaining<ValueHandlerRegistrationTests>());
+        {
+            o.RegisterHandlersFromAssemblyContaining<ValueHandlerRegistrationTests>();
+            if (transient)
+                o.WithTransientDispatcher();
+        });
 
         ServiceDescriptor descriptor = services.Single(candidate =>
             candidate.ServiceType == typeof(IValueRequestDispatcher));
-        descriptor.Lifetime.ShouldBe(ServiceLifetime.Scoped);
-    }
-
-    [Fact]
-    public void Given_Transient_Dispatcher_When_Registering_Request_Flow_Then_Value_Dispatcher_Is_Transient()
-    {
-        var services = new ServiceCollection();
-
-        services.AddRequestFlow(o => o
-            .RegisterHandlersFromAssemblyContaining<ValueHandlerRegistrationTests>()
-            .WithTransientDispatcher());
-
-        ServiceDescriptor descriptor = services.Single(candidate =>
-            candidate.ServiceType == typeof(IValueRequestDispatcher));
-        descriptor.Lifetime.ShouldBe(ServiceLifetime.Transient);
+        descriptor.Lifetime.ShouldBe(expectedLifetime);
     }
 
     [Fact]

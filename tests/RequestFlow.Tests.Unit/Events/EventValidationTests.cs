@@ -180,7 +180,7 @@ public sealed class EventValidationTests
     public void Given_Unhandled_Events_Allowed_And_Dead_Subscriptions_Disallowed_When_Validating_Then_Unused_Subscription_Is_Still_Reported()
     {
         RequestFlowValidationException exception = ValidateFixtures(options => options
-            .AllowUnhandledEvents()
+            .AllowAllUnhandledEvents()
             .DisallowUnusedEventHandlers());
 
         exception.Problems.ShouldContain(problem =>
@@ -192,7 +192,7 @@ public sealed class EventValidationTests
     public void Given_Unhandled_Events_Allowed_When_Validating_Then_Unhandled_Event_Is_Not_Reported()
     {
         RequestFlowValidationException exception = ValidateFixtures(
-            options => options.AllowUnhandledEvents());
+            options => options.AllowAllUnhandledEvents());
 
         exception.Problems.ShouldNotContain(problem => problem.Code == "RF0114");
     }

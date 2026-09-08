@@ -29,22 +29,13 @@ public sealed class MultiContractRequestRuleTests
         problems.ShouldHaveSingleItem().Subject.ShouldBe(typeof(VoidAndTyped));
     }
 
-    [Fact]
-    public void Given_A_Request_With_One_Contract_When_Validating_Then_Reports_Nothing()
+    [Theory]
+    [InlineData(typeof(SingleContract))]
+    [InlineData(typeof(VoidOnly))]
+    [InlineData(typeof(SharedContract))]
+    public void Given_A_Request_With_One_Response_Contract_When_Validating_Then_Reports_Nothing(Type requestType)
     {
-        _sut.Validate(Context(typeof(SingleContract))).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_A_Void_Request_When_Validating_Then_Reports_Nothing()
-    {
-        _sut.Validate(Context(typeof(VoidOnly))).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_Two_Marker_Interfaces_Sharing_One_Contract_When_Validating_Then_Reports_Nothing()
-    {
-        _sut.Validate(Context(typeof(SharedContract))).ShouldBeEmpty();
+        _sut.Validate(Context(requestType)).ShouldBeEmpty();
     }
 
     [Fact]

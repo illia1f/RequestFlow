@@ -7,24 +7,14 @@ namespace RequestFlow.Tests.Unit;
 public sealed class StageLifetimeTests
 {
     [Fact]
-    public async Task Given_Stage_With_A_Constructor_Dependency_When_Sending_Request_Then_It_Is_Injected()
-    {
-        ServiceProvider provider = Build();
-
-        await SendAsync(provider);
-
-        StageMarkers.Count.ShouldBe(1);
-        StageMarkers[0].ShouldNotBeNull();
-    }
-
-    [Fact]
     public async Task Given_Scoped_Dependency_When_Sending_Request_Then_Stage_And_Handler_Share_The_Instance()
     {
         ServiceProvider provider = Build();
 
         await SendAsync(provider);
 
-        StageMarkers[0].ShouldBeSameAs(HandlerMarkers[0]);
+        StageMarkers.ShouldHaveSingleItem().ShouldNotBeNull();
+        StageMarkers[0].ShouldBeSameAs(HandlerMarkers.ShouldHaveSingleItem());
     }
 
     [Fact]
@@ -50,23 +40,25 @@ public sealed class StageLifetimeTests
     }
 
     [Fact]
-    public async Task Given_Stage_That_Skips_Next_When_Sending_Request_Then_The_Stage_Below_Is_Never_Constructed()
+    public async Task Given_Stage_That_Skips_Next_When_Sending_Request_Then_The_Lower_Stages_And_Handler_Are_Never_Constructed()
     {
         ServiceProvider provider = BuildTraceChain(typeof(SkipNextStage));
 
         await SendTraceAsync(provider);
 
         CountingStageConstructions.ShouldBe(0);
+        TraceHandlerConstructions.ShouldBe(0);
     }
 
     [Fact]
-    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Stage_Below_Is_Constructed_Once_Per_Call()
+    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Lower_Stages_And_Handler_Are_Constructed_Once_Per_Call()
     {
         ServiceProvider provider = BuildTraceChain(typeof(DoubleNextStage));
 
         await SendTraceAsync(provider);
 
         CountingStageConstructions.ShouldBe(2);
+        TraceHandlerConstructions.ShouldBe(2);
     }
 
     [Fact]
@@ -125,26 +117,6 @@ public sealed class StageLifetimeTests
         string result = await SendOverlapForResultAsync(provider);
 
         result.ShouldBe("caught:released");
-    }
-
-    [Fact]
-    public async Task Given_Stage_That_Skips_Next_When_Sending_Request_Then_The_Handler_Is_Never_Constructed()
-    {
-        ServiceProvider provider = BuildTraceChain(typeof(SkipNextStage));
-
-        await SendTraceAsync(provider);
-
-        TraceHandlerConstructions.ShouldBe(0);
-    }
-
-    [Fact]
-    public async Task Given_Stage_That_Calls_Next_Twice_When_Sending_Request_Then_The_Handler_Is_Constructed_Once_Per_Call()
-    {
-        ServiceProvider provider = BuildTraceChain(typeof(DoubleNextStage));
-
-        await SendTraceAsync(provider);
-
-        TraceHandlerConstructions.ShouldBe(2);
     }
 
     [Fact]

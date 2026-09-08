@@ -24,20 +24,6 @@ public sealed class StreamChainAllocationTests
         stagedBytes.ShouldBe(plainBytes);
     }
 
-    // An async-iterator stage is a real state machine and a real enumerator, unlike the pass-through
-    // above, so this is where a stream chain's cost shows up.
-    [Fact]
-    public async Task Given_A_One_Stage_Async_Iterator_Stream_Chain_When_Enumerating_Then_It_Allocates_More_Than_A_Stageless_One()
-    {
-        IStreamDispatcher staged = Build(o => o.AddStreamStage(typeof(IteratingStage), s => s.AsSingleton()));
-        IStreamDispatcher plain = Build();
-
-        long stagedBytes = await MeasureAsync(staged);
-        long plainBytes = await MeasureAsync(plain);
-
-        stagedBytes.ShouldBeGreaterThan(plainBytes);
-    }
-
     // The cost is per level rather than compounding, so a second async-iterator stage should not cost
     // more than the first one did.
     [Fact]

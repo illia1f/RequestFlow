@@ -7,25 +7,16 @@ namespace RequestFlow.Cqrs.Tests.Unit;
 public sealed class CqrsStreamDispatcherTests
 {
     [Fact]
-    public void Given_Stream_Query_When_Streaming_Query_Then_Returns_Stream_Dispatcher_Sequence()
-    {
-        var query = new ListNames();
-        IAsyncEnumerable<int> sequence = Sequence();
-        _streams.Stream(query, Arg.Any<CancellationToken>()).Returns(sequence);
-
-        IAsyncEnumerable<int> result = _sut.Stream(query);
-
-        result.ShouldBeSameAs(sequence);
-    }
-
-    [Fact]
-    public void Given_Stream_Query_When_Streaming_Query_Then_Forwards_Query_And_Token()
+    public void Given_Stream_Query_When_Streaming_Query_Then_Forwards_Query_And_Token_And_Returns_The_Same_Sequence()
     {
         var query = new ListNames();
         using var cts = new CancellationTokenSource();
+        IAsyncEnumerable<int> sequence = Sequence();
+        _streams.Stream(query, cts.Token).Returns(sequence);
 
-        _sut.Stream(query, cts.Token);
+        IAsyncEnumerable<int> result = _sut.Stream(query, cts.Token);
 
+        result.ShouldBeSameAs(sequence);
         _streams.Received(1).Stream(query, cts.Token);
     }
 

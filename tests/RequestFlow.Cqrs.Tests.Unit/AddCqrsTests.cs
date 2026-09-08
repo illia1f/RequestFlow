@@ -292,7 +292,7 @@ public sealed class AddCqrsRegistrationTests
         services.AddRequestFlow(o =>
             {
                 o.RegisterHandlersFromAssembly(typeof(RequestFlow.Tests.ValidationFixtures.Confused).Assembly);
-                o.AllowUnhandledRequests();
+                o.AllowAllUnhandledRequests();
             })
             .AddCqrs();
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -312,7 +312,7 @@ public sealed class AddCqrsRegistrationTests
         services.AddRequestFlow(o =>
             {
                 o.RegisterHandlersFromAssembly(typeof(RequestFlow.Tests.ValidationFixtures.MixedCqrsFamilies).Assembly);
-                o.AllowUnhandledRequests();
+                o.AllowAllUnhandledRequests();
             })
             .AddCqrs();
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -333,7 +333,7 @@ public sealed class AddCqrsRegistrationTests
         services.AddRequestFlow(o =>
             {
                 o.RegisterHandlersFromAssembly(typeof(RequestFlow.Tests.ValidationFixtures.StreamConfused).Assembly);
-                o.AllowUnhandledRequests();
+                o.AllowAllUnhandledRequests();
             })
             .AddCqrs();
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -357,7 +357,7 @@ public sealed class AddCqrsRegistrationTests
             {
                 o.RegisterHandlersFromAssembly(
                     typeof(RequestFlow.Tests.ValidationFixtures.MixedTaskQueryValueCommand).Assembly);
-                o.AllowUnhandledRequests();
+                o.AllowAllUnhandledRequests();
             })
             .AddCqrs();
         using ServiceProvider provider = services.BuildServiceProvider();

@@ -34,22 +34,13 @@ public sealed class StreamRequestContractRuleTests
         problem.Message.ShouldContain("IStreamRequest");
     }
 
-    [Fact]
-    public void Given_A_Request_With_One_Stream_Contract_When_Validating_Then_Reports_Nothing()
+    [Theory]
+    [InlineData(typeof(SingleStream))]
+    [InlineData(typeof(PlainRequest))]
+    [InlineData(typeof(SharedStream))]
+    public void Given_A_Request_Without_Conflicting_Stream_Contracts_When_Validating_Then_Reports_Nothing(Type requestType)
     {
-        _sut.Validate(Context(typeof(SingleStream))).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_A_Plain_Request_When_Validating_Then_Reports_Nothing()
-    {
-        _sut.Validate(Context(typeof(PlainRequest))).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_Two_Marker_Interfaces_Sharing_One_Stream_Contract_When_Validating_Then_Reports_Nothing()
-    {
-        _sut.Validate(Context(typeof(SharedStream))).ShouldBeEmpty();
+        _sut.Validate(Context(requestType)).ShouldBeEmpty();
     }
 
     [Fact]

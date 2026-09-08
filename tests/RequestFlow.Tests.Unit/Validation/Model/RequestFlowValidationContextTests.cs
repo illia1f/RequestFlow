@@ -131,7 +131,7 @@ public sealed class RequestFlowValidationContextTests
             {
                 o.RegisterHandlersFromAssemblyContaining<RequestFlowValidationContextTests>();
                 if (allowAllUnhandledRequests)
-                    o.AllowUnhandledRequests();
+                    o.AllowAllUnhandledRequests();
                 if (disallowUnusedStages)
                     o.DisallowUnusedStages();
             })
@@ -175,7 +175,7 @@ public sealed class RequestFlowValidationContextTests
             .AddValidationRule<HandlerLifetimeReportingRule>();
         services.AddRequestFlow(o => o
             .RegisterHandlersFromAssembly(typeof(RequestFlow.Tests.ValidationFixtures.Lonely).Assembly)
-            .AllowUnhandledRequests());
+            .AllowAllUnhandledRequests());
         using ServiceProvider provider = services.BuildServiceProvider();
 
         RequestFlowValidationException exception =

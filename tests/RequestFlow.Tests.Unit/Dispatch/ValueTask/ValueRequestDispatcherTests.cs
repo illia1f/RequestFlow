@@ -173,109 +173,86 @@ public sealed class ValueRequestDispatcherTests
         (await result).ShouldBe(NoResult.Value);
     }
 
-    [Fact]
-    public async Task Given_A_Completed_Void_Source_When_Completing_As_No_Result_Then_Consumes_It_Once()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Given_A_Void_Source_When_Completing_As_No_Result_Then_Consumes_It_Once(bool completeBeforeEntry)
     {
         var source = new SingleConsumptionValueTaskSource();
-        source.SetResult();
+        if (completeBeforeEntry)
+            source.SetResult();
 
         ValueTask<NoResult> result = ValueNoResultBridge.Complete(source.CreateValueTask());
+        if (!completeBeforeEntry)
+        {
+            source.GetResultCalls.ShouldBe(0);
+            source.SetResult();
+        }
 
         (await result).ShouldBe(NoResult.Value);
         source.GetResultCalls.ShouldBe(1);
     }
 
-    [Fact]
-    public async Task Given_An_Incomplete_Void_Source_When_Completing_As_No_Result_Then_Consumes_It_Once()
-    {
-        var source = new SingleConsumptionValueTaskSource();
-
-        ValueTask<NoResult> result = ValueNoResultBridge.Complete(source.CreateValueTask());
-
-        source.GetResultCalls.ShouldBe(0);
-        source.SetResult();
-        (await result).ShouldBe(NoResult.Value);
-        source.GetResultCalls.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Given_A_Completed_No_Result_Source_When_Discarding_Its_Result_Then_Consumes_It_Once()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Given_A_No_Result_Source_When_Discarding_Its_Result_Then_Consumes_It_Once(bool completeBeforeEntry)
     {
         var source = new SingleConsumptionValueTaskSource<NoResult>();
-        source.SetResult(NoResult.Value);
+        if (completeBeforeEntry)
+            source.SetResult(NoResult.Value);
 
         ValueTask result = ValueNoResultBridge.Discard(source.CreateValueTask());
+        if (!completeBeforeEntry)
+        {
+            source.GetResultCalls.ShouldBe(0);
+            source.SetResult(NoResult.Value);
+        }
 
         await result;
         source.GetResultCalls.ShouldBe(1);
     }
 
-    [Fact]
-    public async Task Given_An_Incomplete_No_Result_Source_When_Discarding_Its_Result_Then_Consumes_It_Once()
-    {
-        var source = new SingleConsumptionValueTaskSource<NoResult>();
-
-        ValueTask result = ValueNoResultBridge.Discard(source.CreateValueTask());
-
-        source.GetResultCalls.ShouldBe(0);
-        source.SetResult(NoResult.Value);
-        await result;
-        source.GetResultCalls.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Given_A_Completed_Typed_Source_When_Dispatching_Then_The_Handler_Level_Consumes_It_Once()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Given_A_Typed_Source_When_Dispatching_Then_The_Handler_Level_Consumes_It_Once(bool completeBeforeEntry)
     {
         var source = new SingleConsumptionValueTaskSource<string>();
-        source.SetResult("pong");
-        _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
-            .Returns(source.CreateValueTask());
-
-        string result = await _sut.SendAsync(new Ping("bob"));
-
-        result.ShouldBe("pong");
-        source.GetResultCalls.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Given_An_Incomplete_Typed_Source_When_Dispatching_Then_The_Handler_Level_Consumes_It_Once()
-    {
-        var source = new SingleConsumptionValueTaskSource<string>();
+        if (completeBeforeEntry)
+            source.SetResult("pong");
         _pingHandler.HandleAsync(Arg.Any<Ping>(), Arg.Any<CancellationToken>())
             .Returns(source.CreateValueTask());
 
         ValueTask<string> result = _sut.SendAsync(new Ping("bob"));
+        if (!completeBeforeEntry)
+        {
+            source.GetResultCalls.ShouldBe(0);
+            source.SetResult("pong");
+        }
 
-        source.GetResultCalls.ShouldBe(0);
-        source.SetResult("pong");
         (await result).ShouldBe("pong");
         source.GetResultCalls.ShouldBe(1);
     }
 
-    [Fact]
-    public async Task Given_A_Completed_Void_Source_When_Dispatching_Then_The_Handler_Level_Consumes_It_Once()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Given_A_Void_Source_When_Dispatching_Then_The_Handler_Level_Consumes_It_Once(bool completeBeforeEntry)
     {
         var source = new SingleConsumptionValueTaskSource();
-        source.SetResult();
-        _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
-            .Returns(source.CreateValueTask());
-
-        await _sut.SendAsync(new Log("hi"));
-
-        source.GetResultCalls.ShouldBe(1);
-    }
-
-    [Fact]
-    public async Task Given_An_Incomplete_Void_Source_When_Dispatching_Then_The_Handler_Level_Consumes_It_Once()
-    {
-        var source = new SingleConsumptionValueTaskSource();
+        if (completeBeforeEntry)
+            source.SetResult();
         _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>())
             .Returns(source.CreateValueTask());
 
         ValueTask result = _sut.SendAsync(new Log("hi"));
+        if (!completeBeforeEntry)
+        {
+            source.GetResultCalls.ShouldBe(0);
+            source.SetResult();
+        }
 
-        source.GetResultCalls.ShouldBe(0);
-        source.SetResult();
         await result;
         source.GetResultCalls.ShouldBe(1);
     }

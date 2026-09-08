@@ -4,16 +4,10 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports every stage that reached no request. The freeze runs this rule only when the
-/// application called <c>DisallowUnusedStages</c>; whether <c>AllowUnhandledRequests</c> was
-/// called too decides how the message reads.
+/// Reports stages that reach no request when validation of unused stages is enabled.
 /// </summary>
 /// <remarks>
-/// Constraints are how a stage picks its requests, so one nothing satisfies closes for nothing:
-/// <code>
-/// class AuditStage&lt;TRequest, TResponse&gt; : IRequestStage&lt;TRequest, TResponse&gt;
-///     where TRequest : IAudited, IRequest&lt;TResponse&gt;
-/// </code>
+/// Generic constraints can leave a stage with no matching request.
 /// </remarks>
 internal sealed class UnusedStageRule : IRequestFlowValidationRule
 {
@@ -44,7 +38,7 @@ internal sealed class UnusedStageRule : IRequestFlowValidationRule
                 if (anyUnhandled)
                 {
                     message += context.AllUnhandledRequestsAllowed
-                        ? " Some registered requests have no handler, which AllowUnhandledRequests permits; a stage reaching only those still counts as unused."
+                        ? " Some registered requests have no handler, which AllowAllUnhandledRequests permits; a stage reaching only those still counts as unused."
                         : " Some registered requests have no handler; a stage reaching only those counts as unused, so the missing handler may be the fix.";
                 }
 

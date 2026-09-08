@@ -16,165 +16,37 @@ public sealed class ProblemCodesTests
         typeof(ProblemCodes).Assembly.ShouldBe(typeof(RequestFlowValidationProblem).Assembly);
     }
 
-    [Fact]
-    public void Given_The_Multi_Contract_Stream_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
+    [Theory]
+    [InlineData(ProblemCodes.MultiContractStreamRequest, "RF0108")]
+    [InlineData(ProblemCodes.RequestAndStreamRequest, "RF0109")]
+    [InlineData(ProblemCodes.StreamItemMismatch, "RF0110")]
+    [InlineData(ProblemCodes.StreamStageItemMismatch, "RF0111")]
+    [InlineData(ProblemCodes.HandlerResponseMismatch, "RF0112")]
+    [InlineData(ProblemCodes.StageResponseMismatch, "RF0113")]
+    [InlineData(ProblemCodes.StageEventHandlerLifetime, "RF0118")]
+    [InlineData(ProblemCodes.EventHandlerIsInterface, "RF0015")]
+    [InlineData(ProblemCodes.EventHandlerAbstract, "RF0016")]
+    [InlineData(ProblemCodes.EventHandlerMissingContract, "RF0017")]
+    [InlineData(ProblemCodes.ManualHandlerIsInterface, "RF0018")]
+    [InlineData(ProblemCodes.ManualHandlerAbstract, "RF0019")]
+    [InlineData(ProblemCodes.ManualHandlerMissingContract, "RF0020")]
+    [InlineData(ProblemCodes.EventStrategyIsInterface, "RF0013")]
+    [InlineData(ProblemCodes.EventStrategyAbstract, "RF0014")]
+    [InlineData(ProblemCodes.ConflictingEventStrategies, "RF0119")]
+    [InlineData(ProblemCodes.AmbiguousEventStrategy, "RF0120")]
+    [InlineData(ProblemCodes.EventStrategyLifetime, "RF0121")]
+    [InlineData(ProblemCodes.UnusedEventStrategy, "RF0122")]
+    [InlineData(ProblemCodes.EventStrategyRoleLifetime, "RF0123")]
+    [InlineData(ProblemCodes.NonConcreteRequest, "RF0124")]
+    [InlineData(ProblemCodes.MultiContractValueRequest, "RF0125")]
+    [InlineData(ProblemCodes.RequestAndValueRequest, "RF0126")]
+    [InlineData(ProblemCodes.StreamRequestAndValueRequest, "RF0127")]
+    [InlineData(ProblemCodes.ValueRequestAndEvent, "RF0128")]
+    [InlineData(ProblemCodes.ValueHandlerResponseMismatch, "RF0129")]
+    [InlineData(ProblemCodes.ValueStageResponseMismatch, "RF0130")]
+    public void Given_A_Problem_Code_When_Reading_Then_It_Matches_The_Documented_Value(
+        string code, string documentedValue)
     {
-        ProblemCodes.MultiContractStreamRequest.ShouldBe("RF0108");
-    }
-
-    [Fact]
-    public void Given_The_Request_And_Stream_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.RequestAndStreamRequest.ShouldBe("RF0109");
-    }
-
-    [Fact]
-    public void Given_The_Stream_Item_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.StreamItemMismatch.ShouldBe("RF0110");
-    }
-
-    [Fact]
-    public void Given_The_Stream_Stage_Item_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.StreamStageItemMismatch.ShouldBe("RF0111");
-    }
-
-    [Fact]
-    public void Given_The_Handler_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.HandlerResponseMismatch.ShouldBe("RF0112");
-    }
-
-    [Fact]
-    public void Given_The_Stage_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.StageResponseMismatch.ShouldBe("RF0113");
-    }
-
-    [Fact]
-    public void Given_The_Stage_Event_Handler_Lifetime_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.StageEventHandlerLifetime.ShouldBe("RF0118");
-    }
-
-    [Fact]
-    public void Given_The_Event_Handler_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventHandlerIsInterface.ShouldBe("RF0015");
-    }
-
-    [Fact]
-    public void Given_The_Event_Handler_Abstract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventHandlerAbstract.ShouldBe("RF0016");
-    }
-
-    [Fact]
-    public void Given_The_Event_Handler_Missing_Contract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventHandlerMissingContract.ShouldBe("RF0017");
-    }
-
-    [Fact]
-    public void Given_The_Manual_Handler_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ManualHandlerIsInterface.ShouldBe("RF0018");
-    }
-
-    [Fact]
-    public void Given_The_Manual_Handler_Abstract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ManualHandlerAbstract.ShouldBe("RF0019");
-    }
-
-    [Fact]
-    public void Given_The_Manual_Handler_Missing_Contract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ManualHandlerMissingContract.ShouldBe("RF0020");
-    }
-
-    [Fact]
-    public void Given_The_Event_Strategy_Interface_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventStrategyIsInterface.ShouldBe("RF0013");
-    }
-
-    [Fact]
-    public void Given_The_Event_Strategy_Abstract_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventStrategyAbstract.ShouldBe("RF0014");
-    }
-
-    [Fact]
-    public void Given_The_Conflicting_Event_Strategies_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ConflictingEventStrategies.ShouldBe("RF0119");
-    }
-
-    [Fact]
-    public void Given_The_Ambiguous_Event_Strategy_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.AmbiguousEventStrategy.ShouldBe("RF0120");
-    }
-
-    [Fact]
-    public void Given_The_Event_Strategy_Lifetime_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventStrategyLifetime.ShouldBe("RF0121");
-    }
-
-    [Fact]
-    public void Given_The_Unused_Event_Strategy_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.UnusedEventStrategy.ShouldBe("RF0122");
-    }
-
-    [Fact]
-    public void Given_The_Event_Strategy_Role_Lifetime_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.EventStrategyRoleLifetime.ShouldBe("RF0123");
-    }
-
-    [Fact]
-    public void Given_The_Non_Concrete_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.NonConcreteRequest.ShouldBe("RF0124");
-    }
-
-    [Fact]
-    public void Given_The_Multi_Contract_Value_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.MultiContractValueRequest.ShouldBe("RF0125");
-    }
-
-    [Fact]
-    public void Given_The_Request_And_Value_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.RequestAndValueRequest.ShouldBe("RF0126");
-    }
-
-    [Fact]
-    public void Given_The_Stream_Request_And_Value_Request_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.StreamRequestAndValueRequest.ShouldBe("RF0127");
-    }
-
-    [Fact]
-    public void Given_The_Value_Request_And_Event_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ValueRequestAndEvent.ShouldBe("RF0128");
-    }
-
-    [Fact]
-    public void Given_The_Value_Handler_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ValueHandlerResponseMismatch.ShouldBe("RF0129");
-    }
-
-    [Fact]
-    public void Given_The_Value_Stage_Response_Mismatch_Code_When_Reading_Then_It_Matches_The_Documented_Value()
-    {
-        ProblemCodes.ValueStageResponseMismatch.ShouldBe("RF0130");
+        code.ShouldBe(documentedValue);
     }
 }

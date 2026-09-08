@@ -201,7 +201,7 @@ public sealed class AddRequestFlowValidationTests
     {
         var services = new ServiceCollection();
         services.AddRequestFlow(o => o.RegisterHandlersFromAssembly(typeof(Lonely).Assembly));
-        services.AddRequestFlow(o => o.AllowUnhandledRequests());
+        services.AddRequestFlow(o => o.AllowAllUnhandledRequests());
 
         RequestFlowValidationException exception = Should.Throw<RequestFlowValidationException>(() =>
             services.BuildServiceProvider().GetRequiredService<IRequestDispatcher>());
@@ -356,7 +356,7 @@ public sealed class AddRequestFlowValidationTests
         {
             o.RegisterHandlersFromAssembly(typeof(Lonely).Assembly);
             if (allowAllUnhandledRequests)
-                o.AllowUnhandledRequests();
+                o.AllowAllUnhandledRequests();
         });
 
         return Should.Throw<RequestFlowValidationException>(() =>

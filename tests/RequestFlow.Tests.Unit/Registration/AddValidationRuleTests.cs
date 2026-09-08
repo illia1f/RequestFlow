@@ -269,7 +269,7 @@ public sealed class AddValidationRuleTests
         var services = new ServiceCollection();
         services.AddRequestFlow(options => options
                 .RegisterHandlersFromAssemblyContaining<AddValidationRuleTests>()
-                .AllowUnhandledEvents()
+                .AllowAllUnhandledEvents()
                 .DisallowUnusedEventHandlers())
             .AddValidationRule<EventFactsRule>();
         using ServiceProvider provider = services.BuildServiceProvider();

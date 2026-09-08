@@ -86,7 +86,7 @@ public sealed class EventStrategyValidationIntegrationTests
         var services = new ServiceCollection();
         services.AddRequestFlow(options => options
             .RegisterHandlersFromAssemblyContaining<EventStrategyValidationIntegrationTests>()
-            .AllowUnhandledRequests()
+            .AllowAllUnhandledRequests()
             .PublishAllEventsWith<DualRoleStrategy>(strategy => strategy.AsTransient()));
         using ServiceProvider provider = services.BuildServiceProvider();
 
@@ -115,7 +115,7 @@ public sealed class EventStrategyValidationIntegrationTests
         {
             options.RegisterHandlersFromAssemblyContaining<
                 EventStrategyValidationIntegrationTests>();
-            options.AllowUnhandledRequests();
+            options.AllowAllUnhandledRequests();
             configure(options);
         });
         if (configureSecond is not null)

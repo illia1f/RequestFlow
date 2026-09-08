@@ -71,7 +71,7 @@ foreach (var stage in pipeline.ExcludedStages)
 - Call after building the provider and completing registration.
 - Inspection validates and freezes the same maps used by dispatch. A prior `ValidateRequestFlow()` call is optional.
 - Invalid registration throws the existing `RequestFlowValidationException`, including event and application-defined validation problems.
-- Inspection of an unknown request or a request without a handler throws `HandlerNotFoundException`. `AllowUnhandledRequests()` permits startup without creating a pipeline for that request.
+- Inspection throws `HandlerNotFoundException` for unknown requests and requests without handlers. Missing-handler exemptions permit startup but do not create pipelines.
 - Metadata is read-only and retained for the provider. Repeated inspection returns the same description.
 - Inspection does not resolve handlers or stages, invoke their factories, send requests, or enumerate streams. Normal startup validation rules run if the maps have not frozen yet.
 

@@ -3,8 +3,7 @@ using System.Collections.Generic;
 namespace RequestFlow;
 
 /// <summary>
-/// Reports every request type no handler covers. The freeze skips this rule
-/// when <c>AllowUnhandledRequests</c> was called.
+/// Reports requests with no handler unless missing handlers are permitted.
 /// </summary>
 /// <remarks>
 /// The scan picks up requests and handlers one assembly at a time, so a request whose handler
@@ -16,7 +15,7 @@ internal sealed class UnhandledRequestRule : IRequestFlowValidationRule
     {
         foreach (var request in context.Model.Requests)
         {
-            if (request.Handlers.Count == 0)
+            if (request.Handlers.Count == 0 && !context.AllowsUnhandledRequest(request.RequestType))
             {
                 yield return new RequestFlowValidationProblem(
                     ProblemCodes.UnhandledRequest,

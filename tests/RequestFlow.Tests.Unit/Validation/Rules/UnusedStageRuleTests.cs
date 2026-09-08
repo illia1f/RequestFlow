@@ -85,8 +85,8 @@ public sealed class UnusedStageRuleTests
 
         problems.ShouldHaveSingleItem().Message.ShouldBe(
             BaseMessage(typeof(string))
-            + " Some registered requests have no handler, which AllowUnhandledRequests permits; a stage "
-            + "reaching only those still counts as unused.");
+            + " Some registered requests have no handler, which AllowAllUnhandledRequests permits; "
+            + "a stage reaching only those still counts as unused.");
     }
 
     [Fact]
@@ -101,8 +101,7 @@ public sealed class UnusedStageRuleTests
 
         problems.ShouldHaveSingleItem().Message.ShouldBe(
             BaseMessage(typeof(string))
-            + " Some registered requests have no handler; a stage reaching only those counts as unused, so "
-            + "the missing handler may be the fix.");
+            + " Some registered requests have no handler; a stage reaching only those counts as unused, so the missing handler may be the fix.");
     }
 
     // Neither flag value changes the message once every request has a handler, since the sentence
@@ -172,8 +171,7 @@ public sealed class UnusedStageRuleTests
     private static string BaseMessage(Type stageType)
         => $"Stage '{stageType.FullName}' from assembly '{stageType.Assembly.GetName().Name}' applies to no "
             + "registered request; widen its generic constraints, check its WhereHandlerImplements handler filter, "
-            + "scan the assembly holding the requests it "
-            + "targets, or drop DisallowUnusedStages.";
+            + "scan the assembly holding the requests it targets, or drop DisallowUnusedStages.";
 
     #endregion
 }

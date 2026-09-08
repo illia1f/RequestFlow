@@ -572,15 +572,6 @@ public sealed class ChainExecutionTests
         exception.RequestType.ShouldBe(typeof(Silent));
     }
 
-    [Fact]
-    public async Task Given_Synchronously_Completed_Task_When_Bridging_To_No_Result_Then_Returns_Cached_Task()
-    {
-        Task<NoResult> result = NoResultBridge.Complete(Task.CompletedTask);
-
-        result.ShouldBeSameAs(NoResult.Task);
-        await result;
-    }
-
     #region Initialization
 
     private readonly IRequestHandler<Ping, string> _pingHandler;

@@ -12,7 +12,7 @@ internal sealed class UnhandledEventRule : IRequestFlowValidationRule
     {
         foreach (var @event in context.Model.Events)
         {
-            if (@event.Handlers.Count == 0)
+            if (@event.Handlers.Count == 0 && !context.AllowsUnhandledEvent(@event.EventType))
             {
                 yield return new RequestFlowValidationProblem(
                     ProblemCodes.UnhandledEvent,

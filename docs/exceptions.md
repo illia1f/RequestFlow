@@ -128,7 +128,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | Code | Problem message starts with | Cause | Fix |
 | --- | --- | --- | --- |
 | `RF0101` | `Request '...' has more than one handler...` | Two handlers cover the same request, via scan or generic closings | Remove one; exactly one handler per request |
-| `RF0102` | `Request '...' has no handler.` | A scanned request type no handler covers | Write the handler, scan its assembly, or call `AllowUnhandledRequests` |
+| `RF0102` | `Request '...' has no handler.` | A discovered request has no handler and is not exempt | Write the handler, scan its assembly, or [exempt the request](registration.md#missing-handler-exemptions) |
 | `RF0106` | `Request '...' implements more than one request contract...` | The type implements two `IRequest<TResponse>` contracts, directly or through interfaces; a void request carries `IRequest<NoResult>` | Keep one contract; split the type if both responses are needed |
 | `RF0108` | `Stream request '...' implements more than one stream request contract...` | The type implements two `IStreamRequest<TItem>` contracts, directly or through interfaces | Keep one contract; split the type if both sequences are needed |
 | `RF0109` | `Request '...' implements both IRequest and IStreamRequest...` | One type carries a request contract and a stream contract. The map holds one plan per request type, so one would overwrite the other | Keep one contract; split the type if both are needed |
@@ -168,7 +168,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0017` | `'...' does not implement IEventHandler.` | The type passed to `AddEventHandler` is not an event handler | Implement `IEventHandler<TEvent>` |
 | `RF0017` | `'...' has an interface that could not be loaded...` | An interface on the type passed to `AddEventHandler` lives in an assembly the application did not deploy, so the contract cannot be read | Deploy the assembly that defines the interface |
 | `RF0021` | `'...' is not a concrete closed type implementing IEvent...` | The type passed to `AddEvent` is abstract, open, an interface, or outside the event family | Register a concrete closed event type |
-| `RF0114` | `Event '...' has no handler.` | A known concrete event has no applicable exact, base, interface, or `IEvent` handler | Add or scan a handler, or call `AllowUnhandledEvents` when a known empty plan is intentional |
+| `RF0114` | `Event '...' has no handler.` | A known event has no applicable handler and is not exempt | Add or scan a handler, or [exempt the event](registration.md#missing-handler-exemptions) if no handler is needed |
 | `RF0115` | `Event subscription '...' declared for '...' reaches no known event...` | `DisallowUnusedEventHandlers` is on and one handler contract reaches no known concrete event | Scan the targeted event assembly, remove the dead contract, or drop the opt-in |
 | `RF0116` | `Type '...' implements both IRequest and IEvent...` | One concrete type belongs to the request and event contract families | Keep one role; split the type when both messages are needed |
 | `RF0117` | `Type '...' implements both IStreamRequest and IEvent...` | One concrete type belongs to the stream request and event contract families | Keep one role; split the type when both messages are needed |
@@ -180,7 +180,7 @@ Stages registered with `AddStage` bring their own checks (see [stages.md](stages
 | `RF0123` | `Class '...' is registered as a ... event publish strategy and as a ... event handler or stage...` | One class is a publish strategy and also an event handler or reached stage under a different lifetime. Those roles share the concrete service key, so the descriptor registered last decides the lifetime both resolve under. A Task, ValueTask, or stream handler role is keyed on the handler interface and does not conflict | Use one lifetime or split the roles |
 | `RF0128` | `Type '...' implements both IValueRequest and IEvent...` | One concrete type belongs to the ValueTask request and event families | Keep one role; split the type when both messages are needed |
 
-`RF0115` and `RF0122` are opt-in and independent of `AllowUnhandledEvents`. The unhandled option suppresses `RF0114`; it never suppresses a dead subscription or strategy declaration requested through `DisallowUnusedEventHandlers`.
+`DisallowUnusedEventHandlers` enables `RF0115` and `RF0122`. Missing-handler exemptions suppress only `RF0114`; unused subscriptions and strategies are still checked.
 
 #### Manual handler registration
 
@@ -212,12 +212,12 @@ services.AddRequestFlow(o => o
 // RF0102: Request 'Contracts.CancelOrder' has no handler.
 ```
 
-If the assembly intentionally contains only requests, opt out with `AllowUnhandledRequests`:
+If this application deliberately leaves an assembly's requests unhandled, exempt that assembly:
 
 ```csharp
 services.AddRequestFlow(o => o
     .RegisterHandlersFromAssemblyContaining<Contracts.CreateOrder>()
-    .AllowUnhandledRequests());
+    .AllowUnhandledRequestsFromAssembly(typeof(Contracts.CreateOrder).Assembly));
 ```
 
 ## HandlerNotFoundException
@@ -228,12 +228,12 @@ runtime type has no registered handler. The `RequestType` property holds the req
 no handler. Both `Stream` methods throw it from the call rather than from the first enumeration,
 because the lookup is not part of the sequence they hand back.
 
-`InspectRequestFlow<TRequest>()` and its `Type` overload throw it when the requested type has no frozen pipeline, including requests permitted by `AllowUnhandledRequests()`. Inspection uses the exact supplied type.
+`InspectRequestFlow<TRequest>()` and its `Type` overload throw it when the exact supplied type has no frozen pipeline, even if exempted from missing-handler validation.
 
 With default validation a scanned request without a handler already fails at startup, so only three paths lead here:
 
 1. The request's assembly was never scanned. RequestFlow never saw the type, so startup validation could not flag it. Include the assembly in a `RegisterHandlersFromAssembly*` call.
-2. A call opted out with `AllowUnhandledRequests`, so a missing handler surfaces at dispatch instead of at startup.
+2. A missing-handler exemption permits startup; dispatch still needs a handler.
 3. The request is a derived type. Dispatch matches the request's exact runtime type and never walks up the inheritance chain to a base type's handler.
 
 ```csharp
@@ -256,7 +256,7 @@ The second call compiles because `ExpressCreateOrder` is an `IRequest<OrderId>`,
 
 Thrown directly from `PublishAsync` when the event's exact runtime type has no entry in the frozen `EventMap`. `EventType` holds that runtime type. The call throws before it returns a task and before any handler runs.
 
-`AllowUnhandledEvents` permits a known event with an empty plan and has no effect on a map miss. Register the exact runtime type with `AddEvent<TEvent>()` or `AddEvent(Type)`, or scan the assembly declaring it. Scanning does not discover closed generic types such as `EntitySaved<int>`. A derived type or runtime proxy needs its own registration even when its base event is registered.
+Missing-handler exemptions apply only to known events. Register the exact runtime type with `AddEvent<TEvent>()` or `AddEvent(Type)`, or scan its assembly. Scanning does not discover closed generic types such as `EntitySaved<int>`. Derived types and runtime proxies need their own registration even when the base event is registered.
 
 ## Event publication failures
 

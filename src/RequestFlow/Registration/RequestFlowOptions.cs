@@ -39,6 +39,8 @@ public sealed class RequestFlowOptions
 
     internal ServiceLifetime DispatcherLifetime { get; private set; } = ServiceLifetime.Scoped;
 
+    internal UnhandledMessageExemptions Exemptions { get; } = new();
+
     private Assembly? ConfigurationDelegateAssembly { get; set; }
 
     /// <exception cref="ArgumentNullException"/>
@@ -79,9 +81,33 @@ public sealed class RequestFlowOptions
     /// Skips missing-handler validation for all registered assemblies once any call opts in.
     /// Duplicate-handler validation still runs.
     /// </summary>
-    public RequestFlowOptions AllowUnhandledRequests()
+    public RequestFlowOptions AllowAllUnhandledRequests()
     {
         AllUnhandledRequestsAllowed = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Permits one exact request type to have no handler, without registering or scanning it.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledRequest<TRequest>()
+        => AllowUnhandledRequest(typeof(TRequest));
+
+    /// <summary>
+    /// Permits one concrete, closed request type to have no handler, without registering or scanning it.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledRequest(Type requestType)
+    {
+        Exemptions.AddRequest(requestType);
+        return this;
+    }
+
+    /// <summary>
+    /// Permits request types declared in this assembly to have no handler. Does not scan the assembly.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledRequestsFromAssembly(Assembly assembly)
+    {
+        Exemptions.AddRequestAssembly(assembly);
         return this;
     }
 
@@ -152,19 +178,42 @@ public sealed class RequestFlowOptions
         => DeclareEventStrategy(typeof(TEvent), typeof(TStrategy), configure);
 
     /// <summary>
-    /// Permits a known event to have no applicable handler. Once enabled, this setting applies
-    /// to every event registered by any <c>AddRequestFlow</c> call on the service collection.
+    /// Permits every known event to have no applicable handler.
+    /// Applies across the service collection once enabled.
     /// </summary>
-    public RequestFlowOptions AllowUnhandledEvents()
+    public RequestFlowOptions AllowAllUnhandledEvents()
     {
         AllUnhandledEventsAllowed = true;
         return this;
     }
 
     /// <summary>
-    /// Reports an event handler subscription or per-event strategy declaration that reaches no
-    /// known event. Once enabled, this setting applies to every declaration registered by any
-    /// <c>AddRequestFlow</c> call on the service collection.
+    /// Permits one exact event type to have no handler, without registering or scanning it.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledEvent<TEvent>() where TEvent : IEvent
+        => AllowUnhandledEvent(typeof(TEvent));
+
+    /// <summary>
+    /// Permits one concrete, closed event type to have no handler, without registering or scanning it.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledEvent(Type eventType)
+    {
+        Exemptions.AddEvent(eventType);
+        return this;
+    }
+
+    /// <summary>
+    /// Permits event types declared in this assembly to have no handler. Does not scan the assembly.
+    /// </summary>
+    public RequestFlowOptions AllowUnhandledEventsFromAssembly(Assembly assembly)
+    {
+        Exemptions.AddEventAssembly(assembly);
+        return this;
+    }
+
+    /// <summary>
+    /// Reports event handler subscriptions and per-event strategy declarations that reach no known event.
+    /// Applies across the service collection once enabled.
     /// </summary>
     public RequestFlowOptions DisallowUnusedEventHandlers()
     {

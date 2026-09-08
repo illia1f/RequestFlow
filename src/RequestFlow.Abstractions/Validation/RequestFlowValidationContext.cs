@@ -1,17 +1,15 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Reflection;
 
 namespace RequestFlow;
 
 /// <summary>
-/// What a validation rule reads: the frozen registration, plus the registration choices that shape a finding.
+/// The frozen registration and options shared by all validation rules.
 /// </summary>
 /// <remarks>
-/// Built once per freeze and handed to every rule, so a rule added with <c>AddValidationRule</c>
-/// sees the facts a built-in one sees.
-/// <para>
-/// A rule test builds one with <see cref="RequestFlowModelBuilder.BuildContext(bool, bool, bool, bool)"/>
-/// instead of standing up a container.
-/// </para>
+/// Build test contexts with <see cref="RequestFlowModelBuilder"/>.
 /// </remarks>
 public sealed class RequestFlowValidationContext
 {
@@ -21,13 +19,19 @@ public sealed class RequestFlowValidationContext
         bool allUnhandledRequestsAllowed,
         bool unusedStagesDisallowed,
         bool allUnhandledEventsAllowed,
-        bool unusedEventHandlersDisallowed)
+        bool unusedEventHandlersDisallowed,
+        UnhandledMessageExemptions? exemptions = null)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         AllUnhandledRequestsAllowed = allUnhandledRequestsAllowed;
         UnusedStagesDisallowed = unusedStagesDisallowed;
         AllUnhandledEventsAllowed = allUnhandledEventsAllowed;
         UnusedEventHandlersDisallowed = unusedEventHandlersDisallowed;
+        exemptions ??= new UnhandledMessageExemptions();
+        UnhandledRequestTypes = new ReadOnlyCollection<Type>(exemptions.RequestTypes.ToArray());
+        UnhandledRequestAssemblies = new ReadOnlyCollection<Assembly>(exemptions.RequestAssemblies.ToArray());
+        UnhandledEventTypes = new ReadOnlyCollection<Type>(exemptions.EventTypes.ToArray());
+        UnhandledEventAssemblies = new ReadOnlyCollection<Assembly>(exemptions.EventAssemblies.ToArray());
     }
 
     /// <summary>
@@ -36,17 +40,19 @@ public sealed class RequestFlowValidationContext
     public RequestFlowModel Model { get; }
 
     /// <summary>
-    /// True when <c>AllowUnhandledRequests</c> was called, so a request with no handler is permitted.
+    /// True when missing handlers are permitted for every request.
+    /// Selected exemptions do not set this flag.
     /// </summary>
     public bool AllUnhandledRequestsAllowed { get; }
 
     /// <summary>
-    /// True when <c>DisallowUnusedStages</c> was called, so a stage that reached no request is a problem.
+    /// True when a stage that reaches no request is a validation error.
     /// </summary>
     public bool UnusedStagesDisallowed { get; }
 
     /// <summary>
-    /// True when an event with no applicable handler is permitted.
+    /// True when missing handlers are permitted for every known event.
+    /// Selected exemptions do not set this flag.
     /// </summary>
     public bool AllUnhandledEventsAllowed { get; }
 
@@ -54,4 +60,59 @@ public sealed class RequestFlowValidationContext
     /// True when an event subscription that reaches no known event is a problem.
     /// </summary>
     public bool UnusedEventHandlersDisallowed { get; }
+
+    /// <summary>
+    /// Exact request types permitted to have no handler.
+    /// </summary>
+    public IReadOnlyList<Type> UnhandledRequestTypes { get; }
+
+    /// <summary>
+    /// Assemblies whose request types are permitted to have no handler.
+    /// </summary>
+    public IReadOnlyList<Assembly> UnhandledRequestAssemblies { get; }
+
+    /// <summary>
+    /// Exact event types permitted to have no handler.
+    /// </summary>
+    public IReadOnlyList<Type> UnhandledEventTypes { get; }
+
+    /// <summary>
+    /// Assemblies whose event types are permitted to have no handler.
+    /// </summary>
+    public IReadOnlyList<Assembly> UnhandledEventAssemblies { get; }
+
+    /// <summary>
+    /// Whether the global policy or a selected exemption permits this request to have no handler.
+    /// </summary>
+    public bool AllowsUnhandledRequest(Type requestType)
+    {
+        if (requestType is null)
+            throw new ArgumentNullException(nameof(requestType));
+        return AllUnhandledRequestsAllowed || Matches(requestType, UnhandledRequestTypes, UnhandledRequestAssemblies);
+    }
+
+    /// <summary>
+    /// Whether the global policy or a selected exemption permits this event to have no handler.
+    /// </summary>
+    public bool AllowsUnhandledEvent(Type eventType)
+    {
+        if (eventType is null)
+            throw new ArgumentNullException(nameof(eventType));
+        return AllUnhandledEventsAllowed || Matches(eventType, UnhandledEventTypes, UnhandledEventAssemblies);
+    }
+
+    private static bool Matches(Type type, IReadOnlyList<Type> types, IReadOnlyList<Assembly> assemblies)
+    {
+        foreach (Type allowed in types)
+        {
+            if (allowed == type)
+                return true;
+        }
+        foreach (Assembly assembly in assemblies)
+        {
+            if (assembly == type.Assembly)
+                return true;
+        }
+        return false;
+    }
 }

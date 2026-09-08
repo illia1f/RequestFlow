@@ -40,7 +40,7 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0019` | pass an abstract class to `AddHandler` |
 | `RF0020` | pass a type without a Task, ValueTask, or stream handler contract to `AddHandler` |
 | `RF0101` | cover one request with two handlers |
-| `RF0102` | leave a request unhandled, unless you call `AllowUnhandledRequests` |
+| `RF0102` | leave a request unhandled without a missing-handler exemption |
 | `RF0103` | register one stage type twice |
 | `RF0104` | reach one request from two stage declarations that close to the same stage class |
 | `RF0105` | keep a stage that applies to no registered request, once you call `DisallowUnusedStages` |
@@ -52,7 +52,7 @@ Each row says what the check stops you doing. [exceptions.md](exceptions.md) has
 | `RF0111` | give a stream stage an item type its request does not declare; caught only when the stage wrapped no handler |
 | `RF0112` | give a handler a response type its request does not declare |
 | `RF0113` | give a stage a response type its request does not declare; caught only when the stage wrapped no handler |
-| `RF0114` | leave a known event with no applicable handler, unless you call `AllowUnhandledEvents` |
+| `RF0114` | leave a known event with no applicable handler or missing-handler exemption |
 | `RF0115` | keep an event-handler subscription that reaches no known event, once you call `DisallowUnusedEventHandlers` |
 | `RF0116` | implement `IRequest<TResponse>` and `IEvent` on one type |
 | `RF0117` | implement `IStreamRequest<TItem>` and `IEvent` on one type |
@@ -79,10 +79,11 @@ Problems come out in fixed rule order: registration shape problems first, then t
 - Event-family conflicts report `RF0116`, `RF0117`, and `RF0128` in that order.
 - `EventStrategyRule` runs after `RF0118` and reports its shape codes `RF0013` and `RF0014` before `RF0119` to `RF0123`.
 
-Four rules can be missing from the pass. Registration options control these checks:
+Registration options control these checks:
 
-- `AllowUnhandledRequests` disables `RF0102`.
-- `AllowUnhandledEvents` disables `RF0114`.
+- `AllowAllUnhandledRequests` disables `RF0102`.
+- `AllowAllUnhandledEvents` disables `RF0114`.
+- Type and assembly exemptions suppress `RF0102` or `RF0114` only for matching messages.
 - `DisallowUnusedStages` enables `RF0105`.
 - `DisallowUnusedEventHandlers` enables `RF0115` and `RF0122`.
 
@@ -116,7 +117,7 @@ public sealed class RequestNameRule : IRequestFlowValidationRule
 }
 ```
 
-The context carries `Model`, the registration as frozen, plus four registration flags: `AllUnhandledRequestsAllowed`, `UnusedStagesDisallowed`, `AllUnhandledEventsAllowed`, and `UnusedEventHandlersDisallowed`. One context is built per pass and handed to every rule, so a rule of yours reads what a built-in one reads.
+Every rule receives the same context: the frozen `Model`, registration flags, and missing-handler exemptions.
 
 A problem carries three things. `Code` is a stable identifier for the kind of problem, which is what a caller matches on. `Message` says what is wrong and how to fix it. `Subject` is the type at fault, and it is optional, since not every problem has one. `ToString` renders `Code: Message`, and that is the line the exception message shows.
 
@@ -203,13 +204,17 @@ public void Given_A_Request_Without_The_Suffix_When_Validating_Then_The_Rule_Rep
 }
 ```
 
-`BuildContext` wraps a freshly built model. Its four flags are optional and default to what registration does with no opt-in, so a request-only test calls it bare and a test that reads an event flag names only that one:
+`BuildContext` creates a model and context. The two request flags default to `false`; setting event flags requires all four arguments:
 
 ```csharp
 RequestFlowValidationContext context = new RequestFlowModelBuilder()
     .AddEvent(typeof(OrderPlaced))
     .AddEventHandler(typeof(SendReceipt), typeof(OrderPlaced))
-    .BuildContext(unusedEventHandlersDisallowed: true);
+    .BuildContext(
+        allUnhandledRequestsAllowed: false,
+        unusedStagesDisallowed: false,
+        allUnhandledEventsAllowed: false,
+        unusedEventHandlersDisallowed: true);
 ```
 
 `Build()` returns the model without a context, for a test that wants it on its own.
@@ -279,9 +284,20 @@ Requests come in scan order, followed by request types only a handler brought in
 
 ## The registration flags
 
-The four flags sit on the context beside the model. `AllUnhandledRequestsAllowed` is true once `AllowUnhandledRequests` has been called, and `UnusedStagesDisallowed` once `DisallowUnusedStages` has. `AllUnhandledEventsAllowed` records `AllowUnhandledEvents`, while `UnusedEventHandlersDisallowed` records `DisallowUnusedEventHandlers`.
+Each context flag records an enabled registration option:
 
-The event flags are independent. `AllowUnhandledEvents` suppresses `RF0114` for a known event with no handler. It does not suppress `RF0115` or `RF0122` when `DisallowUnusedEventHandlers` asks the freeze to report a subscription or per-event strategy declaration that reaches no known event.
+| Context flag | Registration option |
+| --- | --- |
+| `AllUnhandledRequestsAllowed` | `AllowAllUnhandledRequests()` |
+| `UnusedStagesDisallowed` | `DisallowUnusedStages()` |
+| `AllUnhandledEventsAllowed` | `AllowAllUnhandledEvents()` |
+| `UnusedEventHandlersDisallowed` | `DisallowUnusedEventHandlers()` |
+
+- `UnhandledRequestTypes`, `UnhandledRequestAssemblies`, `UnhandledEventTypes`, and `UnhandledEventAssemblies` are read-only snapshots of type and assembly exemptions. They do not set the global flags.
+- `AllowsUnhandledRequest(requestType)` and `AllowsUnhandledEvent(eventType)` check the global flag, exact type, and declaring assembly.
+- `RequestFlowModelBuilder` accepts the same type and assembly exemptions for rule tests. They do not add messages to the model; each `BuildContext` call copies them.
+
+Missing-handler exemptions do not suppress the unused-handler and strategy checks enabled by `DisallowUnusedEventHandlers`.
 
 `RF0122` tests applicability, not whether the declaration won. A family declaration shadowed by an exact declaration is still applicable and reports nothing. A declaration involved in an `RF0120` tie also reports no `RF0122`. Global declarations state policy and never report `RF0122`.
 
@@ -297,4 +313,4 @@ foreach (RequestModel request in context.Model.Requests)
 }
 ```
 
-Skipping it is right whether or not the application opted in. With the flag off, `RF0102` already reports the request; with it on, the missing handler is deliberate. Read `AllUnhandledRequestsAllowed` when the two cases deserve different wording, not to decide whether to skip.
+Skip unhandled requests in either case: `RF0102` already reports them, or an exemption permits them. Use `AllowsUnhandledRequest(request.RequestType)` only when the finding's wording depends on that distinction.

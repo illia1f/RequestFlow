@@ -1,4 +1,7 @@
 using System;
+#if NET8_0_OR_GREATER
+using System.Diagnostics.CodeAnalysis;
+#endif
 using RequestFlow;
 
 // Same namespace convention as AddRequestFlow: visible without an extra using.
@@ -15,6 +18,10 @@ public static class ServiceProviderExtensions
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
     /// <exception cref="HandlerNotFoundException"/>
+#if NET8_0_OR_GREATER
+    [RequiresUnreferencedCode(DeploymentWarnings.Trimming)]
+    [RequiresDynamicCode(DeploymentWarnings.NativeAot)]
+#endif
     public static RequestPipeline InspectRequestFlow<TRequest>(this IServiceProvider provider)
         => InspectRequestFlow(provider, typeof(TRequest));
 
@@ -23,11 +30,15 @@ public static class ServiceProviderExtensions
     /// </summary>
     /// <remarks>
     /// Does not resolve handlers or stages. Unknown requests and requests without handlers throw
-    /// <see cref="HandlerNotFoundException"/>, including those allowed by <c>AllowUnhandledRequests</c>.
+    /// <see cref="HandlerNotFoundException"/>, including requests exempted from handler coverage.
     /// </remarks>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
     /// <exception cref="HandlerNotFoundException"/>
+#if NET8_0_OR_GREATER
+    [RequiresUnreferencedCode(DeploymentWarnings.Trimming)]
+    [RequiresDynamicCode(DeploymentWarnings.NativeAot)]
+#endif
     public static RequestPipeline InspectRequestFlow(this IServiceProvider provider, Type requestType)
     {
         if (provider is null)
@@ -47,6 +58,10 @@ public static class ServiceProviderExtensions
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
+#if NET8_0_OR_GREATER
+    [RequiresUnreferencedCode(DeploymentWarnings.Trimming)]
+    [RequiresDynamicCode(DeploymentWarnings.NativeAot)]
+#endif
     public static IServiceProvider ValidateRequestFlow(this IServiceProvider provider)
     {
         if (provider is null)

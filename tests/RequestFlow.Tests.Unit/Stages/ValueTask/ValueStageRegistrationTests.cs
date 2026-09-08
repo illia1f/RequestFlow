@@ -5,28 +5,18 @@ namespace RequestFlow.Tests.Unit;
 
 public sealed class ValueStageRegistrationTests
 {
-    [Fact]
-    public void Given_Open_Value_Stage_When_Adding_Then_Declaration_Records_Value_Family()
+    [Theory]
+    [InlineData(typeof(LoggingValueStage<,>))]
+    [InlineData(typeof(PingValueStage))]
+    public void Given_A_Value_Stage_When_Adding_By_Type_Then_Declaration_Records_Value_Family(Type stageType)
     {
         var options = new RequestFlowOptions();
 
-        options.AddValueStage(typeof(LoggingValueStage<,>));
+        options.AddValueStage(stageType);
 
         StageDeclaration declaration = options.StageDeclarations.ShouldHaveSingleItem();
         declaration.Family.ShouldBeSameAs(StageFamily.Value);
-        declaration.StageType.ShouldBe(typeof(LoggingValueStage<,>));
-    }
-
-    [Fact]
-    public void Given_Closed_Value_Stage_When_Adding_By_Type_Then_Declaration_Records_Value_Family()
-    {
-        var options = new RequestFlowOptions();
-
-        options.AddValueStage(typeof(PingValueStage));
-
-        StageDeclaration declaration = options.StageDeclarations.ShouldHaveSingleItem();
-        declaration.Family.ShouldBeSameAs(StageFamily.Value);
-        declaration.StageType.ShouldBe(typeof(PingValueStage));
+        declaration.StageType.ShouldBe(stageType);
     }
 
     [Fact]
@@ -63,24 +53,13 @@ public sealed class ValueStageRegistrationTests
         Should.Throw<ArgumentNullException>(() => options.AddValueStage(null!));
     }
 
-    [Fact]
-    public void Given_Open_Typed_Value_Stage_When_Validating_Then_It_Is_Valid()
+    [Theory]
+    [InlineData(typeof(LoggingValueStage<,>))]
+    [InlineData(typeof(VoidValueStage<>))]
+    public void Given_An_Open_Value_Stage_When_Validating_Then_It_Is_Valid(Type stageType)
     {
         StageDeclaration[] declarations =
-            [new StageDeclaration(typeof(LoggingValueStage<,>), null, StageFamily.Value)];
-
-        Validated<StageDeclaration> result =
-            RegistrationValidator.ValidateStageDeclarations(declarations);
-
-        result.Valid.ShouldHaveSingleItem();
-        result.Problems.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_Open_Plain_Void_Value_Stage_When_Validating_Then_It_Is_Valid()
-    {
-        StageDeclaration[] declarations =
-            [new StageDeclaration(typeof(VoidValueStage<>), null, StageFamily.Value)];
+            [new StageDeclaration(stageType, null, StageFamily.Value)];
 
         Validated<StageDeclaration> result =
             RegistrationValidator.ValidateStageDeclarations(declarations);

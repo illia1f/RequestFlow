@@ -9,9 +9,7 @@ namespace RequestFlow;
 public interface IStreamDispatcher
 {
     /// <summary>
-    /// Resolves the plan for <paramref name="request"/> and returns the sequence its handler
-    /// produces, wrapped in whatever stream stages apply. The lookup happens on this call; the
-    /// handler runs on the first enumeration.
+    /// Resolves the plan for <paramref name="request"/> and returns the sequence its handler produces, wrapped in whatever stream stages apply.
     /// </summary>
     /// <param name="request">The request to stream.</param>
     /// <param name="cancellationToken">

@@ -9,7 +9,7 @@ public sealed class BuiltInRuleFailureTests
     public void Given_A_Built_In_Rule_Throwing_When_Validating_Then_The_Exception_Surfaces_As_Thrown()
     {
         var registry = new RequestFlowRegistry();
-        registry.AllowUnhandledRequests();
+        registry.AllowAllUnhandledRequests();
         registry.Add([new UnloadableInterfacesType(typeof(Probe))], []);
         using ServiceProvider provider = new ServiceCollection().BuildServiceProvider();
 

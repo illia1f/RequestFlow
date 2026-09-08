@@ -187,48 +187,18 @@ public sealed class AddStageTests
         result.Problems[0].Message.ShouldContain("in that order");
     }
 
-    [Fact]
-    public void Given_Open_Void_Form_Stage_When_Validating_Then_Declaration_Is_Valid()
+    [Theory]
+    [InlineData(typeof(VoidOnlyStage<>))]
+    [InlineData(typeof(WipeAuditStage))]
+    [InlineData(typeof(ResponseBoundStage<>))]
+    [InlineData(typeof(ResponseBoundStage<Ping>))]
+    public void Given_A_Valid_Stage_Shape_When_Validating_Then_Declaration_Is_Valid(Type stageType)
     {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(VoidOnlyStage<>), null, StageFamily.Request)];
+        StageDeclaration[] declarations = [new StageDeclaration(stageType, null, StageFamily.Request)];
 
         Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
 
-        result.Valid.Count.ShouldBe(1);
-        result.Problems.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_Closed_Void_Form_Stage_When_Validating_Then_Declaration_Is_Valid()
-    {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(WipeAuditStage), null, StageFamily.Request)];
-
-        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
-
-        result.Valid.Count.ShouldBe(1);
-        result.Problems.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_Open_Response_Bound_Stage_When_Validating_Then_Declaration_Is_Valid()
-    {
-        StageDeclaration[] declarations = [new StageDeclaration(typeof(ResponseBoundStage<>), null, StageFamily.Request)];
-
-        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
-
-        result.Valid.Count.ShouldBe(1);
-        result.Problems.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_Single_Parameter_Stage_Closed_Over_Its_Request_When_Validating_Then_Declaration_Is_Valid()
-    {
-        Type closed = typeof(ResponseBoundStage<>).MakeGenericType(typeof(Ping));
-        StageDeclaration[] declarations = [new StageDeclaration(closed, null, StageFamily.Request)];
-
-        Validated<StageDeclaration> result = RegistrationValidator.ValidateStageDeclarations(declarations);
-
-        result.Valid.Count.ShouldBe(1);
+        result.Valid.ShouldHaveSingleItem();
         result.Problems.ShouldBeEmpty();
     }
 

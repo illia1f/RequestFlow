@@ -48,6 +48,9 @@ public sealed class HandlerScannerTests
 
         result.RequestTypes.ShouldContain(typeof(ScanPing));
         result.RequestTypes.ShouldContain(typeof(ScanVoid));
+        result.RequestTypes.ShouldContain(typeof(ScanValue));
+        result.RequestTypes.ShouldContain(typeof(ScanValueVoid));
+        result.RequestTypes.ShouldContain(typeof(Tail));
     }
 
     [Fact]
@@ -90,72 +93,35 @@ public sealed class HandlerScannerTests
         result.RequestTypes.ShouldContain(typeof(ScanPing));
     }
 
-    [Fact]
-    public void Given_A_Typed_Handler_When_Discovering_Then_Records_The_Closed_Core_Contract()
+    [Theory]
+    [InlineData(typeof(ScanPingHandler), typeof(ScanPing), typeof(IRequestHandler<ScanPing, int>), typeof(IRequestHandler<,>))]
+    [InlineData(typeof(ScanValueHandler), typeof(ScanValue), typeof(IValueRequestHandler<ScanValue, int>), typeof(IValueRequestHandler<,>))]
+    [InlineData(typeof(TailHandler), typeof(Tail), typeof(IStreamRequestHandler<Tail, int>), typeof(IStreamRequestHandler<,>))]
+    public void Given_A_Response_Handler_When_Discovering_Then_Records_The_Request_Response_And_Contract(
+        Type handlerType, Type requestType, Type contract, Type contractDefinition)
     {
-        HandlerDiscovery discovery = HandlerScanner.Discover(typeof(ScanPingHandler)).ShouldHaveSingleItem();
+        HandlerDiscovery discovery = HandlerScanner.Discover(handlerType).ShouldHaveSingleItem();
 
-        discovery.Contract.ShouldBe(typeof(IRequestHandler<ScanPing, int>));
-        discovery.ContractDefinition.ShouldBe(typeof(IRequestHandler<,>));
-    }
-
-    [Fact]
-    public void Given_A_Void_Handler_When_Discovering_Then_Records_The_Void_Contract()
-    {
-        HandlerDiscovery discovery = HandlerScanner.Discover(typeof(ScanVoidHandler)).ShouldHaveSingleItem();
-
-        discovery.Contract.ShouldBe(typeof(IRequestHandler<ScanVoid>));
-        discovery.ContractDefinition.ShouldBe(typeof(IRequestHandler<>));
-    }
-
-    [Fact]
-    public void Given_A_Typed_Value_Handler_When_Discovering_Then_Records_The_Value_Contract()
-    {
-        HandlerDiscovery typed = HandlerScanner.Discover(typeof(ScanValueHandler)).ShouldHaveSingleItem();
-
-        typed.RequestType.ShouldBe(typeof(ScanValue));
-        typed.ResponseType.ShouldBe(typeof(int));
-        typed.IsVoid.ShouldBeFalse();
-        typed.ContractDefinition.ShouldBe(typeof(IValueRequestHandler<,>));
-    }
-
-    [Fact]
-    public void Given_A_Plain_Void_Value_Handler_When_Discovering_Then_Records_The_Value_Contract()
-    {
-        HandlerDiscovery plain = HandlerScanner.Discover(typeof(ScanValueVoidHandler)).ShouldHaveSingleItem();
-
-        plain.RequestType.ShouldBe(typeof(ScanValueVoid));
-        plain.ResponseType.ShouldBe(typeof(NoResult));
-        plain.IsVoid.ShouldBeTrue();
-        plain.ContractDefinition.ShouldBe(typeof(IValueRequestHandler<>));
-    }
-
-    [Fact]
-    public void Given_Value_Request_Types_When_Scanning_Then_Request_Types_Are_Collected()
-    {
-        ScanResult result = ScanSelf();
-
-        result.RequestTypes.ShouldContain(typeof(ScanValue));
-        result.RequestTypes.ShouldContain(typeof(ScanValueVoid));
-    }
-
-    [Fact]
-    public void Given_A_Stream_Handler_When_Discovering_Then_Records_The_Item_Type_As_The_Response()
-    {
-        HandlerDiscovery discovery = HandlerScanner.Discover(typeof(TailHandler)).ShouldHaveSingleItem();
-
-        discovery.RequestType.ShouldBe(typeof(Tail));
+        discovery.RequestType.ShouldBe(requestType);
         discovery.ResponseType.ShouldBe(typeof(int));
         discovery.IsVoid.ShouldBeFalse();
-        discovery.ContractDefinition.ShouldBe(typeof(IStreamRequestHandler<,>));
+        discovery.Contract.ShouldBe(contract);
+        discovery.ContractDefinition.ShouldBe(contractDefinition);
     }
 
-    [Fact]
-    public void Given_A_Stream_Request_When_Scanning_Then_It_Is_Reported_As_A_Request_Type()
+    [Theory]
+    [InlineData(typeof(ScanVoidHandler), typeof(ScanVoid), typeof(IRequestHandler<ScanVoid>), typeof(IRequestHandler<>))]
+    [InlineData(typeof(ScanValueVoidHandler), typeof(ScanValueVoid), typeof(IValueRequestHandler<ScanValueVoid>), typeof(IValueRequestHandler<>))]
+    public void Given_A_Void_Handler_When_Discovering_Then_Records_The_Request_And_Void_Contract(
+        Type handlerType, Type requestType, Type contract, Type contractDefinition)
     {
-        ScanResult result = HandlerScanner.Scan([typeof(HandlerScannerTests).Assembly]);
+        HandlerDiscovery discovery = HandlerScanner.Discover(handlerType).ShouldHaveSingleItem();
 
-        result.RequestTypes.ShouldContain(typeof(Tail));
+        discovery.RequestType.ShouldBe(requestType);
+        discovery.ResponseType.ShouldBe(typeof(NoResult));
+        discovery.IsVoid.ShouldBeTrue();
+        discovery.Contract.ShouldBe(contract);
+        discovery.ContractDefinition.ShouldBe(contractDefinition);
     }
 
     [Fact]

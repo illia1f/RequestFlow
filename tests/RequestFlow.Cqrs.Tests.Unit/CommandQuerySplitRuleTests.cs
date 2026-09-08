@@ -180,7 +180,7 @@ public sealed class CommandQuerySplitRuleTests
 
     private sealed record PlainValueQuery : IValueQuery<int>;
 
-    // Handled because AddCqrsTests freezes this assembly without AllowUnhandledRequests.
+    // These handlers let other tests validate the whole assembly with missing-handler checks enabled.
     private sealed class PlainCommandHandler : IRequestHandler<PlainCommand, int>
     {
         public Task<int> HandleAsync(PlainCommand request, CancellationToken cancellationToken)

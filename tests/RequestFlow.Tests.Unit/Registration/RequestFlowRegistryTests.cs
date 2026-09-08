@@ -5,34 +5,24 @@ namespace RequestFlow.Tests.Unit;
 
 public sealed class RequestFlowRegistryTests
 {
-    [Fact]
-    public void Given_An_Applicable_Stage_When_Building_The_Dispatch_Map_Then_Request_Gets_The_Staged_Plan()
+    [Theory]
+    [InlineData(typeof(Echo), true, typeof(StagedRequestPlan<Echo, string>))]
+    [InlineData(typeof(Purge), true, typeof(StagedVoidRequestPlan<Purge>))]
+    [InlineData(typeof(Echo), false, typeof(RequestPlan<Echo, string>))]
+    public void Given_Request_Stages_When_Building_The_Dispatch_Map_Then_Selects_The_Matching_Plan(
+        Type requestType, bool addStage, Type expectedPlanType)
     {
-        DispatchMap map = BuildMap(o => o.AddStage(typeof(WrapStage<,>)));
+        using ServiceProvider provider = BuildProvider(o =>
+        {
+            if (addStage)
+                o.AddStage(typeof(WrapStage<,>));
+        });
+        DispatchMap map = provider.GetRequiredService<DispatchMap>();
 
-        map.TryGetPlanFor(typeof(Echo), out RequestPlanBase? plan);
+        bool found = map.TryGetPlanFor(requestType, out RequestPlanBase? plan);
 
-        plan.ShouldBeOfType<StagedRequestPlan<Echo, string>>();
-    }
-
-    [Fact]
-    public void Given_An_Applicable_Stage_When_Building_The_Dispatch_Map_Then_Void_Request_Gets_The_Staged_Void_Plan()
-    {
-        DispatchMap map = BuildMap(o => o.AddStage(typeof(WrapStage<,>)));
-
-        map.TryGetPlanFor(typeof(Purge), out RequestPlanBase? plan);
-
-        plan.ShouldBeOfType<StagedVoidRequestPlan<Purge>>();
-    }
-
-    [Fact]
-    public void Given_No_Stages_When_Building_The_Dispatch_Map_Then_Request_Gets_The_Plain_Plan()
-    {
-        DispatchMap map = BuildMap();
-
-        map.TryGetPlanFor(typeof(Echo), out RequestPlanBase? plan);
-
-        plan.ShouldBeOfType<RequestPlan<Echo, string>>();
+        found.ShouldBeTrue();
+        plan.ShouldBeOfType(expectedPlanType);
     }
 
     // A plan builds its levels when the map freezes, so a dispatch reaches that same plan: it asks
@@ -58,9 +48,6 @@ public sealed class RequestFlowRegistryTests
     }
 
     #region Helpers
-
-    private static DispatchMap BuildMap(Action<RequestFlowOptions>? configure = null)
-        => BuildProvider(configure).GetRequiredService<DispatchMap>();
 
     private static ServiceProvider BuildProvider(Action<RequestFlowOptions>? configure = null)
     {

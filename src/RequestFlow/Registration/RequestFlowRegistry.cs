@@ -29,18 +29,16 @@ internal sealed class RequestFlowRegistry
     private readonly List<StageDeclaration> _stageDeclarations = [];
     private readonly HashSet<Type> _registeredClosedStageTypes = [];
     private readonly AsyncLocal<FreezeEntry?> _activeFreeze = new();
+    private readonly UnhandledMessageExemptions _exemptions = new();
 
-    /// <summary>
-    /// True once any <c>AddRequestFlow</c> call opted out of the missing-handler check.
-    /// </summary>
+    public void AddExemptions(UnhandledMessageExemptions exemptions)
+        => _exemptions.Add(exemptions);
+
     public bool AllUnhandledRequestsAllowed { get; private set; }
 
-    public void AllowUnhandledRequests()
+    public void AllowAllUnhandledRequests()
         => AllUnhandledRequestsAllowed = true;
 
-    /// <summary>
-    /// True once any <c>AddRequestFlow</c> call asked for a stage that applies to nothing to be fatal.
-    /// </summary>
     public bool UnusedStagesDisallowed { get; private set; }
 
     public void DisallowUnusedStages()
@@ -48,7 +46,7 @@ internal sealed class RequestFlowRegistry
 
     public bool AllUnhandledEventsAllowed { get; private set; }
 
-    public void AllowUnhandledEvents()
+    public void AllowAllUnhandledEvents()
         => AllUnhandledEventsAllowed = true;
 
     public bool UnusedEventHandlersDisallowed { get; private set; }
@@ -249,7 +247,8 @@ internal sealed class RequestFlowRegistry
             AllUnhandledRequestsAllowed,
             UnusedStagesDisallowed,
             AllUnhandledEventsAllowed,
-            UnusedEventHandlersDisallowed);
+            UnusedEventHandlersDisallowed,
+            _exemptions);
 
         ValidationRuleRunner.Validate(
             context,

@@ -65,20 +65,14 @@ public sealed class RequestFlowModelBuilderTests
         request.Stages.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void Given_A_Class_As_The_Contract_When_Adding_A_Stage_Declaration_Then_Throws_Argument_Exception()
+    [Theory]
+    [InlineData(typeof(string))]
+    [InlineData(typeof(IEquatable<int>))]
+    public void Given_An_Invalid_Contract_When_Adding_A_Stage_Declaration_Then_Throws_Argument_Exception(Type contractType)
     {
         var sut = new RequestFlowModelBuilder();
 
-        Should.Throw<ArgumentException>(() => sut.AddStageDeclaration(typeof(object), typeof(string)));
-    }
-
-    [Fact]
-    public void Given_A_Closed_Interface_As_The_Contract_When_Adding_A_Stage_Declaration_Then_Throws_Argument_Exception()
-    {
-        var sut = new RequestFlowModelBuilder();
-
-        Should.Throw<ArgumentException>(() => sut.AddStageDeclaration(typeof(object), typeof(IEquatable<int>)));
+        Should.Throw<ArgumentException>(() => sut.AddStageDeclaration(typeof(object), contractType));
     }
 
     [Fact]

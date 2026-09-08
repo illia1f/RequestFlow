@@ -6,19 +6,23 @@ namespace RequestFlow.Tests.Unit.Validation;
 
 public sealed class StreamStageItemMismatchRuleTests
 {
-    [Fact]
-    public void Given_A_Closed_Stage_With_A_Wider_Item_Type_When_Validating_Then_Reports_The_Stage()
+    [Theory]
+    [InlineData(typeof(StringStream), typeof(WideItemStage))]
+    [InlineData(typeof(DerivedStream), typeof(WideItemStage))]
+    [InlineData(typeof(StringStream), typeof(OpenWideItemStage<>))]
+    public void Given_A_Stage_With_A_Wider_Item_Type_When_Validating_Then_Reports_The_Stage(
+        Type requestType, Type stageType)
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(StringStream))
-            .AddStageDeclaration(typeof(WideItemStage), typeof(IStreamRequestStage<,>))
+            .AddRequest(requestType)
+            .AddStageDeclaration(stageType, typeof(IStreamRequestStage<,>))
             .BuildContext();
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
         RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
         problem.Code.ShouldBe("RF0111");
-        problem.Subject.ShouldBe(typeof(WideItemStage));
+        problem.Subject.ShouldBe(stageType);
         problem.Message.ShouldContain("System.Object");
         problem.Message.ShouldContain("System.String");
     }
@@ -35,21 +39,6 @@ public sealed class StreamStageItemMismatchRuleTests
     }
 
     [Fact]
-    public void Given_A_Stage_Naming_A_Base_Request_When_A_Derived_Request_Is_Registered_Then_Reports_The_Stage()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(DerivedStream))
-            .AddStageDeclaration(typeof(WideItemStage), typeof(IStreamRequestStage<,>))
-            .BuildContext();
-
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
-
-        RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
-        problem.Code.ShouldBe("RF0111");
-        problem.Subject.ShouldBe(typeof(WideItemStage));
-    }
-
-    [Fact]
     public void Given_An_Open_Generic_Stage_When_Validating_Then_Reports_Nothing()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
@@ -58,23 +47,6 @@ public sealed class StreamStageItemMismatchRuleTests
             .BuildContext();
 
         _sut.Validate(context).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_An_Open_One_Parameter_Stage_With_A_Wider_Item_Type_When_Validating_Then_Reports_The_Stage()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(StringStream))
-            .AddStageDeclaration(typeof(OpenWideItemStage<>), typeof(IStreamRequestStage<,>))
-            .BuildContext();
-
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
-
-        RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
-        problem.Code.ShouldBe("RF0111");
-        problem.Subject.ShouldBe(typeof(OpenWideItemStage<>));
-        problem.Message.ShouldContain("System.Object");
-        problem.Message.ShouldContain("System.String");
     }
 
     [Fact]

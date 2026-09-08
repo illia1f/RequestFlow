@@ -102,7 +102,7 @@ public sealed class EventRegistrationTests
             o.RegisterHandlersFromAssemblyContaining<EventRegistrationTests>());
         services.AddRequestFlow(o => o
             .PublishEventsInParallel()
-            .AllowUnhandledEvents()
+            .AllowAllUnhandledEvents()
             .DisallowUnusedEventHandlers());
 
         RequestFlowRegistry registry = services
