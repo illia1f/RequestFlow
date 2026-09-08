@@ -158,6 +158,8 @@ ValueTask dispatch uses the same request errors as Task dispatch:
 - Awaiting a canceled ValueTask surfaces its cancellation outcome.
 
 Cancellation is cooperative. RequestFlow passes the caller's token to each stage and the handler.
-A stage can pass another token to `next.InvokeAsync(token)` for the levels below it. Omitting the
-token, or passing `CancellationToken.None`, preserves the token handed to the stage. RequestFlow
-does not cancel work on its own. See [Exceptions](exceptions.md) for the complete reference.
+
+- A stage can replace the downstream token with `next.InvokeAsync(token)`. Omitting the token or passing `CancellationToken.None` keeps the stage's token.
+- To run downstream work independently of that token, pass a token from a source the stage never cancels. Keep the source alive until the work finishes.
+
+RequestFlow does not cancel work on its own. See [Exceptions](exceptions.md) for the full reference.

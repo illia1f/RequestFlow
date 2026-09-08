@@ -5,19 +5,23 @@ namespace RequestFlow.Tests.Unit.Validation;
 
 public sealed class StageResponseMismatchRuleTests
 {
-    [Fact]
-    public void Given_A_Closed_Stage_With_A_Wider_Response_Type_When_Validating_Then_Reports_The_Stage()
+    [Theory]
+    [InlineData(typeof(StringAsk), typeof(WideResponseStage))]
+    [InlineData(typeof(DerivedAsk), typeof(WideResponseStage))]
+    [InlineData(typeof(StringAsk), typeof(OpenWideResponseStage<>))]
+    public void Given_A_Stage_With_A_Wider_Response_Type_When_Validating_Then_Reports_The_Stage(
+        Type requestType, Type stageType)
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(StringAsk))
-            .AddStageDeclaration(typeof(WideResponseStage))
+            .AddRequest(requestType)
+            .AddStageDeclaration(stageType)
             .BuildContext();
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
         RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
         problem.Code.ShouldBe("RF0113");
-        problem.Subject.ShouldBe(typeof(WideResponseStage));
+        problem.Subject.ShouldBe(stageType);
         problem.Message.ShouldContain("System.Object");
         problem.Message.ShouldContain("System.String");
     }
@@ -34,21 +38,6 @@ public sealed class StageResponseMismatchRuleTests
     }
 
     [Fact]
-    public void Given_A_Stage_Naming_A_Base_Request_When_A_Derived_Request_Is_Registered_Then_Reports_The_Stage()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(DerivedAsk))
-            .AddStageDeclaration(typeof(WideResponseStage))
-            .BuildContext();
-
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
-
-        RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
-        problem.Code.ShouldBe("RF0113");
-        problem.Subject.ShouldBe(typeof(WideResponseStage));
-    }
-
-    [Fact]
     public void Given_An_Open_Generic_Stage_When_Validating_Then_Reports_Nothing()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
@@ -57,23 +46,6 @@ public sealed class StageResponseMismatchRuleTests
             .BuildContext();
 
         _sut.Validate(context).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_An_Open_One_Parameter_Stage_With_A_Wider_Response_Type_When_Validating_Then_Reports_The_Stage()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(StringAsk))
-            .AddStageDeclaration(typeof(OpenWideResponseStage<>))
-            .BuildContext();
-
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
-
-        RequestFlowValidationProblem problem = problems.ShouldHaveSingleItem();
-        problem.Code.ShouldBe("RF0113");
-        problem.Subject.ShouldBe(typeof(OpenWideResponseStage<>));
-        problem.Message.ShouldContain("System.Object");
-        problem.Message.ShouldContain("System.String");
     }
 
     [Fact]

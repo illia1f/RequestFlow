@@ -6,34 +6,25 @@ namespace RequestFlow.Tests.Unit.Validation;
 
 public sealed class ValueStageResponseMismatchRuleTests
 {
-    [Fact]
-    public void Given_A_Closed_Value_Stage_With_A_Wider_Response_When_Validating_Then_Reports_RF0130()
+    [Theory]
+    [InlineData(typeof(StringValue), typeof(WideValueStage))]
+    [InlineData(typeof(IValueRequest<string>), typeof(ExactValueContractStage))]
+    [InlineData(typeof(DerivedValue), typeof(WideValueStage))]
+    [InlineData(typeof(StringValue), typeof(OpenWideValueStage<>))]
+    public void Given_A_Value_Stage_With_A_Wider_Response_When_Validating_Then_Reports_RF0130(
+        Type requestType, Type stageType)
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(StringValue))
-            .AddStageDeclaration(typeof(WideValueStage), typeof(IValueRequestStage<,>))
+            .AddRequest(requestType)
+            .AddStageDeclaration(stageType, typeof(IValueRequestStage<,>))
             .BuildContext();
 
         RequestFlowValidationProblem problem = _sut.Validate(context).ShouldHaveSingleItem();
 
         problem.Code.ShouldBe(ProblemCodes.ValueStageResponseMismatch);
-        problem.Subject.ShouldBe(typeof(WideValueStage));
+        problem.Subject.ShouldBe(stageType);
         problem.Message.ShouldContain("System.Object");
         problem.Message.ShouldContain("System.String");
-    }
-
-    [Fact]
-    public void Given_The_Exact_Value_Request_Contract_And_A_Wider_Stage_When_Validating_Then_Reports_RF0130()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(IValueRequest<string>))
-            .AddStageDeclaration(typeof(ExactValueContractStage), typeof(IValueRequestStage<,>))
-            .BuildContext();
-
-        RequestFlowValidationProblem problem = _sut.Validate(context).ShouldHaveSingleItem();
-
-        problem.Code.ShouldBe(ProblemCodes.ValueStageResponseMismatch);
-        problem.Subject.ShouldBe(typeof(ExactValueContractStage));
     }
 
     [Fact]
@@ -48,20 +39,6 @@ public sealed class ValueStageResponseMismatchRuleTests
     }
 
     [Fact]
-    public void Given_A_Value_Stage_Naming_A_Base_Request_When_Validating_A_Derived_Request_Then_Reports_RF0130()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(DerivedValue))
-            .AddStageDeclaration(typeof(WideValueStage), typeof(IValueRequestStage<,>))
-            .BuildContext();
-
-        RequestFlowValidationProblem problem = _sut.Validate(context).ShouldHaveSingleItem();
-
-        problem.Code.ShouldBe(ProblemCodes.ValueStageResponseMismatch);
-        problem.Subject.ShouldBe(typeof(WideValueStage));
-    }
-
-    [Fact]
     public void Given_An_Open_Two_Parameter_Value_Stage_When_Validating_Then_Reports_Nothing()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
@@ -70,20 +47,6 @@ public sealed class ValueStageResponseMismatchRuleTests
             .BuildContext();
 
         _sut.Validate(context).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Given_An_Open_One_Parameter_Value_Stage_With_A_Wider_Response_When_Validating_Then_Reports_RF0130()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddRequest(typeof(StringValue))
-            .AddStageDeclaration(typeof(OpenWideValueStage<>), typeof(IValueRequestStage<,>))
-            .BuildContext();
-
-        RequestFlowValidationProblem problem = _sut.Validate(context).ShouldHaveSingleItem();
-
-        problem.Code.ShouldBe(ProblemCodes.ValueStageResponseMismatch);
-        problem.Subject.ShouldBe(typeof(OpenWideValueStage<>));
     }
 
     [Fact]

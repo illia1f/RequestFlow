@@ -16,16 +16,6 @@ public sealed class EventExceptionTests
     }
 
     [Fact]
-    public void Given_An_Event_Publisher_When_Publishing_Without_A_Token_Then_The_Default_Token_Is_Accepted()
-    {
-        IEventPublisher publisher = Substitute.For<IEventPublisher>();
-
-        Task publish = publisher.PublishAsync(new SpecificEvent());
-
-        publish.ShouldNotBeNull();
-    }
-
-    [Fact]
     public void Given_Event_Handler_Failure_Arguments_When_Creating_A_Failure_Then_They_Are_Exposed()
     {
         var cause = new InvalidOperationException("boom");

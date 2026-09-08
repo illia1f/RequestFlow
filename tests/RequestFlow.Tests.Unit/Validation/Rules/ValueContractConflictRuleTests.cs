@@ -122,8 +122,6 @@ public sealed class ValueContractConflictRuleTests
             [.. rules.SelectMany(rule => rule.Validate(context))];
 
         problems.ShouldHaveSingleItem().Code.ShouldBe(ProblemCodes.RequestAndValueRequest);
-        problems.ShouldNotContain(problem => problem.Code == ProblemCodes.HandlerResponseMismatch);
-        problems.ShouldNotContain(problem => problem.Code == ProblemCodes.StageResponseMismatch);
     }
 
     [Fact]
@@ -151,8 +149,6 @@ public sealed class ValueContractConflictRuleTests
             [.. rules.SelectMany(rule => rule.Validate(context))];
 
         problems.ShouldHaveSingleItem().Code.ShouldBe(ProblemCodes.StreamRequestAndValueRequest);
-        problems.ShouldNotContain(problem => problem.Code == ProblemCodes.StreamItemMismatch);
-        problems.ShouldNotContain(problem => problem.Code == ProblemCodes.StreamStageItemMismatch);
     }
 
     [Fact]

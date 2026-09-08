@@ -36,8 +36,10 @@ public sealed class StreamCancellationTests
         });
     }
 
-    [Fact]
-    public async Task Given_Both_Tokens_When_The_Dispatch_One_Is_Cancelled_Then_The_Walk_Stops()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Given_Both_Tokens_When_Either_Is_Cancelled_Then_The_Walk_Stops(bool cancelDispatch)
     {
         using var dispatch = new CancellationTokenSource();
         using var iteration = new CancellationTokenSource();
@@ -47,23 +49,7 @@ public sealed class StreamCancellationTests
         {
             await foreach (int item in sut.Stream(new Endless(), dispatch.Token).WithCancellation(iteration.Token))
             {
-                dispatch.Cancel();
-            }
-        });
-    }
-
-    [Fact]
-    public async Task Given_Both_Tokens_When_The_Iteration_One_Is_Cancelled_Then_The_Walk_Stops()
-    {
-        using var dispatch = new CancellationTokenSource();
-        using var iteration = new CancellationTokenSource();
-        IStreamDispatcher sut = Build();
-
-        await Should.ThrowAsync<OperationCanceledException>(async () =>
-        {
-            await foreach (int item in sut.Stream(new Endless(), dispatch.Token).WithCancellation(iteration.Token))
-            {
-                iteration.Cancel();
+                (cancelDispatch ? dispatch : iteration).Cancel();
             }
         });
     }

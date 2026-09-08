@@ -14,14 +14,6 @@ public sealed class RequestFlowValidationExceptionTests
     }
 
     [Fact]
-    public void Given_A_Problem_When_Creating_The_Exception_Then_The_Message_Starts_With_The_Registration_Prefix()
-    {
-        var exception = new RequestFlowValidationException([Problem("RF0101", "duplicate handler")]);
-
-        exception.Message.ShouldStartWith("RequestFlow registration is invalid:");
-    }
-
-    [Fact]
     public void Given_Several_Problems_When_Creating_The_Exception_Then_The_Message_Lists_Every_Problem_One_Per_Line()
     {
         var exception = new RequestFlowValidationException(

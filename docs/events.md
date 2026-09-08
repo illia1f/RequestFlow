@@ -79,7 +79,7 @@ public sealed class AuditAllEvents : IEventHandler<IEvent>
 
 - Scanning sees `EntitySaved<>`, not constructed types such as `EntitySaved<int>`. Register each closed event type that the application publishes.
 - `AddEvent` registers the event type only. Existing handler contracts and publish strategies apply during startup validation.
-- Repeated declarations collapse across `AddRequestFlow` calls. Invalid event types report `RF0021`; valid events without a handler report `RF0114` unless `AllowUnhandledEvents()` is enabled.
+- Repeated declarations register once across `AddRequestFlow` calls. Invalid event types produce `RF0021`; events without a handler produce `RF0114` unless exempted from missing-handler validation.
 
 ## Select a publish strategy
 
@@ -273,11 +273,12 @@ Only two errors come out of `PublishAsync` before it returns a task: an `Argumen
 
 ## Known, unhandled, and unknown events
 
-A known event with no applicable handler is an `RF0114` at startup unless `AllowUnhandledEvents()` is called, in which case an empty plan is frozen. A built-in strategy completes without resolving a service. A custom strategy still resolves and runs with `delivery.Count == 0`.
+- A known event is a concrete, closed `IEvent` type found by scanning, named by an exact closed handler contract, or registered with `AddEvent`.
+- A known event without an applicable handler produces `RF0114` at startup unless exempted. An exempt event gets an empty plan: built-in strategies do no work; a custom strategy still resolves and runs with `delivery.Count == 0`.
+- Abstract event bases, interfaces, and open generic definitions can be handler targets but get no plans of their own.
+- Unknown runtime types throw `EventNotRegisteredException`, including unregistered derived types and proxies of known events. Missing-handler exemptions do not register event types.
 
-For an event to count as known it must be concrete and closed, implement `IEvent`, and have been found by the scan, named by an exact closed handler contract, or registered with `AddEvent`. Abstract event bases, event interfaces, and open generic definitions may be handler targets but do not get plans of their own.
-
-Even with `AllowUnhandledEvents()` enabled, an unknown runtime type always raises `EventNotRegisteredException`. That includes an unscanned derived type or proxy whose base event is known. The opt-out covers a known event with no handler. It does not let the publisher work out a closure for a type that was absent at startup.
+Use `AllowUnhandledEvent<TEvent>()` for one exact event, `AllowUnhandledEventsFromAssembly(assembly)` for one assembly, or `AllowAllUnhandledEvents()` for all known events. See [Missing-handler exemptions](registration.md#missing-handler-exemptions).
 
 ## Cancellation
 
@@ -316,10 +317,10 @@ Event declarations and validation flags accumulate through additive `AddRequestF
 | `PublishEventsSequentially()` | Selects `SequentialPublishStrategy` globally; explicit form of the default |
 | `PublishEventsFailFast()` | Selects `FailFastPublishStrategy` globally |
 | `PublishEventsInParallel<TEvent>()`, `PublishEventsSequentially<TEvent>()`, `PublishEventsFailFast<TEvent>()` | Select that strategy for an assignable event target |
-| `AllowUnhandledEvents()` | Suppresses `RF0114` and permits known empty plans |
+| `AllowAllUnhandledEvents()` | Suppresses `RF0114` and permits known empty plans |
 | `DisallowUnusedEventHandlers()` | Enables `RF0115` for a dead subscription and `RF0122` for a dead strategy declaration |
 
-`DisallowUnusedEventHandlers()` and `AllowUnhandledEvents()` are independent. The former asks whether a handler subscription reaches any known event; the latter asks whether each known event has a handler. Turning one on does nothing to the other.
+Missing-handler exemptions do not disable `DisallowUnusedEventHandlers()`: a handler subscription or typed strategy must still reach a known event.
 
 `WithScopedHandlers()` covers the event handlers discovered by that particular registration call. The publisher follows the dispatcher lifetime: scoped by default, transient when `WithTransientDispatcher()` is set. See [service lifetimes](lifetimes.md) for the full registration table.
 
@@ -333,7 +334,7 @@ The behavior warnings below come from black-box probes against MediatR 12.5.0 an
 - A notification that reached nobody in the probes is delivered under RequestFlow when a base, interface, or `IEvent` handler applies, and becomes an `RF0114` startup problem when none does.
 - Do not mistake RequestFlow's same-tier order for registration order or a compatibility guarantee. Review handlers whose side effects depend on the order of exact-type registrations.
 - RequestFlow runs every applicable handler unless a publisher cancellation check stops the walk, and aggregates handler failures. Code that catches a handler exception directly around `Publish` needs to inspect `EventPublishException.Failures` instead.
-- Where MediatR 12.5.0 permitted a notification without handlers, RequestFlow needs `AllowUnhandledEvents()` for that case.
+- Where MediatR 12.5.0 permitted a notification without handlers, RequestFlow needs a missing-handler exemption for that event.
 - Repeated `AddMediatR` registration delivered notification handlers more than once in the 12.5.0 probes; MediatR 14.1.0 stopped that duplicate delivery. RequestFlow deduplicates scanned assemblies, and manual `AddEventHandler` entries, across additive registration calls.
 - Conditional registration ports directly: `if (flag) services.AddTransient<INotificationHandler<X>, H>()` becomes `if (flag) options.AddEventHandler<H>()` inside the configure delegate. Leave the bare container registration behind, because under RequestFlow it does nothing.
 - A `TypeEvaluator` scan filter maps to `ExcludeEventHandler<THandler>()` per handler kept out, and an open generic notification handler ports as manually added closings, `options.AddEventHandler<AuditHandler<OrderPlaced>>()` per event.

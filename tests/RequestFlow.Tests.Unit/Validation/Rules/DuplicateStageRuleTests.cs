@@ -5,13 +5,15 @@ namespace RequestFlow.Tests.Unit.Validation;
 
 public sealed class DuplicateStageRuleTests
 {
-    [Fact]
-    public void Given_Same_Stage_Declared_Twice_When_Validating_Then_Reports_One_Problem()
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Given_Repeated_Stage_Declarations_When_Validating_Then_Reports_One_Problem(int declarationCount)
     {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddStageDeclaration(typeof(string))
-            .AddStageDeclaration(typeof(string))
-            .BuildContext();
+        var builder = new RequestFlowModelBuilder();
+        for (int i = 0; i < declarationCount; i++)
+            builder.AddStageDeclaration(typeof(string));
+        RequestFlowValidationContext context = builder.BuildContext();
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
@@ -20,20 +22,6 @@ public sealed class DuplicateStageRuleTests
         problem.Subject.ShouldBe(typeof(string));
         problem.Message.ShouldContain("registered more than once");
         problem.Message.ShouldContain("whatever each call filtered on");
-    }
-
-    [Fact]
-    public void Given_Same_Stage_Declared_Three_Times_When_Validating_Then_Reports_One_Problem()
-    {
-        RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .AddStageDeclaration(typeof(string))
-            .AddStageDeclaration(typeof(string))
-            .AddStageDeclaration(typeof(string))
-            .BuildContext();
-
-        List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
-
-        problems.ShouldHaveSingleItem().Code.ShouldBe("RF0103");
     }
 
     [Fact]

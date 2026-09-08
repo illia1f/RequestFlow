@@ -29,27 +29,25 @@ internal sealed class RequestFlowRegistry
     private readonly List<StageDeclaration> _stageDeclarations = [];
     private readonly HashSet<Type> _registeredClosedStageTypes = [];
     private readonly AsyncLocal<FreezeEntry?> _activeFreeze = new();
+    private readonly UnhandledMessageExemptions _exemptions = new();
 
-    /// <summary>
-    /// True once any <c>AddRequestFlow</c> call opted out of the missing-handler check.
-    /// </summary>
-    public bool UnhandledRequestsAllowed { get; private set; }
+    public void AddExemptions(UnhandledMessageExemptions exemptions)
+        => _exemptions.Add(exemptions);
 
-    public void AllowUnhandledRequests()
-        => UnhandledRequestsAllowed = true;
+    public bool AllUnhandledRequestsAllowed { get; private set; }
 
-    /// <summary>
-    /// True once any <c>AddRequestFlow</c> call asked for a stage that applies to nothing to be fatal.
-    /// </summary>
+    public void AllowAllUnhandledRequests()
+        => AllUnhandledRequestsAllowed = true;
+
     public bool UnusedStagesDisallowed { get; private set; }
 
     public void DisallowUnusedStages()
         => UnusedStagesDisallowed = true;
 
-    public bool UnhandledEventsAllowed { get; private set; }
+    public bool AllUnhandledEventsAllowed { get; private set; }
 
-    public void AllowUnhandledEvents()
-        => UnhandledEventsAllowed = true;
+    public void AllowAllUnhandledEvents()
+        => AllUnhandledEventsAllowed = true;
 
     public bool UnusedEventHandlersDisallowed { get; private set; }
 
@@ -246,10 +244,11 @@ internal sealed class RequestFlowRegistry
 
         RequestFlowValidationContext context = new(
             model,
-            UnhandledRequestsAllowed,
+            AllUnhandledRequestsAllowed,
             UnusedStagesDisallowed,
-            UnhandledEventsAllowed,
-            UnusedEventHandlersDisallowed);
+            AllUnhandledEventsAllowed,
+            UnusedEventHandlersDisallowed,
+            _exemptions);
 
         ValidationRuleRunner.Validate(
             context,

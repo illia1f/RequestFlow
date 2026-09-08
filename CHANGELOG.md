@@ -10,16 +10,35 @@ The `release` workflow uses the section matching the pushed tag as the GitHub Re
 
 ### Added
 
+- Missing-handler exemptions by request type, event type, or declaring assembly. `RequestFlowValidationContext` exposes the exemptions through read-only lists and `AllowsUnhandledRequest` / `AllowsUnhandledEvent`. `RequestFlowModelBuilder` supports exemptions in rule tests. See [Registration](docs/registration.md#missing-handler-exemptions).
 - `RegisterHandlersFromCallingAssembly()` scans the assembly containing the `AddRequestFlow` configuration delegate, so no marker type is needed. Use `RegisterHandlersFromAssemblyContaining<T>()` or `RegisterHandlersFromAssembly(assembly)` when the target assembly must be explicit.
 - `AddHandler<THandler>()` registers a Task, ValueTask, or stream handler without scanning its assembly. `ExcludeHandler<THandler>()` excludes it from the same call's scan. Scanned and manually added handlers register once. Invalid handler types produce `RF0018` to `RF0020`.
 - ValueTask requests, handlers, and `IValueRequestDispatcher`, with `IValueRequestStage`, `ValueContinuation`, and `AddValueStage` for stages. Task and ValueTask chains stay separate; existing Task contracts are unchanged. See [ValueTask requests](docs/value-tasks.md) for usage and consumption rules.
 - ValueTask commands and queries: `IValueCommand<TResponse>`, `IValueCommand`, `IValueQuery<TResponse>`, and their handlers. `AddCqrs` registers `IValueCommandDispatcher` and `IValueQueryDispatcher`.
 - ValueTask validation codes: `RF0125` rejects more than one `IValueRequest<TResponse>` contract; `RF0126` to `RF0128` reject ValueTask contracts combined with Task, stream, or event contracts; and `RF0129` and `RF0130` reject handler or stage response mismatches.
 - `RF0124`: a handler declared against an interface or abstract request type now fails the freeze, from any registration source, when the target cannot expose the declared type as the request's exact runtime type. The `net462` asset keeps interface and abstract `MarshalByRefObject` handlers valid for `RealProxy` transparent proxies.
+- `provider.InspectRequestFlow<TRequest>()` and its `Type` overload return a request's frozen pipeline without resolving handlers or stages. Inspection runs startup validation if needed and throws `HandlerNotFoundException` for requests without a pipeline, even when exempted.
+- `RequestPipeline` describes the request family, declared handler, service type, lifetimes, ordered stages, and excluded stages with reasons. DI replacements and factories can supply different instances. See [Pipeline inspection](docs/pipeline-inspection.md).
+- `AddEvent<TEvent>()` and `AddEvent(Type)` register an event without scanning or adding a handler, including closed generic events. Repeated declarations register once; existing handlers and publish strategies apply. Invalid types produce `RF0021` at startup validation.
+- [MediatR migration guide](docs/migrating-from-mediatr.md) and [compatibility reference](docs/compatibility.md) covering target frameworks, dependencies, trimming, and NativeAOT.
+
+### Changed
+
+- Renamed the global validation flags to `AllUnhandledRequestsAllowed` and `AllUnhandledEventsAllowed`, with matching parameter names on `RequestFlowModelBuilder.BuildContext`.
+- Renamed `AllowUnhandledRequests()` and `AllowUnhandledEvents()` to `AllowAllUnhandledRequests()` and `AllowAllUnhandledEvents()`. The new names retain application-wide behavior; type and assembly exemptions limit it to specific messages.
+- `AddRequestFlow`, `ValidateRequestFlow`, and both `InspectRequestFlow` overloads warn about trimming (`IL2026`) and NativeAOT (`IL3050`) on `net8.0` and `net10.0` when those analyzers run. Both deployment modes remain unsupported, including with manual registration.
+- `CQRS0001` rejects command/query conflicts involving ValueTask contracts, including combinations with Task contracts and stream queries.
+- Diagnostics name the relevant APIs: `RF0004` includes `IValueRequestHandler`, `RF0103` and `RF0104` name `AddValueStage`, and `RF0105` names `WhereHandlerImplements`. `EventNotRegisteredException` explains explicit registration for closed generic events. Update code that matches the old message text.
+- `RequestFlow.Cqrs` gets `Microsoft.Extensions.DependencyInjection.Abstractions` through `RequestFlow`; the direct dependency is removed. Package descriptions and tags include ValueTask, events, and startup validation.
+- The [Orders sample](samples/README.md) uses separate Orders and Audit modules with shared startup validation and cross-module events. `--inspect-pipelines` prints pipelines and stage exclusions, then exits; `--break-rules` demonstrates startup failures. Swagger and OpenAPI are available in Development.
+- [Streaming guidance](docs/streaming.md) covers deferred execution, scope lifetime, and checks to finish before starting an HTTP response.
 
 ### Fixed
 
 - `AddEventHandler<THandler>()` and `RegisterGenericHandler(...)` with a type whose interface list cannot load, because an interface's assembly is not deployed, no longer throw a raw loader exception out of `AddRequestFlow`; the freeze reports `RF0017` or `RF0004` beside the other problems.
+- Filtered duplicate stages and declarations in another family no longer hide response or item mismatches (`RF0113` and `RF0111`). Duplicates still produce `RF0103`.
+- `RF0107` preserves rule exceptions and stack traces in `RequestFlowValidationException.InnerException` as an `AggregateException`, in rule order. A new constructor accepts the inner exception. Failed rules lose their findings; remaining rules still run.
+- Validation re-entry throws `InvalidOperationException`; re-entry from a rule's `Validate` method produces `RF0107`. Validation and inspection detect calls on worker threads that inherit the execution context, but direct dispatcher resolution on another thread can still block on DI locks. See [Validation rules](docs/validation-rules.md#registering-a-rule).
 
 ## [1.0.0-preview.8] - 2026-08-24
 

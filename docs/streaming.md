@@ -55,9 +55,13 @@ The handler's item type has to be the one the request declares. `IStreamRequest<
 Inject `IStreamDispatcher` and call `Stream`:
 
 ```csharp
-app.MapGet("/orders/export", (DateTimeOffset since, IStreamDispatcher dispatcher, CancellationToken ct)
-    => dispatcher.Stream(new ExportOrders(since), ct));
+await foreach (OrderRow row in dispatcher.Stream(new ExportOrders(since), ct))
+{
+    Console.WriteLine(row.Id);
+}
 ```
+
+For an HTTP endpoint, see [HTTP responses](#http-responses) before returning a stream.
 
 There is no `AddStreaming` call. `AddRequestFlow` finds stream handlers in the same scan as the rest and registers `IStreamDispatcher` beside `IRequestDispatcher`, on the same lifetime and over the same frozen map:
 
@@ -74,7 +78,7 @@ Resolving either dispatcher runs the one validation pass and freezes the one map
 From the `Stream` call:
 
 - `ArgumentNullException` when `request` is null.
-- `HandlerNotFoundException` when the request's runtime type has no registered handler. A scanned stream request without one fails startup as `RF0102` first, so reaching dispatch takes one of the paths [exceptions.md](exceptions.md#handlernotfoundexception) lists: an assembly nobody scanned, a registration that called `AllowUnhandledRequests`, or a derived request type.
+- `HandlerNotFoundException` when the request's runtime type has no registered handler. This can happen for an unscanned, exempt, or derived type. Other discovered requests without handlers fail startup validation as `RF0102`. See [exceptions.md](exceptions.md#handlernotfoundexception).
 - `ResponseTypeMismatchException` when the call site's `TItem` differs from the registered item type. `IStreamRequest<out TItem>` is covariant, so an upcast compiles and then misses, exactly as on the task path.
 
 From enumeration:
@@ -83,7 +87,16 @@ From enumeration:
 - The container's own exception when a level fails to resolve, a handler with a missing constructor dependency for example. Levels resolve when the chain runs, not on the `Stream` call ([exceptions.md](exceptions.md#what-requestflow-never-wraps)).
 - Anything the handler or a stage throws while producing items.
 
-A `Stream` call that returns without throwing means the request has a registered handler. Whether that handler resolves, and what it does, waits for the first enumeration. Resolving from the dispatching scope that late also means the enumeration has to finish before that scope is disposed; [lifetimes.md](lifetimes.md#why-the-dispatcher-is-scoped) covers the worker pattern.
+Execution and scope:
+
+- `Stream` checks for a matching plan. Handlers and stages start on the first `MoveNextAsync`, normally through `await foreach`, and resolve their services as execution reaches them.
+- Finish enumeration or dispose the enumerator before disposing the dispatching scope. See [lifetimes.md](lifetimes.md#why-the-dispatcher-is-scoped) for the worker pattern.
+
+## HTTP responses
+
+- Complete checks that determine the HTTP status, such as authorization and request validation, before returning a stream or starting the response body. Returning from `Stream` does not mean a stage has approved the request.
+- `ValidateRequestFlow()` checks registration, not an individual request's values or permissions.
+- Later items can fail even after the first succeeds. Once the response starts, a failure cannot change its status.
 
 ## Cancellation
 

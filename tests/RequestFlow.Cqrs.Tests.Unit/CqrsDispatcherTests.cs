@@ -6,24 +6,17 @@ namespace RequestFlow.Cqrs.Tests.Unit;
 public sealed class CqrsDispatcherTests
 {
     [Fact]
-    public async Task Given_Typed_Command_When_Sending_Command_Then_Returns_Request_Dispatcher_Response()
-    {
-        var command = new Rename("bob");
-        _requests.SendAsync(command, Arg.Any<CancellationToken>()).Returns("renamed bob");
-
-        string result = await _sut.SendAsync(command);
-
-        result.ShouldBe("renamed bob");
-    }
-
-    [Fact]
-    public async Task Given_Typed_Command_When_Sending_Command_Then_Forwards_Command_And_Token()
+    public async Task Given_Typed_Command_When_Sending_Command_Then_Forwards_Command_And_Token_And_Returns_The_Same_Task()
     {
         var command = new Rename("bob");
         using var cts = new CancellationTokenSource();
+        Task<string> expected = Task.FromResult("renamed bob");
+        _requests.SendAsync(command, cts.Token).Returns(expected);
 
-        await _sut.SendAsync(command, cts.Token);
+        Task<string> result = _sut.SendAsync(command, cts.Token);
 
+        result.ShouldBeSameAs(expected);
+        (await result).ShouldBe("renamed bob");
         await _requests.Received(1).SendAsync(command, cts.Token);
     }
 
@@ -32,31 +25,29 @@ public sealed class CqrsDispatcherTests
     {
         var command = new Purge();
         using var cts = new CancellationTokenSource();
+        var completion = new TaskCompletionSource<object?>();
+        _requests.SendAsync((IRequest)command, cts.Token).Returns(completion.Task);
 
-        await _sut.SendAsync(command, cts.Token);
+        Task result = _sut.SendAsync(command, cts.Token);
 
+        result.ShouldBeSameAs(completion.Task);
+        completion.SetResult(null);
+        await result;
         await _requests.Received(1).SendAsync((IRequest)command, cts.Token);
     }
 
     [Fact]
-    public async Task Given_Query_When_Sending_Query_Then_Returns_Request_Dispatcher_Response()
-    {
-        var query = new FindName("42");
-        _requests.SendAsync(query, Arg.Any<CancellationToken>()).Returns("bob");
-
-        string result = await _sut.SendAsync(query);
-
-        result.ShouldBe("bob");
-    }
-
-    [Fact]
-    public async Task Given_Query_When_Sending_Query_Then_Forwards_Query_And_Token()
+    public async Task Given_Query_When_Sending_Query_Then_Forwards_Query_And_Token_And_Returns_The_Same_Task()
     {
         var query = new FindName("42");
         using var cts = new CancellationTokenSource();
+        Task<string> expected = Task.FromResult("bob");
+        _requests.SendAsync(query, cts.Token).Returns(expected);
 
-        await _sut.SendAsync(query, cts.Token);
+        Task<string> result = _sut.SendAsync(query, cts.Token);
 
+        result.ShouldBeSameAs(expected);
+        (await result).ShouldBe("bob");
         await _requests.Received(1).SendAsync(query, cts.Token);
     }
 

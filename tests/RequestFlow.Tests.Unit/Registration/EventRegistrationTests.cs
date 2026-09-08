@@ -102,7 +102,7 @@ public sealed class EventRegistrationTests
             o.RegisterHandlersFromAssemblyContaining<EventRegistrationTests>());
         services.AddRequestFlow(o => o
             .PublishEventsInParallel()
-            .AllowUnhandledEvents()
+            .AllowAllUnhandledEvents()
             .DisallowUnusedEventHandlers());
 
         RequestFlowRegistry registry = services
@@ -112,7 +112,7 @@ public sealed class EventRegistrationTests
 
         registry.EventStrategyDeclarations.ShouldHaveSingleItem().StrategyType
             .ShouldBe(typeof(ParallelPublishStrategy));
-        registry.UnhandledEventsAllowed.ShouldBeTrue();
+        registry.AllUnhandledEventsAllowed.ShouldBeTrue();
         registry.UnusedEventHandlersDisallowed.ShouldBeTrue();
     }
 

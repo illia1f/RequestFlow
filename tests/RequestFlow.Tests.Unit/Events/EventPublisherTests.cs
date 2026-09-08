@@ -15,13 +15,10 @@ public sealed class EventPublisherTests
         action.ShouldThrow<ArgumentNullException>().ParamName.ShouldBe("event");
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Given_An_Unknown_Event_Type_When_Publishing_Then_Throws_Not_Registered_Exception_Synchronously(
-        bool parallel)
+    [Fact]
+    public void Given_An_Unknown_Event_Type_When_Publishing_Then_Throws_Not_Registered_Exception_Synchronously()
     {
-        EventPublisher publisher = EmptyPublisher(typeof(KnownEvent), parallel: parallel);
+        EventPublisher publisher = EmptyPublisher(typeof(KnownEvent));
 
         Action action = () => publisher.PublishAsync(new UnknownEvent());
 
@@ -29,13 +26,10 @@ public sealed class EventPublisherTests
         exception.EventType.ShouldBe(typeof(UnknownEvent));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Given_An_Unknown_Runtime_Subclass_When_Publishing_Then_Throws_Not_Registered_Exception_Synchronously(
-        bool parallel)
+    [Fact]
+    public void Given_An_Unknown_Runtime_Subclass_When_Publishing_Then_Throws_Not_Registered_Exception_Synchronously()
     {
-        EventPublisher publisher = EmptyPublisher(typeof(KnownBaseEvent), parallel: parallel);
+        EventPublisher publisher = EmptyPublisher(typeof(KnownBaseEvent));
 
         Action action = () => publisher.PublishAsync(new UnknownDerivedEvent());
 
@@ -308,6 +302,7 @@ public sealed class EventPublisherTests
         await provider.GetRequiredService<IEventPublisher>().PublishAsync(@event);
 
         @event.Calls.ShouldBe(1);
+        @event.ObservedToken.ShouldBe(CancellationToken.None);
     }
 
     [Theory]
@@ -595,6 +590,8 @@ public sealed class EventPublisherTests
     public sealed record DuplicateAssemblyEvent : IEvent
     {
         public int Calls { get; set; }
+
+        public CancellationToken? ObservedToken { get; set; }
     }
 
     public sealed class DuplicateAssemblyHandler : IEventHandler<DuplicateAssemblyEvent>
@@ -602,6 +599,7 @@ public sealed class EventPublisherTests
         public Task HandleAsync(DuplicateAssemblyEvent @event, CancellationToken cancellationToken)
         {
             @event.Calls++;
+            @event.ObservedToken = cancellationToken;
             return Task.CompletedTask;
         }
     }

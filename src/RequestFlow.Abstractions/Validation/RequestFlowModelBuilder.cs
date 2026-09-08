@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace RequestFlow;
 
@@ -17,6 +18,43 @@ public sealed class RequestFlowModelBuilder
     private readonly List<Type> _eventTypes = [];
     private readonly List<EventSubscriptionInput> _eventSubscriptions = [];
     private readonly List<EventStrategyInput> _eventStrategies = [];
+    private readonly UnhandledMessageExemptions _exemptions = new();
+
+    /// <summary>
+    /// Permits one exact request type to have no handler in the validation context.
+    /// </summary>
+    public RequestFlowModelBuilder AllowUnhandledRequest(Type requestType)
+    {
+        _exemptions.AddRequest(requestType);
+        return this;
+    }
+
+    /// <summary>
+    /// Permits request types declared in this assembly to have no handler in the validation context.
+    /// </summary>
+    public RequestFlowModelBuilder AllowUnhandledRequestsFromAssembly(Assembly assembly)
+    {
+        _exemptions.AddRequestAssembly(assembly);
+        return this;
+    }
+
+    /// <summary>
+    /// Permits one exact event type to have no handler in the validation context.
+    /// </summary>
+    public RequestFlowModelBuilder AllowUnhandledEvent(Type eventType)
+    {
+        _exemptions.AddEvent(eventType);
+        return this;
+    }
+
+    /// <summary>
+    /// Permits event types declared in this assembly to have no handler in the validation context.
+    /// </summary>
+    public RequestFlowModelBuilder AllowUnhandledEventsFromAssembly(Assembly assembly)
+    {
+        _exemptions.AddEventAssembly(assembly);
+        return this;
+    }
 
     /// <summary>
     /// Adds a request type or configures its existing entry.
@@ -200,23 +238,24 @@ public sealed class RequestFlowModelBuilder
     /// By default, unhandled requests and events are errors; unused stages and subscriptions are allowed.
     /// </remarks>
     public RequestFlowValidationContext BuildContext(
-        bool unhandledRequestsAllowed = false, bool unusedStagesDisallowed = false)
-        => BuildContext(unhandledRequestsAllowed, unusedStagesDisallowed, false, false);
+        bool allUnhandledRequestsAllowed = false, bool unusedStagesDisallowed = false)
+        => BuildContext(allUnhandledRequestsAllowed, unusedStagesDisallowed, false, false);
 
     /// <summary>
     /// Builds a validation context with request, stage, and event flags.
     /// </summary>
     public RequestFlowValidationContext BuildContext(
-        bool unhandledRequestsAllowed,
+        bool allUnhandledRequestsAllowed,
         bool unusedStagesDisallowed,
-        bool unhandledEventsAllowed,
+        bool allUnhandledEventsAllowed,
         bool unusedEventHandlersDisallowed)
         => new(
             Build(),
-            unhandledRequestsAllowed,
+            allUnhandledRequestsAllowed,
             unusedStagesDisallowed,
-            unhandledEventsAllowed,
-            unusedEventHandlersDisallowed);
+            allUnhandledEventsAllowed,
+            unusedEventHandlersDisallowed,
+            _exemptions);
 
     private readonly struct StageDeclarationInput(
         Type stageType, RequestFlowLifetime lifetime, Type contractType)

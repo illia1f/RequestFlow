@@ -269,7 +269,7 @@ public sealed class AddValidationRuleTests
         var services = new ServiceCollection();
         services.AddRequestFlow(options => options
                 .RegisterHandlersFromAssemblyContaining<AddValidationRuleTests>()
-                .AllowUnhandledEvents()
+                .AllowAllUnhandledEvents()
                 .DisallowUnusedEventHandlers())
             .AddValidationRule<EventFactsRule>();
         using ServiceProvider provider = services.BuildServiceProvider();
@@ -400,7 +400,7 @@ public sealed class AddValidationRuleTests
             yield return new RequestFlowValidationProblem(
                 "TEST0005",
                 $"event={hasEvent} subscription={hasSubscription} " +
-                $"unhandled={context.UnhandledEventsAllowed} " +
+                $"unhandled={context.AllUnhandledEventsAllowed} " +
                 $"unused={context.UnusedEventHandlersDisallowed}",
                 typeof(RequestFlow.Tests.ValidationFixtures.ExternalContractEvent));
         }

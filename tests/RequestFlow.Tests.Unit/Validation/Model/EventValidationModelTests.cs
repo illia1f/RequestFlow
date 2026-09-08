@@ -217,14 +217,14 @@ public sealed class EventValidationModelTests
     public void Given_All_Four_Flags_When_Building_A_Context_Then_They_Are_Recorded()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder().BuildContext(
-            unhandledRequestsAllowed: true,
+            allUnhandledRequestsAllowed: true,
             unusedStagesDisallowed: false,
-            unhandledEventsAllowed: true,
+            allUnhandledEventsAllowed: true,
             unusedEventHandlersDisallowed: true);
 
-        context.UnhandledRequestsAllowed.ShouldBeTrue();
+        context.AllUnhandledRequestsAllowed.ShouldBeTrue();
         context.UnusedStagesDisallowed.ShouldBeFalse();
-        context.UnhandledEventsAllowed.ShouldBeTrue();
+        context.AllUnhandledEventsAllowed.ShouldBeTrue();
         context.UnusedEventHandlersDisallowed.ShouldBeTrue();
     }
 

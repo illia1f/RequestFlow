@@ -240,7 +240,7 @@ services.AddRequestFlow(o => o
     .DisallowUnusedStages());
 ```
 
-The setting is sticky, like `AllowUnhandledRequests`: once any call opts in, every registered stage is checked.
+Once any `AddRequestFlow` call enables `DisallowUnusedStages`, every registered stage is checked.
 
 ## Lifetime
 

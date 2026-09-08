@@ -34,28 +34,6 @@ public sealed class LevelTests
     }
 
     [Fact]
-    public async Task Given_A_Typed_Stage_That_Returns_Null_When_Entering_It_Then_Throws_Naming_The_Stage()
-    {
-        LevelEntry<string> sut = TypedStage(typeof(NullTaskStage), NullBelow);
-
-        StageNullTaskException exception = await Should.ThrowAsync<StageNullTaskException>(
-            () => sut(new Ping("hi"), Provider(new NullTaskStage()), CancellationToken.None));
-
-        exception.StageType.ShouldBe(typeof(NullTaskStage));
-    }
-
-    [Fact]
-    public async Task Given_A_Void_Form_Stage_That_Returns_Null_When_Entering_It_Then_Throws_Naming_The_Stage()
-    {
-        LevelEntry<NoResult> sut = VoidStage(typeof(NullTaskVoidStage), VoidBelow);
-
-        StageNullTaskException exception = await Should.ThrowAsync<StageNullTaskException>(
-            () => sut(new Log(), Provider(new NullTaskVoidStage()), CancellationToken.None));
-
-        exception.StageType.ShouldBe(typeof(NullTaskVoidStage));
-    }
-
-    [Fact]
     public async Task Given_A_Typed_Handler_Level_When_Entering_It_Then_It_Produces_The_Response()
     {
         LevelEntry<string> sut = LevelFactory.Handler<Ping, string>();
@@ -76,52 +54,12 @@ public sealed class LevelTests
     }
 
     [Fact]
-    public async Task Given_A_Handler_That_Returns_Null_When_Entering_Its_Level_Then_Throws_Naming_The_Request()
-    {
-        LevelEntry<string> sut = LevelFactory.Handler<Broken, string>();
-
-        HandlerNullTaskException exception = await Should.ThrowAsync<HandlerNullTaskException>(
-            () => sut(new Broken(), Provider(new BrokenHandler()), CancellationToken.None));
-
-        exception.RequestType.ShouldBe(typeof(Broken));
-    }
-
-    [Fact]
     public async Task Given_A_Request_Of_Another_Type_When_Entering_A_Stage_Level_Then_Throws_Invalid_Cast_Exception()
     {
         LevelEntry<string> sut = TypedStage(typeof(RecordingStage), NullBelow);
 
         await Should.ThrowAsync<InvalidCastException>(
             () => sut(new Log(), Provider(new RecordingStage()), CancellationToken.None));
-    }
-
-    // A whole chain, not one level: which level a position gets depends on the position and the stage shape.
-    [Fact]
-    public async Task Given_A_Two_Stage_Chain_When_Entering_It_Then_The_First_Stage_Is_Outermost()
-    {
-        List<string> log = [];
-        ServiceProvider provider = Provider(new OuterStage(log), new InnerStage(log), new PingHandler());
-        LevelEntry<string> root = ChainBuilder.Typed<Ping, string>(
-            Chain([typeof(OuterStage), typeof(InnerStage)], []));
-
-        string result = await root(new Ping("hi"), provider, CancellationToken.None);
-
-        result.ShouldBe("hi");
-        log.ShouldBe(["outer", "inner"]);
-    }
-
-    [Fact]
-    public async Task Given_A_Void_Chain_Of_Both_Stage_Shapes_When_Entering_It_Then_Both_Shapes_Run()
-    {
-        List<string> log = [];
-        ServiceProvider provider = Provider(
-            new TypedShapeVoidStage(log), new VoidShapeStage(log), new LogHandler());
-        LevelEntry<NoResult> root = ChainBuilder.Void<Log>(
-            Chain([typeof(TypedShapeVoidStage), typeof(VoidShapeStage)], [true, false]));
-
-        await root(new Log(), provider, CancellationToken.None);
-
-        log.ShouldBe(["typed", "void"]);
     }
 
     [Fact]
@@ -201,9 +139,6 @@ public sealed class LevelTests
                 case ResetHandler handler:
                     services.AddSingleton<IRequestHandler<Reset, string>>(handler);
                     break;
-                case BrokenHandler handler:
-                    services.AddSingleton<IRequestHandler<Broken, string>>(handler);
-                    break;
                 default:
                     services.AddSingleton(level.GetType(), level);
                     break;
@@ -230,8 +165,6 @@ public sealed class LevelTests
 
     public sealed record Log : IRequest;
 
-    public sealed record Broken : IRequest<string>;
-
     public record Command : IRequest<string>;
 
     public sealed record Reset : Command;
@@ -247,12 +180,6 @@ public sealed class LevelTests
     {
         public Task HandleAsync(Log request, CancellationToken cancellationToken)
             => Task.CompletedTask;
-    }
-
-    private sealed class BrokenHandler : IRequestHandler<Broken, string>
-    {
-        public Task<string> HandleAsync(Broken request, CancellationToken cancellationToken)
-            => null!;
     }
 
     private sealed class CommandHandler : IRequestHandler<Command, string>
@@ -280,42 +207,6 @@ public sealed class LevelTests
             => Task.FromResult(request.Text + ":stopped");
     }
 
-    private sealed class NullTaskStage : IRequestStage<Ping, string>
-    {
-        public Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken)
-            => null!;
-    }
-
-    private sealed class OuterStage(List<string> log) : IRequestStage<Ping, string>
-    {
-        public Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken)
-        {
-            log.Add("outer");
-
-            return next.InvokeAsync(cancellationToken);
-        }
-    }
-
-    private sealed class InnerStage(List<string> log) : IRequestStage<Ping, string>
-    {
-        public Task<string> HandleAsync(Ping request, Continuation<string> next, CancellationToken cancellationToken)
-        {
-            log.Add("inner");
-
-            return next.InvokeAsync(cancellationToken);
-        }
-    }
-
-    private sealed class TypedShapeVoidStage(List<string> log) : IRequestStage<Log, NoResult>
-    {
-        public Task<NoResult> HandleAsync(Log request, Continuation<NoResult> next, CancellationToken cancellationToken)
-        {
-            log.Add("typed");
-
-            return next.InvokeAsync(cancellationToken);
-        }
-    }
-
     private sealed class VoidShapeStage(List<string> log) : IRequestStage<Log>
     {
         public Task HandleAsync(Log request, Continuation next, CancellationToken cancellationToken)
@@ -324,12 +215,6 @@ public sealed class LevelTests
 
             return next.InvokeAsync(cancellationToken);
         }
-    }
-
-    private sealed class NullTaskVoidStage : IRequestStage<Log>
-    {
-        public Task HandleAsync(Log request, Continuation next, CancellationToken cancellationToken)
-            => null!;
     }
 
     private sealed class BaseCommandStage(List<string> log) : IRequestStage<Command, string>

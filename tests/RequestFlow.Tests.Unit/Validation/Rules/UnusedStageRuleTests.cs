@@ -79,14 +79,14 @@ public sealed class UnusedStageRuleTests
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
             .AddRequest(typeof(int))
             .AddStageDeclaration(typeof(string))
-            .BuildContext(unhandledRequestsAllowed: true);
+            .BuildContext(allUnhandledRequestsAllowed: true);
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
         problems.ShouldHaveSingleItem().Message.ShouldBe(
             BaseMessage(typeof(string))
-            + " Some registered requests have no handler, which AllowUnhandledRequests permits; a stage "
-            + "reaching only those still counts as unused.");
+            + " Some registered requests have no handler, which AllowAllUnhandledRequests permits; "
+            + "a stage reaching only those still counts as unused.");
     }
 
     [Fact]
@@ -101,8 +101,7 @@ public sealed class UnusedStageRuleTests
 
         problems.ShouldHaveSingleItem().Message.ShouldBe(
             BaseMessage(typeof(string))
-            + " Some registered requests have no handler; a stage reaching only those counts as unused, so "
-            + "the missing handler may be the fix.");
+            + " Some registered requests have no handler; a stage reaching only those counts as unused, so the missing handler may be the fix.");
     }
 
     // Neither flag value changes the message once every request has a handler, since the sentence
@@ -111,12 +110,12 @@ public sealed class UnusedStageRuleTests
     [InlineData(false)]
     [InlineData(true)]
     public void Given_All_Requests_Handled_When_Validating_Then_The_Message_Is_The_Base_One(
-        bool unhandledRequestsAllowed)
+        bool allUnhandledRequestsAllowed)
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
             .AddRequest(typeof(int), r => r.AddHandler(typeof(object), typeof(bool)))
             .AddStageDeclaration(typeof(string))
-            .BuildContext(unhandledRequestsAllowed);
+            .BuildContext(allUnhandledRequestsAllowed);
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
@@ -172,8 +171,7 @@ public sealed class UnusedStageRuleTests
     private static string BaseMessage(Type stageType)
         => $"Stage '{stageType.FullName}' from assembly '{stageType.Assembly.GetName().Name}' applies to no "
             + "registered request; widen its generic constraints, check its WhereHandlerImplements handler filter, "
-            + "scan the assembly holding the requests it "
-            + "targets, or drop DisallowUnusedStages.";
+            + "scan the assembly holding the requests it targets, or drop DisallowUnusedStages.";
 
     #endregion
 }

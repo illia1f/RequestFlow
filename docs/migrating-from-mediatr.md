@@ -177,7 +177,7 @@ builder.Services.AddRequestFlow(options =>
 
 - `ExternalPricingHandler` and `LocalPricingHandler` implement the same request handler contract. The flag selects exactly one; the disabled path uses local pricing.
 - Excluding a handler leaves its request discovered. Without a fallback, validation reports `RF0102`. To disable the request entirely, keep its requests and handlers in a separate feature assembly and scan that assembly only when enabled.
-- Use `ExcludeEventHandler<THandler>()` and `AddEventHandler<THandler>()` for conditional event handlers. If disabling one leaves a known event unhandled, supply another handler or opt in to `AllowUnhandledEvents()`.
+- Use `ExcludeEventHandler<THandler>()` and `AddEventHandler<THandler>()` for conditional event handlers. If disabling one leaves a known event unhandled, add another handler or exempt the event.
 
 ## Replace pipeline behaviors with stages
 

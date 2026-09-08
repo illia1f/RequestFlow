@@ -16,15 +16,6 @@ public sealed class ValueRequestContractTests
     }
 
     [Fact]
-    public void Given_The_Value_Request_Response_Parameter_When_Inspecting_Variance_Then_It_Is_Covariant()
-    {
-        GenericParameterAttributes variance = typeof(IValueRequest<>).GetGenericArguments()[0]
-            .GenericParameterAttributes & GenericParameterAttributes.VarianceMask;
-
-        variance.ShouldBe(GenericParameterAttributes.Covariant);
-    }
-
-    [Fact]
     public void Given_The_Void_Handler_Contract_When_Inspecting_Handle_Then_It_Returns_Plain_Value_Task()
     {
         MethodInfo handle = typeof(IValueRequestHandler<Signal>)

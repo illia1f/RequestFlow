@@ -5,15 +5,12 @@ using System.Threading;
 namespace RequestFlow.Cqrs;
 
 /// <summary>
-/// Streams a query to its single handler. Injection sites holding this interface
-/// can stream queries only, never send commands.
+/// Streams a query to its single handler.
 /// </summary>
 public interface IStreamQueryDispatcher
 {
     /// <summary>
-    /// Dispatches <paramref name="query"/> to its handler and returns the sequence it produces,
-    /// wrapped in whatever stream stages apply. The lookup happens on this call; the handler
-    /// runs on the first enumeration.
+    /// Resolves the plan for <paramref name="query"/> and returns its handler's sequence through the applicable stream stages.
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="HandlerNotFoundException"/>

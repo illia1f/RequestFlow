@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+#if NET8_0_OR_GREATER
+using System.Diagnostics.CodeAnalysis;
+#endif
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using RequestFlow;
 
@@ -20,6 +23,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="RequestFlowValidationException"/>
+#if NET8_0_OR_GREATER
+    [RequiresUnreferencedCode(DeploymentWarnings.Trimming)]
+    [RequiresDynamicCode(DeploymentWarnings.NativeAot)]
+#endif
     public static RequestFlowBuilder AddRequestFlow(
         this IServiceCollection services, Action<RequestFlowOptions> configure)
     {
@@ -29,11 +36,12 @@ public static class ServiceCollectionExtensions
         RequestFlowOptions options = new RequestFlowOptions().Apply(configure);
 
         RequestFlowRegistry registry = GetOrAddRegistry(services);
-        if (options.UnhandledRequestsAllowed)
-            registry.AllowUnhandledRequests();
+        registry.AddExemptions(options.Exemptions);
+        if (options.AllUnhandledRequestsAllowed)
+            registry.AllowAllUnhandledRequests();
         registry.AddEventStrategyDeclarations(options.EventStrategyDeclarations);
-        if (options.UnhandledEventsAllowed)
-            registry.AllowUnhandledEvents();
+        if (options.AllUnhandledEventsAllowed)
+            registry.AllowAllUnhandledEvents();
         if (options.UnusedEventHandlersDisallowed)
             registry.DisallowUnusedEventHandlers();
         if (options.UnusedStagesDisallowed)

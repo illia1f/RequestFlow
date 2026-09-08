@@ -232,7 +232,7 @@ public sealed class RegisterGenericHandlerTests
         services.AddRequestFlow(o =>
         {
             o.RegisterGenericHandler(typeof(GenericStreamHandler<>), typeof(Counted));
-            o.AllowUnhandledRequests();
+            o.AllowAllUnhandledRequests();
         });
         IStreamDispatcher dispatcher = services.BuildServiceProvider().CreateScope().ServiceProvider
             .GetRequiredService<IStreamDispatcher>();

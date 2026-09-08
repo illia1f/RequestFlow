@@ -250,7 +250,7 @@ public sealed class PipelineInspectionTests
         services.AddRequestFlow(options => options
             .RegisterHandlersFromAssemblyContaining<ManualHandlerRegistrationTests>()
             .ExcludeHandler<ManualHandlerRegistrationTests.SwappablePingHandler>()
-            .AllowUnhandledRequests());
+            .AllowAllUnhandledRequests());
         using ServiceProvider provider = services.BuildServiceProvider();
         provider.ValidateRequestFlow();
 

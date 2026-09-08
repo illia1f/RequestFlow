@@ -128,7 +128,7 @@ public sealed class CommandQuerySplitRuleTests
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
             .AddRequest(typeof(Confused))
-            .BuildContext(unhandledRequestsAllowed: true, unusedStagesDisallowed: true);
+            .BuildContext(allUnhandledRequestsAllowed: true, unusedStagesDisallowed: true);
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
@@ -180,7 +180,7 @@ public sealed class CommandQuerySplitRuleTests
 
     private sealed record PlainValueQuery : IValueQuery<int>;
 
-    // Handled because AddCqrsTests freezes this assembly without AllowUnhandledRequests.
+    // These handlers let other tests validate the whole assembly with missing-handler checks enabled.
     private sealed class PlainCommandHandler : IRequestHandler<PlainCommand, int>
     {
         public Task<int> HandleAsync(PlainCommand request, CancellationToken cancellationToken)

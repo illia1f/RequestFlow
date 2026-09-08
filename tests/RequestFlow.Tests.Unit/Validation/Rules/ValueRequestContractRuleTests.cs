@@ -124,7 +124,6 @@ public sealed class ValueRequestContractRuleTests
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
         problems.ShouldHaveSingleItem().Code.ShouldBe(ProblemCodes.MultiContractValueRequest);
-        problems.ShouldNotContain(problem => problem.Code == ProblemCodes.ValueHandlerResponseMismatch);
     }
 
     [Fact]

@@ -8,42 +8,24 @@ namespace RequestFlow.Tests.Unit;
 
 public sealed class ValueChainAllocationTests(ITestOutputHelper output)
 {
-    [Fact]
-    public void Given_Synchronous_Typed_Value_Handler_Without_Stages_When_Dispatching_Then_It_Allocates_Zero_Bytes()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Given_A_Synchronous_Typed_Value_Chain_When_Dispatching_Then_It_Allocates_Zero_Bytes(int stageCount)
     {
+        Type[] stageTypes = stageCount switch
+        {
+            0 => [],
+            1 => [typeof(FirstTypedStage)],
+            _ => [typeof(FirstTypedStage), typeof(SecondTypedStage)],
+        };
         using ServiceProvider provider = BuildTypedDispatcher(
-            out IValueRequestDispatcher dispatcher);
+            out IValueRequestDispatcher dispatcher, stageTypes);
 
         long bytes = Measure(() => dispatcher.SendAsync(TypedRequestInstance));
 
-        output.WriteLine($"typed-handler-no-stages: {bytes}");
-        bytes.ShouldBe(0);
-    }
-
-    [Fact]
-    public void Given_Synchronous_Typed_Value_Handler_With_One_Stage_When_Dispatching_Then_It_Allocates_Zero_Bytes()
-    {
-        using ServiceProvider provider = BuildTypedDispatcher(
-            out IValueRequestDispatcher dispatcher,
-            typeof(FirstTypedStage));
-
-        long bytes = Measure(() => dispatcher.SendAsync(TypedRequestInstance));
-
-        output.WriteLine($"typed-handler-one-stage: {bytes}");
-        bytes.ShouldBe(0);
-    }
-
-    [Fact]
-    public void Given_Synchronous_Typed_Value_Handler_With_Two_Stages_When_Dispatching_Then_It_Allocates_Zero_Bytes()
-    {
-        using ServiceProvider provider = BuildTypedDispatcher(
-            out IValueRequestDispatcher dispatcher,
-            typeof(FirstTypedStage),
-            typeof(SecondTypedStage));
-
-        long bytes = Measure(() => dispatcher.SendAsync(TypedRequestInstance));
-
-        output.WriteLine($"typed-handler-two-stages: {bytes}");
+        output.WriteLine($"typed-handler-{stageCount}-stages: {bytes}");
         bytes.ShouldBe(0);
     }
 
