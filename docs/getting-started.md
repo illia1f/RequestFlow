@@ -38,7 +38,7 @@ public sealed class CreateOrderHandler : IRequestHandler<CreateOrder, OrderId>
 }
 ```
 
-Each request type has exactly one handler. Startup validation enforces this: a request with no handler, or with two, fails before the first dispatch (see [exceptions.md](exceptions.md)).
+Each request type must have exactly one handler by default. Startup validation rejects missing or duplicate handlers (see [exceptions.md](exceptions.md)). [Missing-handler exemptions](registration.md#missing-handler-exemptions) permit startup without a handler; dispatching an exempt request still throws `HandlerNotFoundException`.
 
 A request that returns nothing implements `IRequest` instead, and its handler returns plain `Task`:
 
