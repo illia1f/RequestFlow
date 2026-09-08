@@ -128,7 +128,7 @@ public sealed class CommandQuerySplitRuleTests
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
             .AddRequest(typeof(Confused))
-            .BuildContext(unhandledRequestsAllowed: true, unusedStagesDisallowed: true);
+            .BuildContext(allUnhandledRequestsAllowed: true, unusedStagesDisallowed: true);
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 

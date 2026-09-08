@@ -183,7 +183,7 @@ public sealed class AddRequestFlowValidationTests
     [Fact]
     public void Given_Unhandled_Requests_Allowed_When_Resolving_Dispatcher_Then_Missing_Handler_Is_Not_Reported()
     {
-        RequestFlowValidationException exception = ScanFixtureAssembly(allowUnhandledRequests: true);
+        RequestFlowValidationException exception = ScanFixtureAssembly(allowAllUnhandledRequests: true);
 
         exception.Problems.ShouldNotContain(p => p.Message.Contains(nameof(Lonely)));
     }
@@ -191,7 +191,7 @@ public sealed class AddRequestFlowValidationTests
     [Fact]
     public void Given_Unhandled_Requests_Allowed_When_Resolving_Dispatcher_Then_Duplicate_Handlers_Are_Still_Reported()
     {
-        RequestFlowValidationException exception = ScanFixtureAssembly(allowUnhandledRequests: true);
+        RequestFlowValidationException exception = ScanFixtureAssembly(allowAllUnhandledRequests: true);
 
         exception.Problems.ShouldContain(p => p.Message.Contains(nameof(Duplicated)));
     }
@@ -349,13 +349,13 @@ public sealed class AddRequestFlowValidationTests
 
     #region Helpers
 
-    private static RequestFlowValidationException ScanFixtureAssembly(bool allowUnhandledRequests = false)
+    private static RequestFlowValidationException ScanFixtureAssembly(bool allowAllUnhandledRequests = false)
     {
         var services = new ServiceCollection();
         services.AddRequestFlow(o =>
         {
             o.RegisterHandlersFromAssembly(typeof(Lonely).Assembly);
-            if (allowUnhandledRequests)
+            if (allowAllUnhandledRequests)
                 o.AllowUnhandledRequests();
         });
 

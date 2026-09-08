@@ -33,10 +33,10 @@ internal sealed class RequestFlowRegistry
     /// <summary>
     /// True once any <c>AddRequestFlow</c> call opted out of the missing-handler check.
     /// </summary>
-    public bool UnhandledRequestsAllowed { get; private set; }
+    public bool AllUnhandledRequestsAllowed { get; private set; }
 
     public void AllowUnhandledRequests()
-        => UnhandledRequestsAllowed = true;
+        => AllUnhandledRequestsAllowed = true;
 
     /// <summary>
     /// True once any <c>AddRequestFlow</c> call asked for a stage that applies to nothing to be fatal.
@@ -46,10 +46,10 @@ internal sealed class RequestFlowRegistry
     public void DisallowUnusedStages()
         => UnusedStagesDisallowed = true;
 
-    public bool UnhandledEventsAllowed { get; private set; }
+    public bool AllUnhandledEventsAllowed { get; private set; }
 
     public void AllowUnhandledEvents()
-        => UnhandledEventsAllowed = true;
+        => AllUnhandledEventsAllowed = true;
 
     public bool UnusedEventHandlersDisallowed { get; private set; }
 
@@ -246,9 +246,9 @@ internal sealed class RequestFlowRegistry
 
         RequestFlowValidationContext context = new(
             model,
-            UnhandledRequestsAllowed,
+            AllUnhandledRequestsAllowed,
             UnusedStagesDisallowed,
-            UnhandledEventsAllowed,
+            AllUnhandledEventsAllowed,
             UnusedEventHandlersDisallowed);
 
         ValidationRuleRunner.Validate(

@@ -116,7 +116,7 @@ public sealed class RequestNameRule : IRequestFlowValidationRule
 }
 ```
 
-The context carries `Model`, the registration as frozen, plus four registration flags: `UnhandledRequestsAllowed`, `UnusedStagesDisallowed`, `UnhandledEventsAllowed`, and `UnusedEventHandlersDisallowed`. One context is built per pass and handed to every rule, so a rule of yours reads what a built-in one reads.
+The context carries `Model`, the registration as frozen, plus four registration flags: `AllUnhandledRequestsAllowed`, `UnusedStagesDisallowed`, `AllUnhandledEventsAllowed`, and `UnusedEventHandlersDisallowed`. One context is built per pass and handed to every rule, so a rule of yours reads what a built-in one reads.
 
 A problem carries three things. `Code` is a stable identifier for the kind of problem, which is what a caller matches on. `Message` says what is wrong and how to fix it. `Subject` is the type at fault, and it is optional, since not every problem has one. `ToString` renders `Code: Message`, and that is the line the exception message shows.
 
@@ -279,7 +279,7 @@ Requests come in scan order, followed by request types only a handler brought in
 
 ## The registration flags
 
-The four flags sit on the context beside the model. `UnhandledRequestsAllowed` is true once `AllowUnhandledRequests` has been called, and `UnusedStagesDisallowed` once `DisallowUnusedStages` has. `UnhandledEventsAllowed` records `AllowUnhandledEvents`, while `UnusedEventHandlersDisallowed` records `DisallowUnusedEventHandlers`.
+The four flags sit on the context beside the model. `AllUnhandledRequestsAllowed` is true once `AllowUnhandledRequests` has been called, and `UnusedStagesDisallowed` once `DisallowUnusedStages` has. `AllUnhandledEventsAllowed` records `AllowUnhandledEvents`, while `UnusedEventHandlersDisallowed` records `DisallowUnusedEventHandlers`.
 
 The event flags are independent. `AllowUnhandledEvents` suppresses `RF0114` for a known event with no handler. It does not suppress `RF0115` or `RF0122` when `DisallowUnusedEventHandlers` asks the freeze to report a subscription or per-event strategy declaration that reaches no known event.
 
@@ -297,4 +297,4 @@ foreach (RequestModel request in context.Model.Requests)
 }
 ```
 
-Skipping it is right whether or not the application opted in. With the flag off, `RF0102` already reports the request; with it on, the missing handler is deliberate. Read `UnhandledRequestsAllowed` when the two cases deserve different wording, not to decide whether to skip.
+Skipping it is right whether or not the application opted in. With the flag off, `RF0102` already reports the request; with it on, the missing handler is deliberate. Read `AllUnhandledRequestsAllowed` when the two cases deserve different wording, not to decide whether to skip.

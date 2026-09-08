@@ -14,7 +14,7 @@ internal static class BuiltInRules
     {
         yield return new DuplicateHandlerRule();
 
-        if (!context.UnhandledRequestsAllowed)
+        if (!context.AllUnhandledRequestsAllowed)
             yield return new UnhandledRequestRule();
 
         yield return new DuplicateStageRule(facts);
@@ -45,7 +45,7 @@ internal static class BuiltInRules
         yield return new StageResponseMismatchRule(facts);
         yield return new ValueStageResponseMismatchRule(facts);
 
-        if (!context.UnhandledEventsAllowed)
+        if (!context.AllUnhandledEventsAllowed)
             yield return new UnhandledEventRule();
 
         if (context.UnusedEventHandlersDisallowed)

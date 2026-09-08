@@ -18,15 +18,15 @@ public sealed class RequestFlowValidationContext
     /// <exception cref="ArgumentNullException"/>
     internal RequestFlowValidationContext(
         RequestFlowModel model,
-        bool unhandledRequestsAllowed,
+        bool allUnhandledRequestsAllowed,
         bool unusedStagesDisallowed,
-        bool unhandledEventsAllowed,
+        bool allUnhandledEventsAllowed,
         bool unusedEventHandlersDisallowed)
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
-        UnhandledRequestsAllowed = unhandledRequestsAllowed;
+        AllUnhandledRequestsAllowed = allUnhandledRequestsAllowed;
         UnusedStagesDisallowed = unusedStagesDisallowed;
-        UnhandledEventsAllowed = unhandledEventsAllowed;
+        AllUnhandledEventsAllowed = allUnhandledEventsAllowed;
         UnusedEventHandlersDisallowed = unusedEventHandlersDisallowed;
     }
 
@@ -38,7 +38,7 @@ public sealed class RequestFlowValidationContext
     /// <summary>
     /// True when <c>AllowUnhandledRequests</c> was called, so a request with no handler is permitted.
     /// </summary>
-    public bool UnhandledRequestsAllowed { get; }
+    public bool AllUnhandledRequestsAllowed { get; }
 
     /// <summary>
     /// True when <c>DisallowUnusedStages</c> was called, so a stage that reached no request is a problem.
@@ -48,7 +48,7 @@ public sealed class RequestFlowValidationContext
     /// <summary>
     /// True when an event with no applicable handler is permitted.
     /// </summary>
-    public bool UnhandledEventsAllowed { get; }
+    public bool AllUnhandledEventsAllowed { get; }
 
     /// <summary>
     /// True when an event subscription that reaches no known event is a problem.

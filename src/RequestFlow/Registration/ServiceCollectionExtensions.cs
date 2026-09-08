@@ -29,10 +29,10 @@ public static class ServiceCollectionExtensions
         RequestFlowOptions options = new RequestFlowOptions().Apply(configure);
 
         RequestFlowRegistry registry = GetOrAddRegistry(services);
-        if (options.UnhandledRequestsAllowed)
+        if (options.AllUnhandledRequestsAllowed)
             registry.AllowUnhandledRequests();
         registry.AddEventStrategyDeclarations(options.EventStrategyDeclarations);
-        if (options.UnhandledEventsAllowed)
+        if (options.AllUnhandledEventsAllowed)
             registry.AllowUnhandledEvents();
         if (options.UnusedEventHandlersDisallowed)
             registry.DisallowUnusedEventHandlers();

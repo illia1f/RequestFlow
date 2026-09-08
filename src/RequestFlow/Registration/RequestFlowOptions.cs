@@ -31,7 +31,7 @@ public sealed class RequestFlowOptions
 
     internal bool UnusedStagesDisallowed { get; private set; }
 
-    internal bool UnhandledEventsAllowed { get; private set; }
+    internal bool AllUnhandledEventsAllowed { get; private set; }
 
     internal bool UnusedEventHandlersDisallowed { get; private set; }
 
@@ -73,7 +73,7 @@ public sealed class RequestFlowOptions
         return this;
     }
 
-    internal bool UnhandledRequestsAllowed { get; private set; }
+    internal bool AllUnhandledRequestsAllowed { get; private set; }
 
     /// <summary>
     /// Skips missing-handler validation for all registered assemblies once any call opts in.
@@ -81,7 +81,7 @@ public sealed class RequestFlowOptions
     /// </summary>
     public RequestFlowOptions AllowUnhandledRequests()
     {
-        UnhandledRequestsAllowed = true;
+        AllUnhandledRequestsAllowed = true;
         return this;
     }
 
@@ -157,7 +157,7 @@ public sealed class RequestFlowOptions
     /// </summary>
     public RequestFlowOptions AllowUnhandledEvents()
     {
-        UnhandledEventsAllowed = true;
+        AllUnhandledEventsAllowed = true;
         return this;
     }
 

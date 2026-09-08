@@ -112,7 +112,7 @@ public sealed class EventRegistrationTests
 
         registry.EventStrategyDeclarations.ShouldHaveSingleItem().StrategyType
             .ShouldBe(typeof(ParallelPublishStrategy));
-        registry.UnhandledEventsAllowed.ShouldBeTrue();
+        registry.AllUnhandledEventsAllowed.ShouldBeTrue();
         registry.UnusedEventHandlersDisallowed.ShouldBeTrue();
     }
 

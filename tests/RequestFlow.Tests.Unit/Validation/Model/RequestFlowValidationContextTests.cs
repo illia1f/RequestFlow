@@ -14,15 +14,15 @@ public sealed class RequestFlowValidationContextTests
 
         var context = new RequestFlowValidationContext(
             model,
-            unhandledRequestsAllowed: true,
+            allUnhandledRequestsAllowed: true,
             unusedStagesDisallowed: true,
-            unhandledEventsAllowed: true,
+            allUnhandledEventsAllowed: true,
             unusedEventHandlersDisallowed: true);
 
         context.Model.ShouldBeSameAs(model);
-        context.UnhandledRequestsAllowed.ShouldBeTrue();
+        context.AllUnhandledRequestsAllowed.ShouldBeTrue();
         context.UnusedStagesDisallowed.ShouldBeTrue();
-        context.UnhandledEventsAllowed.ShouldBeTrue();
+        context.AllUnhandledEventsAllowed.ShouldBeTrue();
         context.UnusedEventHandlersDisallowed.ShouldBeTrue();
     }
 
@@ -47,17 +47,17 @@ public sealed class RequestFlowValidationContextTests
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder().BuildContext();
 
-        context.UnhandledRequestsAllowed.ShouldBeFalse();
+        context.AllUnhandledRequestsAllowed.ShouldBeFalse();
         context.UnusedStagesDisallowed.ShouldBeFalse();
     }
 
     [Fact]
-    public void Given_Unhandled_Requests_Allowed_When_Building_A_Context_Then_Only_That_Flag_Is_Set()
+    public void Given_All_Unhandled_Requests_Allowed_When_Building_A_Context_Then_Only_That_Flag_Is_Set()
     {
         RequestFlowValidationContext context =
-            new RequestFlowModelBuilder().BuildContext(unhandledRequestsAllowed: true);
+            new RequestFlowModelBuilder().BuildContext(allUnhandledRequestsAllowed: true);
 
-        context.UnhandledRequestsAllowed.ShouldBeTrue();
+        context.AllUnhandledRequestsAllowed.ShouldBeTrue();
         context.UnusedStagesDisallowed.ShouldBeFalse();
     }
 
@@ -68,7 +68,7 @@ public sealed class RequestFlowValidationContextTests
             new RequestFlowModelBuilder().BuildContext(unusedStagesDisallowed: true);
 
         context.UnusedStagesDisallowed.ShouldBeTrue();
-        context.UnhandledRequestsAllowed.ShouldBeFalse();
+        context.AllUnhandledRequestsAllowed.ShouldBeFalse();
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class RequestFlowValidationContextTests
     public void Given_A_Hand_Built_Context_When_An_External_Rule_Validates_Then_It_Reads_Both_Flags()
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
-            .BuildContext(unhandledRequestsAllowed: true, unusedStagesDisallowed: true);
+            .BuildContext(allUnhandledRequestsAllowed: true, unusedStagesDisallowed: true);
 
         RequestFlowValidationProblem problem =
             new FlagReportingRule().Validate(context).ShouldHaveSingleItem();
@@ -124,13 +124,13 @@ public sealed class RequestFlowValidationContextTests
     [InlineData(false, true)]
     [InlineData(true, true)]
     public void Given_Registration_Opt_Ins_When_An_External_Rule_Runs_At_Freeze_Then_It_Reads_Them_Off_The_Context(
-        bool allowUnhandledRequests, bool disallowUnusedStages)
+        bool allowAllUnhandledRequests, bool disallowUnusedStages)
     {
         var services = new ServiceCollection();
         services.AddRequestFlow(o =>
             {
                 o.RegisterHandlersFromAssemblyContaining<RequestFlowValidationContextTests>();
-                if (allowUnhandledRequests)
+                if (allowAllUnhandledRequests)
                     o.AllowUnhandledRequests();
                 if (disallowUnusedStages)
                     o.DisallowUnusedStages();
@@ -143,7 +143,7 @@ public sealed class RequestFlowValidationContextTests
 
         exception.Problems.ShouldContain(p =>
             p.Code == FlagCode
-            && p.Message == $"unhandled={allowUnhandledRequests} unused={disallowUnusedStages}");
+            && p.Message == $"unhandled={allowAllUnhandledRequests} unused={disallowUnusedStages}");
     }
 
     [Fact]
@@ -214,7 +214,7 @@ public sealed class RequestFlowValidationContextTests
         public IEnumerable<RequestFlowValidationProblem> Validate(RequestFlowValidationContext context)
             => [new RequestFlowValidationProblem(
                 FlagCode,
-                $"unhandled={context.UnhandledRequestsAllowed} unused={context.UnusedStagesDisallowed}")];
+                $"unhandled={context.AllUnhandledRequestsAllowed} unused={context.UnusedStagesDisallowed}")];
     }
 
     #endregion

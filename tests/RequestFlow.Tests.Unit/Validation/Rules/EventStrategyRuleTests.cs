@@ -270,9 +270,9 @@ public sealed class EventStrategyRuleTests
             closure.EventStrategies);
         var context = new RequestFlowValidationContext(
             model,
-            unhandledRequestsAllowed: false,
+            allUnhandledRequestsAllowed: false,
             unusedStagesDisallowed: false,
-            unhandledEventsAllowed: false,
+            allUnhandledEventsAllowed: false,
             unusedEventHandlersDisallowed: unusedStrategiesDisallowed);
 
         return new EventStrategyRule(closure.StrategyResolution).Validate(context).ToArray();

@@ -79,7 +79,7 @@ public sealed class UnusedStageRuleTests
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
             .AddRequest(typeof(int))
             .AddStageDeclaration(typeof(string))
-            .BuildContext(unhandledRequestsAllowed: true);
+            .BuildContext(allUnhandledRequestsAllowed: true);
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 
@@ -111,12 +111,12 @@ public sealed class UnusedStageRuleTests
     [InlineData(false)]
     [InlineData(true)]
     public void Given_All_Requests_Handled_When_Validating_Then_The_Message_Is_The_Base_One(
-        bool unhandledRequestsAllowed)
+        bool allUnhandledRequestsAllowed)
     {
         RequestFlowValidationContext context = new RequestFlowModelBuilder()
             .AddRequest(typeof(int), r => r.AddHandler(typeof(object), typeof(bool)))
             .AddStageDeclaration(typeof(string))
-            .BuildContext(unhandledRequestsAllowed);
+            .BuildContext(allUnhandledRequestsAllowed);
 
         List<RequestFlowValidationProblem> problems = [.. _sut.Validate(context)];
 

@@ -17,6 +17,10 @@ The `release` workflow uses the section matching the pushed tag as the GitHub Re
 - ValueTask validation codes: `RF0125` rejects more than one `IValueRequest<TResponse>` contract; `RF0126` to `RF0128` reject ValueTask contracts combined with Task, stream, or event contracts; and `RF0129` and `RF0130` reject handler or stage response mismatches.
 - `RF0124`: a handler declared against an interface or abstract request type now fails the freeze, from any registration source, when the target cannot expose the declared type as the request's exact runtime type. The `net462` asset keeps interface and abstract `MarshalByRefObject` handlers valid for `RealProxy` transparent proxies.
 
+### Changed
+
+- Renamed the global validation flags to `AllUnhandledRequestsAllowed` and `AllUnhandledEventsAllowed`, with matching `allUnhandledRequestsAllowed` and `allUnhandledEventsAllowed` parameters on `RequestFlowModelBuilder.BuildContext`.
+
 ### Fixed
 
 - `AddEventHandler<THandler>()` and `RegisterGenericHandler(...)` with a type whose interface list cannot load, because an interface's assembly is not deployed, no longer throw a raw loader exception out of `AddRequestFlow`; the freeze reports `RF0017` or `RF0004` beside the other problems.

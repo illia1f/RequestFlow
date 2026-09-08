@@ -200,22 +200,22 @@ public sealed class RequestFlowModelBuilder
     /// By default, unhandled requests and events are errors; unused stages and subscriptions are allowed.
     /// </remarks>
     public RequestFlowValidationContext BuildContext(
-        bool unhandledRequestsAllowed = false, bool unusedStagesDisallowed = false)
-        => BuildContext(unhandledRequestsAllowed, unusedStagesDisallowed, false, false);
+        bool allUnhandledRequestsAllowed = false, bool unusedStagesDisallowed = false)
+        => BuildContext(allUnhandledRequestsAllowed, unusedStagesDisallowed, false, false);
 
     /// <summary>
     /// Builds a validation context with request, stage, and event flags.
     /// </summary>
     public RequestFlowValidationContext BuildContext(
-        bool unhandledRequestsAllowed,
+        bool allUnhandledRequestsAllowed,
         bool unusedStagesDisallowed,
-        bool unhandledEventsAllowed,
+        bool allUnhandledEventsAllowed,
         bool unusedEventHandlersDisallowed)
         => new(
             Build(),
-            unhandledRequestsAllowed,
+            allUnhandledRequestsAllowed,
             unusedStagesDisallowed,
-            unhandledEventsAllowed,
+            allUnhandledEventsAllowed,
             unusedEventHandlersDisallowed);
 
     private readonly struct StageDeclarationInput(

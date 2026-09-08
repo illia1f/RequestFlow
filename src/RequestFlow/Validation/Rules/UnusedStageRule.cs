@@ -43,7 +43,7 @@ internal sealed class UnusedStageRule : IRequestFlowValidationRule
 
                 if (anyUnhandled)
                 {
-                    message += context.UnhandledRequestsAllowed
+                    message += context.AllUnhandledRequestsAllowed
                         ? " Some registered requests have no handler, which AllowUnhandledRequests permits; a stage reaching only those still counts as unused."
                         : " Some registered requests have no handler; a stage reaching only those counts as unused, so the missing handler may be the fix.";
                 }
