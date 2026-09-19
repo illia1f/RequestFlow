@@ -32,8 +32,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <Compile Include="$(MSBuildThisFileDirectory)Compat\*.cs" LinkBase="Compat" />
+  <ItemGroup>
+    <PackageReference Include="PolySharp" Version="1.16.0" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

@@ -57,24 +57,30 @@ public sealed class CqrsValueDispatcherTests
     }
 
     [Fact]
-    public async Task Given_A_Null_Value_Command_When_Sending_Then_Throws_Argument_Null_Exception()
+    public void Given_A_Null_Value_Command_When_Sending_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            async () => await _sut.SendAsync((IValueCommand<string>)null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync((IValueCommand<string>)null!); });
+
+        exception.ParamName.ShouldBe("command");
     }
 
     [Fact]
-    public async Task Given_A_Null_Void_Value_Command_When_Sending_Then_Throws_Argument_Null_Exception()
+    public void Given_A_Null_Void_Value_Command_When_Sending_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            async () => await _sut.SendAsync((IValueCommand)null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync((IValueCommand)null!); });
+
+        exception.ParamName.ShouldBe("command");
     }
 
     [Fact]
-    public async Task Given_A_Null_Value_Query_When_Sending_Then_Throws_Argument_Null_Exception()
+    public void Given_A_Null_Value_Query_When_Sending_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            async () => await _sut.SendAsync((IValueQuery<string>)null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync((IValueQuery<string>)null!); });
+
+        exception.ParamName.ShouldBe("query");
     }
 
     [Fact]

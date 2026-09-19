@@ -19,18 +19,32 @@ internal sealed class StreamDispatcher(DispatchMap map, IServiceProvider service
     public IAsyncEnumerable<TItem> Stream<TItem>(
         IStreamRequest<TItem> request, CancellationToken cancellationToken = default)
     {
-        if (request is null)
-            throw new ArgumentNullException(nameof(request));
+        ThrowHelper.ThrowIfNull(request);
 
         Type requestType = request.GetType();
 
         if (!_map.TryGetPlanFor(requestType, out RequestPlanBase? plan))
-            throw new HandlerNotFoundException(requestType);
+            return ThrowHelper.HandlerNotFound<IAsyncEnumerable<TItem>>(requestType);
 
         if (plan is not StreamPlan<TItem> streamPlan)
-            throw new ResponseTypeMismatchException(requestType, expected: plan!.ResponseType, actual: typeof(TItem));
+            return ThrowHelper.ResponseTypeMismatch<IAsyncEnumerable<TItem>>(
+                requestType, expected: plan.ResponseType, actual: typeof(TItem));
 
-        return Walk(streamPlan, request, _services, cancellationToken);
+        return cancellationToken.CanBeCanceled
+            ? Walk(streamPlan, request, _services, cancellationToken)
+            : WalkWithoutDispatchToken(streamPlan, request, _services);
+    }
+
+    private static async IAsyncEnumerable<TItem> WalkWithoutDispatchToken<TItem>(
+        StreamPlan<TItem> plan,
+        object request,
+        IServiceProvider services,
+        [EnumeratorCancellation] CancellationToken iterationToken = default)
+    {
+        await foreach (TItem item in plan.Execute(request, services, iterationToken).ConfigureAwait(false))
+        {
+            yield return item;
+        }
     }
 
     // The dispatch token arrives as a parameter and the iteration token through the attribute, so

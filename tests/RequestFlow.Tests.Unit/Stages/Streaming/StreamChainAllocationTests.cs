@@ -61,6 +61,18 @@ public sealed class StreamChainAllocationTests
         longWalk.ShouldBe(shortWalk);
     }
 
+    [Fact]
+    public async Task Given_No_Dispatch_Cancellation_Token_When_Enumerating_Then_It_Allocates_Less_Than_A_Cancelable_Dispatch()
+    {
+        IStreamDispatcher dispatcher = Build();
+        using var source = new CancellationTokenSource();
+
+        long withoutToken = await MeasureAsync(dispatcher);
+        long withToken = await MeasureAsync(dispatcher, cancellationToken: source.Token);
+
+        withoutToken.ShouldBeLessThan(withToken);
+    }
+
     #region Helpers
 
     private static IStreamDispatcher Build(Action<RequestFlowOptions>? configure = null)
@@ -78,22 +90,23 @@ public sealed class StreamChainAllocationTests
 
     // GC.GetAllocatedBytesForCurrentThread counts this thread only, so the handler completes
     // synchronously and every level stays on the calling thread.
-    private static async Task<long> MeasureAsync(IStreamDispatcher dispatcher, int items = 8)
+    private static async Task<long> MeasureAsync(
+        IStreamDispatcher dispatcher, int items = 8, CancellationToken cancellationToken = default)
     {
         for (int i = 0; i < 64; i++)
         {
-            await DrainAsync(dispatcher, items);
+            await DrainAsync(dispatcher, items, cancellationToken);
         }
 
         long before = GC.GetAllocatedBytesForCurrentThread();
-        await DrainAsync(dispatcher, items);
+        await DrainAsync(dispatcher, items, cancellationToken);
 
         return GC.GetAllocatedBytesForCurrentThread() - before;
     }
 
-    private static async Task DrainAsync(IStreamDispatcher dispatcher, int items)
+    private static async Task DrainAsync(IStreamDispatcher dispatcher, int items, CancellationToken cancellationToken)
     {
-        await foreach (int item in dispatcher.Stream(new Ticks(items)))
+        await foreach (int item in dispatcher.Stream(new Ticks(items), cancellationToken))
         { }
     }
 

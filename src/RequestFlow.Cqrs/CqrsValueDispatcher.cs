@@ -15,8 +15,7 @@ internal sealed class CqrsValueDispatcher(IValueRequestDispatcher dispatcher)
         IValueCommand<TResponse> command,
         CancellationToken cancellationToken = default)
     {
-        if (command is null)
-            throw new ArgumentNullException(nameof(command));
+        ThrowHelper.ThrowIfNull(command);
 
         return _dispatcher.SendAsync(command, cancellationToken);
     }
@@ -26,8 +25,7 @@ internal sealed class CqrsValueDispatcher(IValueRequestDispatcher dispatcher)
         IValueCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (command is null)
-            throw new ArgumentNullException(nameof(command));
+        ThrowHelper.ThrowIfNull(command);
 
         return _dispatcher.SendAsync(command, cancellationToken);
     }
@@ -37,8 +35,7 @@ internal sealed class CqrsValueDispatcher(IValueRequestDispatcher dispatcher)
         IValueQuery<TResponse> query,
         CancellationToken cancellationToken = default)
     {
-        if (query is null)
-            throw new ArgumentNullException(nameof(query));
+        ThrowHelper.ThrowIfNull(query);
 
         return _dispatcher.SendAsync(query, cancellationToken);
     }

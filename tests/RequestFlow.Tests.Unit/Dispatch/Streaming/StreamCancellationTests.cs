@@ -130,6 +130,44 @@ public sealed class StreamCancellationTests
         items.ShouldBe([0, 1, 2, 3, 4]);
     }
 
+    [Fact]
+    public async Task Given_A_Pass_Through_Stage_Substituting_A_Token_When_Only_The_Iteration_Token_Is_Cancelled_Then_The_Walk_Completes()
+    {
+        using var iteration = new CancellationTokenSource();
+        using var shield = new CancellationTokenSource();
+        ShieldingStage.Shield = shield.Token;
+        IStreamDispatcher sut = Build(options => options.AddStreamStage<ShieldingStage>());
+
+        List<int> items = [];
+        await foreach (int item in sut.Stream(new Shielded()).WithCancellation(iteration.Token))
+        {
+            items.Add(item);
+            iteration.Cancel();
+        }
+
+        items.ShouldBe([0, 1, 2, 3, 4]);
+    }
+
+    [Fact]
+    public async Task Given_One_Stream_With_Two_Enumerators_When_One_Iteration_Token_Is_Cancelled_Then_The_Other_Continues()
+    {
+        using var firstToken = new CancellationTokenSource();
+        using var secondToken = new CancellationTokenSource();
+        IAsyncEnumerable<int> stream = Build().Stream(new Endless());
+        await using IAsyncEnumerator<int> first = stream.GetAsyncEnumerator(firstToken.Token);
+        await using IAsyncEnumerator<int> second = stream.GetAsyncEnumerator(secondToken.Token);
+
+        (await first.MoveNextAsync()).ShouldBeTrue();
+        (await second.MoveNextAsync()).ShouldBeTrue();
+        firstToken.Cancel();
+        Task<bool> canceled = first.MoveNextAsync().AsTask();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => canceled);
+        canceled.IsCanceled.ShouldBeTrue();
+        (await second.MoveNextAsync()).ShouldBeTrue();
+        second.Current.ShouldBe(1);
+    }
+
     #region Helpers
 
     private static IStreamDispatcher Build(Action<RequestFlowOptions>? configure = null)

@@ -115,6 +115,22 @@ public sealed class StreamDispatcherTests
         items.ShouldBe([0, 1, 2]);
     }
 
+    [Fact]
+    public async Task Given_An_Enumerator_Disposed_Before_Moving_When_Streaming_Without_A_Token_Then_The_Handler_Is_Not_Resolved()
+    {
+        var services = Substitute.For<IServiceProvider>();
+        var map = new DispatchMap(new Dictionary<Type, RequestPlanBase>
+        {
+            [typeof(Tail)] = new StreamPlan<Tail, int>(),
+        });
+        var dispatcher = new StreamDispatcher(map, services);
+        IAsyncEnumerator<int> enumerator = dispatcher.Stream(new Tail(3)).GetAsyncEnumerator();
+
+        await enumerator.DisposeAsync();
+
+        services.DidNotReceive().GetService(Arg.Any<Type>());
+    }
+
     #region Initialization
 
     private readonly StreamDispatcher _sut;

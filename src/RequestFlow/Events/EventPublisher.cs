@@ -11,13 +11,12 @@ internal sealed class EventPublisher(EventMap map, IServiceProvider services) : 
 
     public Task PublishAsync(IEvent @event, CancellationToken cancellationToken = default)
     {
-        if (@event is null)
-            throw new ArgumentNullException(nameof(@event));
+        ThrowHelper.ThrowIfNull(@event, nameof(@event));
 
         Type eventType = @event.GetType();
         if (!_map.TryGetPlanFor(eventType, out EventPlan? plan))
-            throw new EventNotRegisteredException(eventType);
+            return ThrowHelper.EventNotRegistered<Task>(eventType);
 
-        return plan!.ExecuteAsync(@event, _services, cancellationToken);
+        return plan.ExecuteAsync(@event, _services, cancellationToken);
     }
 }
