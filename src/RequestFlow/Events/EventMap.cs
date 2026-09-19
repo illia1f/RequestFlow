@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 #if NET8_0_OR_GREATER
 using System.Collections.Frozen;
@@ -16,6 +17,6 @@ internal sealed class EventMap(Dictionary<Type, EventPlan> plans)
 #endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetPlanFor(Type eventType, out EventPlan? plan)
+    public bool TryGetPlanFor(Type eventType, [NotNullWhen(true)] out EventPlan? plan)
         => _plans.TryGetValue(eventType, out plan);
 }
