@@ -17,19 +17,19 @@ public sealed class ValueRequestDispatcherTests
     }
 
     [Fact]
-    public async Task Given_Unknown_Value_Request_When_Sending_Request_Then_Throws_Handler_Not_Found_Exception()
+    public void Given_Unknown_Value_Request_When_Sending_Request_Then_Throws_Handler_Not_Found_Exception()
     {
-        var exception = await Should.ThrowAsync<HandlerNotFoundException>(
-            async () => await _sut.SendAsync(new Unknown()));
+        var exception = Should.Throw<HandlerNotFoundException>(
+            () => { _sut.SendAsync(new Unknown()); });
 
         exception.RequestType.ShouldBe(typeof(Unknown));
     }
 
     [Fact]
-    public async Task Given_Covariant_Value_Response_When_Sending_Request_Then_Throws_Response_Type_Mismatch_Exception()
+    public void Given_Covariant_Value_Response_When_Sending_Request_Then_Throws_Response_Type_Mismatch_Exception()
     {
-        var exception = await Should.ThrowAsync<ResponseTypeMismatchException>(
-            async () => await _sut.SendAsync<BaseResult>(new Fetch()));
+        var exception = Should.Throw<ResponseTypeMismatchException>(
+            () => { _sut.SendAsync<BaseResult>(new Fetch()); });
 
         exception.RequestType.ShouldBe(typeof(Fetch));
         exception.ExpectedResponseType.ShouldBe(typeof(DerivedResult));
@@ -37,17 +37,21 @@ public sealed class ValueRequestDispatcherTests
     }
 
     [Fact]
-    public async Task Given_Null_Value_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
+    public void Given_Null_Value_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            async () => await _sut.SendAsync<string>(null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync<string>(null!); });
+
+        exception.ParamName.ShouldBe("request");
     }
 
     [Fact]
-    public async Task Given_Null_Void_Value_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
+    public void Given_Null_Void_Value_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            async () => await _sut.SendAsync((IValueRequest)null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync((IValueRequest)null!); });
+
+        exception.ParamName.ShouldBe("request");
     }
 
     [Fact]

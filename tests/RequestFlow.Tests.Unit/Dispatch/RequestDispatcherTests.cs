@@ -25,10 +25,10 @@ public sealed class RequestDispatcherTests
     }
 
     [Fact]
-    public async Task Given_Unknown_Request_Type_When_Sending_Request_Then_Throws_Handler_Not_Found_Exception()
+    public void Given_Unknown_Request_Type_When_Sending_Request_Then_Throws_Handler_Not_Found_Exception()
     {
-        var exception = await Should.ThrowAsync<HandlerNotFoundException>(
-            () => _sut.SendAsync(new Unknown()));
+        var exception = Should.Throw<HandlerNotFoundException>(
+            () => { _sut.SendAsync(new Unknown()); });
 
         exception.RequestType.ShouldBe(typeof(Unknown));
     }
@@ -55,10 +55,10 @@ public sealed class RequestDispatcherTests
     }
 
     [Fact]
-    public async Task Given_Covariant_Response_Type_When_Sending_Request_Then_Throws_Response_Type_Mismatch_Exception()
+    public void Given_Covariant_Response_Type_When_Sending_Request_Then_Throws_Response_Type_Mismatch_Exception()
     {
-        var exception = await Should.ThrowAsync<ResponseTypeMismatchException>(
-            () => _sut.SendAsync<object>(new Ping("bob")));
+        var exception = Should.Throw<ResponseTypeMismatchException>(
+            () => { _sut.SendAsync<object>(new Ping("bob")); });
 
         exception.RequestType.ShouldBe(typeof(Ping));
         exception.ExpectedResponseType.ShouldBe(typeof(string));
@@ -90,17 +90,21 @@ public sealed class RequestDispatcherTests
     }
 
     [Fact]
-    public async Task Given_Null_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
+    public void Given_Null_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            () => _sut.SendAsync<string>(null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync<string>(null!); });
+
+        exception.ParamName.ShouldBe("request");
     }
 
     [Fact]
-    public async Task Given_Null_Void_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
+    public void Given_Null_Void_Request_When_Sending_Request_Then_Throws_Argument_Null_Exception()
     {
-        await Should.ThrowAsync<ArgumentNullException>(
-            () => _sut.SendAsync((IRequest)null!));
+        var exception = Should.Throw<ArgumentNullException>(
+            () => { _sut.SendAsync((IRequest)null!); });
+
+        exception.ParamName.ShouldBe("request");
     }
 
     [Fact]
@@ -188,6 +192,40 @@ public sealed class RequestDispatcherTests
         await _sut.SendAsync(new Log("hi"), cts.Token);
 
         await _logHandler.Received(1).HandleAsync(Arg.Any<Log>(), cts.Token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Given_A_Void_Handler_Task_Faulted_With_Cancellation_When_Sending_Then_The_Returned_Task_Is_Canceled(
+        bool completesLater)
+    {
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+        var failure = new OperationCanceledException(source.Token);
+        var completion = new TaskCompletionSource<object?>();
+        _logHandler.HandleAsync(Arg.Any<Log>(), Arg.Any<CancellationToken>()).Returns(completion.Task);
+        if (!completesLater)
+            completion.SetException(failure);
+
+        Task operation = _sut.SendAsync(new Log("hi"));
+        if (completesLater)
+            completion.SetException(failure);
+
+        OperationCanceledException? exception = null;
+        try
+        {
+            await operation;
+        }
+        catch (OperationCanceledException caught)
+        {
+            exception = caught;
+        }
+
+        exception.ShouldNotBeNull();
+        exception.ShouldBeSameAs(failure);
+        exception.CancellationToken.ShouldBe(source.Token);
+        operation.IsCanceled.ShouldBeTrue();
     }
 
     #region Initialization

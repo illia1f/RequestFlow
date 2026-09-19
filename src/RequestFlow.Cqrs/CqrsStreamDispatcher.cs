@@ -14,8 +14,7 @@ internal sealed class CqrsStreamDispatcher(IStreamDispatcher dispatcher) : IStre
     /// <inheritdoc />
     public IAsyncEnumerable<TItem> Stream<TItem>(IStreamQuery<TItem> query, CancellationToken cancellationToken = default)
     {
-        if (query is null)
-            throw new ArgumentNullException(nameof(query));
+        ThrowHelper.ThrowIfNull(query);
 
         return _dispatcher.Stream(query, cancellationToken);
     }

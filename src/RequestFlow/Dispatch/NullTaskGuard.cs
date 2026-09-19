@@ -8,17 +8,17 @@ internal static class NullTaskGuard
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Task<TResponse> FromHandler<TResponse>(Task<TResponse> task, Type requestType)
-        => task ?? throw new HandlerNullTaskException(requestType);
+        => task ?? ThrowHelper.HandlerNullTask<Task<TResponse>>(requestType);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Task<TResponse> FromStage<TResponse>(Task<TResponse> task, Type stageType)
-        => task ?? throw new StageNullTaskException(stageType);
+        => task ?? ThrowHelper.StageNullTask<Task<TResponse>>(stageType);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Task FromEventHandler(Task task, Type eventType, Type handlerType)
-        => task ?? throw new EventHandlerNullTaskException(eventType, handlerType);
+        => task ?? ThrowHelper.EventHandlerNullTask<Task>(eventType, handlerType);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Task FromStrategy(Task task, Type strategyType)
-        => task ?? throw new EventStrategyNullTaskException(strategyType);
+        => task ?? ThrowHelper.EventStrategyNullTask<Task>(strategyType);
 }

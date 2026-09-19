@@ -14,8 +14,7 @@ internal sealed class CqrsDispatcher(IRequestDispatcher dispatcher) : ICommandDi
     /// <inheritdoc />
     public Task<TResponse> SendAsync<TResponse>(ICommand<TResponse> command, CancellationToken cancellationToken = default)
     {
-        if (command is null)
-            throw new ArgumentNullException(nameof(command));
+        ThrowHelper.ThrowIfNull(command);
 
         return _dispatcher.SendAsync(command, cancellationToken);
     }
@@ -23,8 +22,7 @@ internal sealed class CqrsDispatcher(IRequestDispatcher dispatcher) : ICommandDi
     /// <inheritdoc />
     public Task SendAsync(ICommand command, CancellationToken cancellationToken = default)
     {
-        if (command is null)
-            throw new ArgumentNullException(nameof(command));
+        ThrowHelper.ThrowIfNull(command);
 
         return _dispatcher.SendAsync(command, cancellationToken);
     }
@@ -32,8 +30,7 @@ internal sealed class CqrsDispatcher(IRequestDispatcher dispatcher) : ICommandDi
     /// <inheritdoc />
     public Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
     {
-        if (query is null)
-            throw new ArgumentNullException(nameof(query));
+        ThrowHelper.ThrowIfNull(query);
 
         return _dispatcher.SendAsync(query, cancellationToken);
     }

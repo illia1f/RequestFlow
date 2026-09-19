@@ -43,7 +43,9 @@ internal static class EventPlanFactory
         if (strategyType == typeof(SequentialPublishStrategy))
             return new SequentialEventPlan(@event, entries);
         if (strategyType == typeof(ParallelPublishStrategy))
-            return new ParallelEventPlan(@event, entries);
+            return entries.Length == 1
+                ? new SequentialEventPlan(@event, entries)
+                : new ParallelEventPlan(@event, entries);
         if (strategyType == typeof(FailFastPublishStrategy))
             return new SequentialEventPlan(@event, entries, stopOnFirstFailure: true);
 

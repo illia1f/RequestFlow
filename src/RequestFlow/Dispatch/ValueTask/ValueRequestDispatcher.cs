@@ -15,18 +15,17 @@ internal sealed class ValueRequestDispatcher(DispatchMap map, IServiceProvider s
         IValueRequest<TResponse> request,
         CancellationToken cancellationToken = default)
     {
-        if (request is null)
-            throw new ArgumentNullException(nameof(request));
+        ThrowHelper.ThrowIfNull(request);
 
         Type requestType = request.GetType();
 
         if (!_map.TryGetPlanFor(requestType, out RequestPlanBase? plan))
-            throw new HandlerNotFoundException(requestType);
+            return ThrowHelper.HandlerNotFound<ValueTask<TResponse>>(requestType);
 
         if (plan is not ValueRequestPlan<TResponse> typedPlan)
-            throw new ResponseTypeMismatchException(
+            return ThrowHelper.ResponseTypeMismatch<ValueTask<TResponse>>(
                 requestType,
-                expected: plan!.ResponseType,
+                expected: plan.ResponseType,
                 actual: typeof(TResponse));
 
         return typedPlan.ExecuteAsync(request, _services, cancellationToken);
@@ -37,13 +36,12 @@ internal sealed class ValueRequestDispatcher(DispatchMap map, IServiceProvider s
         IValueRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request is null)
-            throw new ArgumentNullException(nameof(request));
+        ThrowHelper.ThrowIfNull(request);
 
         Type requestType = request.GetType();
 
         if (!_map.TryGetPlanFor(requestType, out RequestPlanBase? plan))
-            throw new HandlerNotFoundException(requestType);
+            return ThrowHelper.HandlerNotFound<ValueTask>(requestType);
 
         if (plan is ValueVoidRequestPlan voidPlan)
             return voidPlan.ExecuteVoidAsync(request, _services, cancellationToken);
@@ -52,9 +50,9 @@ internal sealed class ValueRequestDispatcher(DispatchMap map, IServiceProvider s
             return ValueNoResultBridge.Discard(
                 typedPlan.ExecuteAsync(request, _services, cancellationToken));
 
-        throw new ResponseTypeMismatchException(
+        return ThrowHelper.ResponseTypeMismatch<ValueTask>(
             requestType,
-            expected: plan!.ResponseType,
+            expected: plan.ResponseType,
             actual: typeof(NoResult));
     }
 }
