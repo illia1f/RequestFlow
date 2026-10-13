@@ -170,7 +170,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[8.0.1, )",
-          "RequestFlow.Abstractions": "[1.0.0-preview.9, )"
+          "RequestFlow.Abstractions": "[1.0.0, )"
         }
       },
       "requestflow.abstractions": {

@@ -2,11 +2,11 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Pre-1.0: the public API can still change between previews.
-
 The `release` workflow uses the section matching the pushed tag as the GitHub Release body. A missing section fails the build before publishing. Before tagging, rename `[Unreleased]` to the release version and add its date.
 
-## [Unreleased]
+## [1.0.0] - 2026-10-14
+
+First stable release.
 
 ### Added
 
@@ -176,6 +176,7 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
+[1.0.0]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.9...v1.0.0
 [1.0.0-preview.9]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.8...v1.0.0-preview.9
 [1.0.0-preview.8]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.7...v1.0.0-preview.8
 [1.0.0-preview.7]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.6...v1.0.0-preview.7

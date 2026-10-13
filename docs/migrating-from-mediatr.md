@@ -12,13 +12,13 @@ This guide compares public APIs and behavior visible to callers. RequestFlow is 
 
 ```bash
 dotnet remove package MediatR
-dotnet add package RequestFlow --prerelease
+dotnet add package RequestFlow
 ```
 
 For the typed command/query split:
 
 ```bash
-dotnet add package RequestFlow.Cqrs --prerelease
+dotnet add package RequestFlow.Cqrs
 ```
 
 ## Concept map

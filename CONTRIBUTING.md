@@ -1,7 +1,5 @@
 # Contributing to RequestFlow
 
-Pre-1.0: the public API can still change between previews.
-
 ## Setup
 
 - .NET 10 SDK (`global.json` pins the major version)

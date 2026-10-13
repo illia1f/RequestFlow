@@ -4,10 +4,10 @@ From an empty project to the first dispatched request.
 
 ## Install
 
-Install the preview runtime package:
+Install the runtime package:
 
 ```
-dotnet add package RequestFlow --prerelease
+dotnet add package RequestFlow
 ```
 
 For the console example, also install the DI container that provides `BuildServiceProvider()`:

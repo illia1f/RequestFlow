@@ -2,9 +2,9 @@
 
 Anything past v1 is direction, not commitment.
 
-Release: [1.0.0-preview.9](CHANGELOG.md#100-preview9---2026-09-08).
+Release: [1.0.0](CHANGELOG.md#100---2026-10-14).
 
-## v1.0 (in progress)
+## v1.0
 
 - [x] Core abstractions: `IRequest`, `IRequestHandler<,>`, `NoResult`
 - [x] `IRequestDispatcher` and the dispatcher over a frozen dispatch map
@@ -22,8 +22,9 @@ Release: [1.0.0-preview.9](CHANGELOG.md#100-preview9---2026-09-08).
 - [x] Streaming requests via `IAsyncEnumerable<T>`
 - [x] Opt-in ValueTask request family: `IValueRequest`, ValueTask stages, and CQRS command/query twins
 - [x] MediatR migration and target compatibility guides
-- [ ] BenchmarkDotNet suite against pinned MediatR, martinothamar/Mediator, and DispatchR packages, with raw results
 
 Targets: `netstandard2.0;net462;net8.0;net10.0`. The `net462` target has shipped since `1.0.0-preview.2`.
 
 ## After v1.0
+
+- [ ] BenchmarkDotNet suite against pinned MediatR, martinothamar/Mediator, and DispatchR packages, with raw results

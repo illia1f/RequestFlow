@@ -8,16 +8,16 @@ Supports Task and ValueTask requests, stages, streams, and events. Additionally,
 [![Downloads](https://img.shields.io/nuget/dt/RequestFlow?label=downloads)](https://www.nuget.org/packages/RequestFlow)
 [![CI](https://github.com/illia1f/RequestFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/illia1f/RequestFlow/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/illia1f/RequestFlow/blob/main/LICENSE)
-![Status](https://img.shields.io/badge/status-preview-orange)
+![Status](https://img.shields.io/badge/status-stable-brightgreen)
 ![Targets](https://img.shields.io/badge/targets-net10.0%20%7C%20net8.0%20%7C%20netstandard2.0%20%7C%20net462-512BD4)
 
-> **Status:** [preview on NuGet](https://www.nuget.org/packages/RequestFlow). Install with the `--prerelease` flag:
+> Install from [NuGet](https://www.nuget.org/packages/RequestFlow):
 >
 > ```bash
-> dotnet add package RequestFlow --prerelease
+> dotnet add package RequestFlow
 > ```
 
-See the [preview.9 release notes](https://github.com/illia1f/RequestFlow/blob/main/CHANGELOG.md#100-preview9---2026-09-08) for additions and API renames.
+See the [1.0.0 release notes](https://github.com/illia1f/RequestFlow/blob/main/CHANGELOG.md#100---2026-10-14) for changes since preview.9.
 
 **[Getting started: define a request, register its handler, and send it](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md).**
 
@@ -119,7 +119,7 @@ Install a runtime package at the composition root. Reference an abstractions pac
 
 ## Contributing
 
-Design feedback is the most useful contribution while the packages are in preview.
+Design feedback is the most useful contribution.
 
 ## License
 
