@@ -88,6 +88,10 @@ Void handlers return plain `Task`; `Unit` does not appear in user code. Existing
 
 The [MediatR migration guide](https://github.com/illia1f/RequestFlow/blob/main/docs/migrating-from-mediatr.md) covers the file-by-file sequence, event differences, conditional registration, and unsupported extension points.
 
+## Benchmarks
+
+The [MediatR comparison](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/RequestFlow.Benchmarks.MediatR/README.md) measures requests, stages, streams, events, and short-circuit paths against MediatR 12.5.0 on .NET 10, with correctness probes and package lock files. Its results describe MediatR 12.5.0 only, not later releases. The [benchmark guide](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/README.md) explains how to run the suites.
+
 ## Packages
 
 - **[`RequestFlow.Abstractions`](https://www.nuget.org/packages/RequestFlow.Abstractions)** holds Task and ValueTask requests, handlers, dispatchers, stages, streaming, events, publish strategies, validation models, and exceptions. It has no package dependency on `net8.0` or `net10.0`.

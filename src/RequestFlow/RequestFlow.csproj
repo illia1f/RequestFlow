@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="RequestFlow.Benchmarks" Key="$(RequestFlowPublicKey)" />
     <InternalsVisibleTo Include="RequestFlow.Tests.Unit" Key="$(RequestFlowPublicKey)" />
   </ItemGroup>
 

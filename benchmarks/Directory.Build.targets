@@ -1,0 +1,8 @@
+<Project>
+  <Target Name="EmbedBenchmarkBuildDependencies" BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="ResolvePackageAssets" Condition="'$(OutputType)' == 'Exe'">
+    <ItemGroup>
+      <EmbeddedResource Include="$(ProjectAssetsFile)" LogicalName="RequestFlow.Benchmarks.BuildDependencies.json" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -6,6 +6,20 @@ Pre-1.0: the public API can still change between previews.
 
 The `release` workflow uses the section matching the pushed tag as the GitHub Release body. A missing section fails the build before publishing. Before tagging, rename `[Unreleased]` to the release version and add its date.
 
+## [Unreleased]
+
+### Added
+
+- [Benchmark suites](benchmarks/README.md) on .NET 10. [`RequestFlow.Benchmarks.MediatR`](benchmarks/RequestFlow.Benchmarks.MediatR/README.md) compares requests, void requests, streams, events, catalog size, mixed traffic, and short-circuit pipelines against MediatR 12.5.0, the last Apache-2.0 release. `RequestFlow.Benchmarks` compares RequestFlow's Task and ValueTask paths and stage chains.
+
+### Changed
+
+- The MediatR notes in [events.md](docs/events.md#notes-for-mediatr-migrations) describe MediatR 12.5.0 probes only.
+
+### Performance
+
+- Dispatch allocates less for a stream sent without a cancelable token and for a `ParallelPublishStrategy` event with one applicable handler. Exception types, parameter names, and synchronous throws are unchanged.
+
 ## [1.0.0-preview.9] - 2026-09-08
 
 ### Added

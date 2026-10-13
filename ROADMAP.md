@@ -22,7 +22,7 @@ Release: [1.0.0-preview.9](CHANGELOG.md#100-preview9---2026-09-08).
 - [x] Streaming requests via `IAsyncEnumerable<T>`
 - [x] Opt-in ValueTask request family: `IValueRequest`, ValueTask stages, and CQRS command/query twins
 - [x] MediatR migration and target compatibility guides
-- [ ] BenchmarkDotNet suite against pinned MediatR, martinothamar/Mediator, LiteBus, and DispatchR packages, with raw results
+- [ ] BenchmarkDotNet suite against pinned MediatR, martinothamar/Mediator, and DispatchR packages, with raw results
 
 Targets: `netstandard2.0;net462;net8.0;net10.0`. The `net462` target has shipped since `1.0.0-preview.2`.
 
