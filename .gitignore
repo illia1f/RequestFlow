@@ -1,7 +1,5 @@
-# .gitignore — RequestFlow
-# Modern SDK-style .NET library solution (.slnx), multi-target
-# netstandard2.0;net8.0;net10.0. NuGet-published. No project.json /
-# packages.config legacy cruft on purpose.
+# RequestFlow: SDK-style .NET library solution (.slnx), NuGet-published.
+# No project.json / packages.config legacy cruft on purpose.
 
 # ── Build output ─────────────────────────────────────────────
 [Bb]in/
@@ -24,17 +22,13 @@ artifacts/
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# ── Local build settings (per-machine) ───────────────────────
-# Optional override file. Directory.Build.props imports it when it exists.
-Directory.Local.props
-
 # ── NuGet package output ─────────────────────────────────────
 # Packing RequestFlow / RequestFlow.Cqrs. Symbols too (.snupkg).
 *.nupkg
 *.snupkg
 
 # ── Test results & coverage ──────────────────────────────────
-# Unit test project + coverage (v1 checklist #7).
+# Unit test project + coverage.
 [Tt]est[Rr]esults/
 *.trx
 *.coverage
@@ -44,7 +38,7 @@ coverage*.xml
 coverage*.info
 
 # ── BenchmarkDotNet ──────────────────────────────────────────
-# Dispatch-cost benchmarks vs MediatR (plan §"Targets and quality bar").
+# Dispatch-cost benchmarks vs MediatR.
 BenchmarkDotNet.Artifacts/
 
 # ── MSBuild / binary logs ────────────────────────────────────

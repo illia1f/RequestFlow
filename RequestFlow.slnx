@@ -1,4 +1,12 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <File Path="benchmarks/README.md" />
+    <Project Path="benchmarks/RequestFlow.Benchmarks/RequestFlow.Benchmarks.csproj" />
+    <Project Path="benchmarks/RequestFlow.Benchmarks.Core/RequestFlow.Benchmarks.Core.csproj" />
+    <Project Path="benchmarks/RequestFlow.Benchmarks.Harness/RequestFlow.Benchmarks.Harness.csproj" />
+    <Project Path="benchmarks/RequestFlow.Benchmarks.MediatR/RequestFlow.Benchmarks.MediatR.csproj" />
+    <Project Path="benchmarks/RequestFlow.Benchmarks.RequestFlowFixtures/RequestFlow.Benchmarks.RequestFlowFixtures.csproj" />
+  </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Orders.Api.Violations/Orders.Api.Violations.csproj" />
     <Project Path="samples/Orders.Api/Orders.Api.csproj" />

@@ -328,14 +328,14 @@ Events bypass request and stream stages. A `PublishAsync` call goes straight thr
 
 ## Notes for MediatR migrations
 
-The behavior warnings below come from black-box probes against MediatR 12.5.0 and 14.2.0 on Microsoft.Extensions.DependencyInjection. They describe those versions and that container, not every MediatR release.
+The behavior warnings below come from black-box probes against MediatR 12.5.0 on Microsoft.Extensions.DependencyInjection. They describe that version and that container, not every MediatR release.
 
 - Delivery to base-class, interface, and catch-all notification handlers was gated on the published type also having an exact-type handler. With one, all of them ran; with none, the publish reached no handler at all. RequestFlow's closure is unconditional: every applicable handler runs whether or not an exact-type handler exists.
 - A notification that reached nobody in the probes is delivered under RequestFlow when a base, interface, or `IEvent` handler applies, and becomes an `RF0114` startup problem when none does.
 - Do not mistake RequestFlow's same-tier order for registration order or a compatibility guarantee. Review handlers whose side effects depend on the order of exact-type registrations.
 - RequestFlow runs every applicable handler unless a publisher cancellation check stops the walk, and aggregates handler failures. Code that catches a handler exception directly around `Publish` needs to inspect `EventPublishException.Failures` instead.
 - Where MediatR 12.5.0 permitted a notification without handlers, RequestFlow needs a missing-handler exemption for that event.
-- Repeated `AddMediatR` registration delivered notification handlers more than once in the 12.5.0 probes; MediatR 14.1.0 stopped that duplicate delivery. RequestFlow deduplicates scanned assemblies, and manual `AddEventHandler` entries, across additive registration calls.
+- Repeated `AddMediatR` registration delivered notification handlers more than once in the 12.5.0 probes. RequestFlow deduplicates scanned assemblies, and manual `AddEventHandler` entries, across additive registration calls.
 - Conditional registration ports directly: `if (flag) services.AddTransient<INotificationHandler<X>, H>()` becomes `if (flag) options.AddEventHandler<H>()` inside the configure delegate. Leave the bare container registration behind, because under RequestFlow it does nothing.
 - A `TypeEvaluator` scan filter maps to `ExcludeEventHandler<THandler>()` per handler kept out, and an open generic notification handler ports as manually added closings, `options.AddEventHandler<AuditHandler<OrderPlaced>>()` per event.
 - Map a MediatR notification publisher to `IEventPublishStrategy` ([the port recipe](#port-a-mediatr-notification-publisher)). Its callback throws on failure, while `EventDelivery.StartAsync` returns a failure. Use `RunAsync` or collect and call `ThrowIfAny`; discarding `StartAsync` results drops failures.

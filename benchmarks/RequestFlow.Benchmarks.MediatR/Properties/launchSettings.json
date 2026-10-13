@@ -1,0 +1,19 @@
+{
+  "profiles": {
+    "Verify comparison": {
+      "commandName": "Project",
+      "workingDirectory": "../..",
+      "commandLineArgs": "probe"
+    },
+    "Smoke test": {
+      "commandName": "Project",
+      "workingDirectory": "../..",
+      "commandLineArgs": "--smoke --filter *TaskRetainedScopeBenchmarks*"
+    },
+    "Full comparison": {
+      "commandName": "Project",
+      "workingDirectory": "../..",
+      "commandLineArgs": "--filter *"
+    }
+  }
+}
