@@ -4,7 +4,8 @@
 - Results and behavior notes on this page describe MediatR 12.5.0 only, not later releases.
 - RequestFlow is not affiliated with or endorsed by MediatR or its maintainers.
 - Each class pairs a RequestFlow baseline with the matching native MediatR operation.
-- No timing results are published yet. Probes check behavior, not performance.
+- [Published results](../../docs/benchmarks/mediatr/README.md) come from the 2026-10-15 full run.
+- Probes check behavior, not performance.
 - Build and run with the [quick start](../README.md#quick-start). This page covers what is specific to MediatR.
 
 ## Matrix

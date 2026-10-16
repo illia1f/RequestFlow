@@ -90,7 +90,9 @@ The [MediatR migration guide](https://github.com/illia1f/RequestFlow/blob/main/d
 
 ## Benchmarks
 
-The [MediatR comparison](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/RequestFlow.Benchmarks.MediatR/README.md) measures requests, stages, streams, events, and short-circuit paths against MediatR 12.5.0 on .NET 10, with correctness probes and package lock files. Its results describe MediatR 12.5.0 only, not later releases. The [benchmark guide](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/README.md) explains how to run the suites.
+The [benchmark results](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/README.md) compare RequestFlow with other .NET mediators on .NET 10, including [MediatR 12.5.0](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/mediatr/README.md).
+
+The [MediatR suite](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/RequestFlow.Benchmarks.MediatR/README.md) measures requests, stages, streams, events, and short-circuit paths, with correctness probes and package lock files. Its results describe MediatR 12.5.0 only, not later releases. The [benchmark guide](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/README.md) explains how to run the suites.
 
 ## Packages
 
@@ -113,6 +115,7 @@ Install a runtime package at the composition root. Reference an abstractions pac
 - [Validation rules](https://github.com/illia1f/RequestFlow/blob/main/docs/validation-rules.md): application-defined checks over the frozen registration model
 - [Compatibility](https://github.com/illia1f/RequestFlow/blob/main/docs/compatibility.md): modern targets, downlevel targets, trimming, and NativeAOT
 - [Migrating from MediatR](https://github.com/illia1f/RequestFlow/blob/main/docs/migrating-from-mediatr.md): concept mapping and semantic differences
+- [Benchmarks](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/README.md): time and allocations against other .NET mediators on .NET 10
 - [Service lifetimes](https://github.com/illia1f/RequestFlow/blob/main/docs/lifetimes.md): handler, stage, dispatcher, and publisher lifetimes
 - [Exceptions](https://github.com/illia1f/RequestFlow/blob/main/docs/exceptions.md): exceptions, timing, and fixes
 - [Modular sample](https://github.com/illia1f/RequestFlow/blob/main/samples/README.md): an API host with independently registered Orders and Audit modules

@@ -8,7 +8,7 @@ Two BenchmarkDotNet suites, both on .NET 10:
 | `RequestFlow.Benchmarks` | 34 | RequestFlow alone: Task vs ValueTask paths and stage chains. |
 
 - A case is one benchmark method with one parameter set.
-- No timing results are published yet.
+- Published results: [Benchmarks vs MediatR](../docs/benchmarks/mediatr/README.md), from the 2026-10-15 full run.
 - RequestFlow is built from the checked-out source, so record the commit when sharing results.
 - BenchmarkDotNet 0.15.8 and Microsoft DI 10.0.9. Package lock files pin the resolved dependencies.
 - CI builds both suites but does not run them.
@@ -28,7 +28,7 @@ dotnet run --project benchmarks/RequestFlow.Benchmarks.MediatR -c Release -f net
 dotnet run --project benchmarks/RequestFlow.Benchmarks.MediatR -c Release -f net10.0 --no-build --no-restore -- --quick --filter '*TaskRetainedScopeBenchmarks*'
 
 # Full run of every case into an unused directory.
-dotnet run --project benchmarks/RequestFlow.Benchmarks.MediatR -c Release -f net10.0 --no-build --no-restore -- --filter '*' --artifacts benchmarks/artifacts/YYYY-MM-DD-mediatr-full
+dotnet run --project benchmarks/RequestFlow.Benchmarks.MediatR -c Release -f net10.0 --no-build --no-restore -- --runtimes net10.0 --filter '*' --artifacts benchmarks/artifacts/YYYY-MM-DD-mediatr-full
 ```
 
 - These commands build only the suite and the `net10.0` build of RequestFlow. To build the whole solution, run `dotnet restore -p:RestoreLockedMode=true` and `dotnet build -c Release --no-restore`.
