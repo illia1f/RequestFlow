@@ -78,6 +78,7 @@ public static class BenchmarkVerification
     /// A <see cref="ScopeLifetime.RetainedScope"/> class must retain one scope across calls.
     /// A <see cref="ScopeLifetime.DirectHandler"/> class is exempt from scope checks.
     /// A <c>Completion</c> parameter fixes whether the returned awaitable is complete when the call returns.
+    /// Every message field of such a class must carry that <c>Completion</c>.
     /// </remarks>
     public static BenchmarkProbeResult Run(
         Assembly assembly,
@@ -230,6 +231,8 @@ public static class BenchmarkVerification
             .Select(message => (Message: message, OriginalTrace: message.Trace))
             .ToArray();
 
+        VerifyMessageCompletion(type, method, parameters, [.. messages.Select(message => message.Message)]);
+
         try
         {
             foreach (var message in messages)
@@ -271,6 +274,24 @@ public static class BenchmarkVerification
         {
             foreach (var message in messages)
                 message.Message.Trace = message.OriginalTrace;
+        }
+    }
+
+    private static void VerifyMessageCompletion(
+        Type type, MethodInfo method, IReadOnlyDictionary<string, object?> parameters, WorkloadMessage[] messages)
+    {
+        if (!parameters.TryGetValue("Completion", out object? value) || value is not CompletionKind completion)
+            return;
+
+        if (messages.Length == 0)
+            throw new InvalidOperationException(
+                $"'{type.Name}.{method.Name}' has a Completion parameter but no message field to check it against.");
+
+        foreach (WorkloadMessage message in messages)
+        {
+            if (message.Completion != completion)
+                throw new InvalidOperationException(
+                    $"'{type.Name}.{method.Name}' sends {message.GetType().Name} with Completion={message.Completion}, not {completion}.");
         }
     }
 

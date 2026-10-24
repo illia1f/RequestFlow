@@ -3,6 +3,7 @@
     <File Path="benchmarks/README.md" />
     <Project Path="benchmarks/RequestFlow.Benchmarks/RequestFlow.Benchmarks.csproj" />
     <Project Path="benchmarks/RequestFlow.Benchmarks.Core/RequestFlow.Benchmarks.Core.csproj" />
+    <Project Path="benchmarks/RequestFlow.Benchmarks.DispatchR/RequestFlow.Benchmarks.DispatchR.csproj" />
     <Project Path="benchmarks/RequestFlow.Benchmarks.Harness/RequestFlow.Benchmarks.Harness.csproj" />
     <Project Path="benchmarks/RequestFlow.Benchmarks.MediatR/RequestFlow.Benchmarks.MediatR.csproj" />
     <Project Path="benchmarks/RequestFlow.Benchmarks.RequestFlowFixtures/RequestFlow.Benchmarks.RequestFlowFixtures.csproj" />
