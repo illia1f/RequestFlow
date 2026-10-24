@@ -1,17 +1,18 @@
 # Benchmarks
 
-Two BenchmarkDotNet suites, both on .NET 10:
+Three BenchmarkDotNet suites, all on .NET 10:
 
 | Suite | Cases | Measures |
 | --- | --- | --- |
 | `RequestFlow.Benchmarks.MediatR` | 224 | RequestFlow against MediatR 12.5.0 in one executable, with matching workloads and service lifetimes. See the [MediatR comparison](RequestFlow.Benchmarks.MediatR/README.md). |
+| `RequestFlow.Benchmarks.DispatchR` | 260 | RequestFlow against DispatchR.Mediator 2.3.1 in one executable, with matching workloads and service lifetimes. See the [DispatchR comparison](RequestFlow.Benchmarks.DispatchR/README.md). |
 | `RequestFlow.Benchmarks` | 34 | RequestFlow alone: Task vs ValueTask paths and stage chains. |
 
 - A case is one benchmark method with one parameter set.
 - Published results: [Benchmarks vs MediatR](../docs/benchmarks/mediatr/README.md), from the 2026-10-15 full run.
 - RequestFlow is built from the checked-out source, so record the commit when sharing results.
 - BenchmarkDotNet 0.15.8 and Microsoft DI 10.0.9. Package lock files pin the resolved dependencies.
-- CI builds both suites but does not run them.
+- CI builds all three suites but does not run them.
 
 ## Quick start
 
@@ -63,7 +64,7 @@ dotnet run --project benchmarks/RequestFlow.Benchmarks -c Release -f net10.0 --n
 | `--filter` without `--smoke` or `--quick` | Runs `probe`, then the full profile: two launches, 15 to 50 warm-up and 60 to 100 measured iterations, 5% relative error target. |
 
 - Without arguments, `dotnet run` applies the MediatR suite's first launch profile, **Verify comparison**, so it only runs `probe`.
-- The RequestFlow suite has no launch profile. Without arguments it runs `probe`, then shows BenchmarkDotNet's selection prompt.
+- The DispatchR and RequestFlow suites have no launch profile. Without arguments they run `probe`, then show BenchmarkDotNet's selection prompt.
 
 ## Filters
 
@@ -83,9 +84,22 @@ dotnet run --project benchmarks/RequestFlow.Benchmarks -c Release -f net10.0 --n
 | Short circuit | `*MediatRShortCircuit*` | 18 |
 | Direct-handler reference | `*MediatRTaskDirectHandler*` | 6 |
 
+| DispatchR scenario | Filter | Cases |
+| --- | --- | --- |
+| Task requests | `*DispatchRTask*Scope*` | 36 |
+| Void requests | `*DispatchRVoidRequest*` | 24 |
+| ValueTask requests | `*DispatchRValueRetainedScope*` `*DispatchRValueScopePerOperation*` | 24 |
+| ValueTask void requests | `*DispatchRValueVoidRequest*` | 24 |
+| Streams | `*DispatchRStream*` | 72 |
+| Sequential events | `*DispatchREventSequential*` | 16 |
+| Catalog size | `*DispatchRCatalogSize*` | 18 |
+| Mixed traffic | `*DispatchRMixedTraffic*` | 18 |
+| Short circuit | `*DispatchRShortCircuit*` | 18 |
+| Direct-handler references | `*DispatchR*DirectHandler*` | 10 |
+
 ## Reports
 
-- `--artifacts <dir>` sets the output directory. Without it, reports go to `BenchmarkDotNet.Artifacts/<suite>/<tier>/<run>/` under the current directory, where `<suite>` is `mediatr` or `requestflow`.
+- `--artifacts <dir>` sets the output directory. Without it, reports go to `BenchmarkDotNet.Artifacts/<suite>/<tier>/<run>/` under the current directory, where `<suite>` is `mediatr`, `dispatchr` or `requestflow`.
 - Readable tables are the `results/*-report-github.md` files. `run-manifest.json` records the run status and host details.
 - Git ignores `BenchmarkDotNet.Artifacts/` and `benchmarks/artifacts/`.
 
@@ -126,12 +140,13 @@ Use Visual Studio for exploration only. Publish from the command line.
 
 ## Projects
 
-All five are in the root solution.
+All six are in the root solution.
 
 | Project | Contents |
 | --- | --- |
 | `RequestFlow.Benchmarks` | Stage-chain measurements, Task vs ValueTask dispatch, and probes |
 | `RequestFlow.Benchmarks.MediatR` | MediatR fixtures, paired benchmarks, and probes. Does not depend on `RequestFlow.Benchmarks`. |
+| `RequestFlow.Benchmarks.DispatchR` | DispatchR fixtures, paired benchmarks, and probes. Does not depend on `RequestFlow.Benchmarks`. |
 | `RequestFlow.Benchmarks.Harness` | BenchmarkDotNet configuration, runner, run manifest, and provenance records. Knows nothing about workloads. |
 | `RequestFlow.Benchmarks.Core` | Probe engine, trace names, provider hosts, shared workloads, and the short-circuit dependency graph |
 | `RequestFlow.Benchmarks.RequestFlowFixtures` | RequestFlow handlers, stages, registration, and message catalogs |

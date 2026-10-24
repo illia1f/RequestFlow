@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DispatchR.Mediator" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RequestFlow.Benchmarks.Core\RequestFlow.Benchmarks.Core.csproj" />
+    <ProjectReference Include="..\RequestFlow.Benchmarks.Harness\RequestFlow.Benchmarks.Harness.csproj" />
+    <ProjectReference Include="..\RequestFlow.Benchmarks.RequestFlowFixtures\RequestFlow.Benchmarks.RequestFlowFixtures.csproj" />
+  </ItemGroup>
+</Project>
