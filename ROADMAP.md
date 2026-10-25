@@ -28,4 +28,5 @@ Targets: `netstandard2.0;net462;net8.0;net10.0`. The `net462` target has shipped
 ## After v1.0
 
 - [x] BenchmarkDotNet suite against pinned MediatR 12.5.0, with [results](docs/benchmarks/mediatr/README.md) and [raw reports](docs/benchmarks/mediatr/2026-10-15-mediatr-full/)
-- [ ] BenchmarkDotNet suites against pinned martinothamar/Mediator and DispatchR packages, with raw results
+- [x] BenchmarkDotNet suite against pinned DispatchR.Mediator 2.3.1, with [results](docs/benchmarks/dispatchr/README.md) and [raw reports](docs/benchmarks/dispatchr/2026-10-25-dispatchr-full/)
+- [ ] BenchmarkDotNet suite against pinned martinothamar/Mediator, with raw results

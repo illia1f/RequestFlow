@@ -9,7 +9,7 @@ Three BenchmarkDotNet suites, all on .NET 10:
 | `RequestFlow.Benchmarks` | 34 | RequestFlow alone: Task vs ValueTask paths and stage chains. |
 
 - A case is one benchmark method with one parameter set.
-- Published results: [Benchmarks vs MediatR](../docs/benchmarks/mediatr/README.md), from the 2026-10-15 full run.
+- Published results: [Benchmarks vs MediatR](../docs/benchmarks/mediatr/README.md), from the 2026-10-15 full run, and [Benchmarks vs DispatchR](../docs/benchmarks/dispatchr/README.md), from the 2026-10-25 full run.
 - RequestFlow is built from the checked-out source, so record the commit when sharing results.
 - BenchmarkDotNet 0.15.8 and Microsoft DI 10.0.9. Package lock files pin the resolved dependencies.
 - CI builds all three suites but does not run them.
