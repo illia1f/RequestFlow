@@ -1,10 +1,11 @@
 # RequestFlow vs DispatchR 2.3.1
 
 - Compares RequestFlow with `DispatchR.Mediator 2.3.1` on .NET 10.
-- Behavior notes on this page describe DispatchR.Mediator 2.3.1 only, not other releases.
+- Results and behavior notes on this page describe DispatchR.Mediator 2.3.1 only, not other releases.
 - RequestFlow is not affiliated with or endorsed by DispatchR or its maintainers.
 - Each class pairs a RequestFlow baseline with the matching native DispatchR operation.
-- No timing results exist yet. Probes check behavior, not performance.
+- [Published results](../../docs/benchmarks/dispatchr/README.md) come from the 2026-10-25 full run.
+- Probes check behavior, not performance.
 
 ## Matrix
 

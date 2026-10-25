@@ -90,9 +90,9 @@ The [MediatR migration guide](https://github.com/illia1f/RequestFlow/blob/main/d
 
 ## Benchmarks
 
-The [benchmark results](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/README.md) compare RequestFlow with other .NET mediators on .NET 10, including [MediatR 12.5.0](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/mediatr/README.md).
+The [benchmark results](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/README.md) compare RequestFlow with other .NET mediators on .NET 10, including [MediatR 12.5.0](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/mediatr/README.md) and [DispatchR 2.3.1](https://github.com/illia1f/RequestFlow/blob/main/docs/benchmarks/dispatchr/README.md).
 
-The [MediatR suite](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/RequestFlow.Benchmarks.MediatR/README.md) measures requests, stages, streams, events, and short-circuit paths, with correctness probes and package lock files. Its results describe MediatR 12.5.0 only, not later releases. The [benchmark guide](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/README.md) explains how to run the suites.
+The [benchmark guide](https://github.com/illia1f/RequestFlow/blob/main/benchmarks/README.md) explains how to run the suites.
 
 ## Packages
 
