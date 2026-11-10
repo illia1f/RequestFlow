@@ -176,3 +176,9 @@ IServiceProvider provider = services.BuildServiceProvider().ValidateRequestFlow(
 Nothing reports the split. The map gets a plan for the new request, and the dispatch fails further in, where that plan asks the container for the handler. The error is the container's own "No service for type", not a RequestFlow one. Removing or replacing a descriptor in the same window splits the same way: the provider keeps what it was built with.
 
 Register, replace, or remove every stage and handler descriptor before calling `BuildServiceProvider`. This includes concrete event handler descriptors and `services.Replace(...)` ([stages.md](stages.md#replacing-a-stage-registration)). A provider built after the change is fine; it holds both the registry entry and the descriptor.
+
+## Copied service collections
+
+- The registry sits in the service collection as a singleton instance. Copying the descriptors of a host `IServiceCollection` into others, for example to build tenant or plugin containers, copies that instance, so the host and every copy share one registry.
+- `AddRequestFlow` on one copy then skips an assembly that a call on another copy already scanned, and adds no handler or stage descriptors for it. Validation passes on that container, and dispatch fails with the container's "No service for type" error. If both calls declare the same stage, validation fails with `RF0103` instead.
+- Make every `AddRequestFlow` call on the host collection before copying it, or make none there and call `AddRequestFlow` on each copy.
