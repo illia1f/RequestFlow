@@ -109,6 +109,7 @@ Install a runtime package at the composition root. Reference an abstractions pac
 - [ValueTask requests](https://github.com/illia1f/RequestFlow/blob/main/docs/value-tasks.md): measured opt-in requests, stages, CQRS, and consumption rules
 - [Registration](https://github.com/illia1f/RequestFlow/blob/main/docs/registration.md): scanning, manual registration, generic handlers, additive calls, startup validation
 - [Stages](https://github.com/illia1f/RequestFlow/blob/main/docs/stages.md): wrapping handlers, execution order, filters, and request selection
+- [Recipes](https://github.com/illia1f/RequestFlow/blob/main/docs/recipes.md): stages for pre and post processing, exception handling, validation, and tracing, plus untyped send and hosted-service dispatch
 - [Pipeline inspection](https://github.com/illia1f/RequestFlow/blob/main/docs/pipeline-inspection.md): declared handlers, ordered stages, and stage exclusion reasons
 - [Streaming](https://github.com/illia1f/RequestFlow/blob/main/docs/streaming.md): stream requests, stream stages, cancellation, and enumeration timing
 - [Events](https://github.com/illia1f/RequestFlow/blob/main/docs/events.md): polymorphic delivery, strategies, ordering, failures, and cancellation

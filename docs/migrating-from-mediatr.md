@@ -82,6 +82,9 @@ public sealed class CancelOrderCommandHandler(OrderStore store)
 }
 ```
 
+- A handler that returned `Task<Unit>` ports to this shape: `IRequestHandler<TRequest>` returning plain `Task`.
+- Porting it as `IRequestHandler<TRequest, NoResult>` compiles and dispatches, but in 1.0 void-form stages (`IRequestStage<TRequest>`, and `IValueRequestStage<TRequest>` on the ValueTask side) do not reach that handler. Validation reports nothing unless `DisallowUnusedStages()` is on and the stage reaches no other request.
+
 Request handlers keep `Task` and `Task<T>`, so their await and multiple-await behavior does not change.
 
 ### Opt in to ValueTask only after measurement
@@ -120,7 +123,10 @@ With `RequestFlow.Cqrs`, use `ICommandDispatcher` or `IQueryDispatcher` for Task
 `IStreamQueryDispatcher` for stream queries. Choose the interface matching the request contract.
 A query-only caller then cannot send a command through that dependency.
 
-RequestFlow has no untyped `Send(object)` overload. If the application relies on untyped dispatch for deserialization or generic endpoints, keep that path on a mediator that supports it or add a typed adapter.
+- `IRequestDispatcher`, `IValueRequestDispatcher`, `IStreamDispatcher`, and `IEventPublisher` are scoped by default. A singleton, such as a hosted service that injected `IMediator`, cannot inject one of the four directly: with scope validation on, the host fails at startup with "Cannot consume scoped service". See [Why the dispatcher is scoped](lifetimes.md#why-the-dispatcher-is-scoped).
+- Create a scope per unit of work through `IServiceScopeFactory` ([Dispatching from a hosted service](recipes.md#dispatching-from-a-hosted-service)), or call `WithTransientDispatcher()`, which has the caveats listed in [Switching the dispatcher to transient](lifetimes.md#switching-the-dispatcher-to-transient).
+
+RequestFlow has no untyped `Send(object)` overload. If the application relies on untyped dispatch for deserialization or generic endpoints, keep that path on a mediator that supports it or add an adapter of your own ([Untyped send](recipes.md#untyped-send)).
 
 ## Replace registration
 
@@ -208,7 +214,11 @@ options.AddStage(typeof(ValidationStage<,>));
 
 RequestFlow closes each applicable stage for each handler at startup. Filters and generic constraints decide which handlers a stage reaches. Invalid stage declarations fail startup validation. A declaration that reaches no request is allowed unless registration calls `DisallowUnusedStages()`.
 
-RequestFlow has no separate request pre-processor, post-processor, exception-handler, or exception-action abstractions. Implement those concerns as stages or keep an application-owned adapter during migration.
+- RequestFlow closes an open stage by position and accepts three open shapes: two type parameters used as the request and the response in that order, one used as the request of the void form, or one used as the request with the response fixed by the class.
+- A behavior whose response argument wraps one of its own type parameters, such as `Stage<TRequest, T> : IRequestStage<TRequest, Result<T>>`, or one that declares more than two type parameters, has no open-stage equivalent. Registered open, it fails startup validation with `RF0012`.
+- Port it as a two-parameter stage that constrains `TResponse`, for example `where TResponse : IResult`, or register it closed, once per request. See [Which requests a stage reaches](stages.md#which-requests-a-stage-reaches).
+
+RequestFlow has no separate request pre-processor, post-processor, exception-handler, or exception-action abstractions. Implement those concerns as stages or keep an application-owned adapter during migration. [Recipes](recipes.md) has a stage for each.
 
 ## Migrate streams
 
