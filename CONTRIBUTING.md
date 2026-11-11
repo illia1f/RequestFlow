@@ -14,7 +14,7 @@ dotnet test --filter "FullyQualifiedName~RequestDispatcherTests"
 
 ## Before you push
 
-Builds treat warnings as errors in `src/`. Test projects turn warnings-as-errors off.
+Builds enforce the code style in `.editorconfig` and treat warnings as errors, test projects included. `dotnet format` fixes formatting and unused usings.
 
 CI builds, tests, and packs on Windows. The release workflow publishes from Ubuntu. Tests target net462 only on Windows, so the build job needs a Windows runner.
 

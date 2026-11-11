@@ -7,7 +7,6 @@ on:
       - '**/*.md'
       - 'LICENSE'
       - '.gitignore'
-      - '.editorconfig'
   pull_request:
     branches: [main]
 

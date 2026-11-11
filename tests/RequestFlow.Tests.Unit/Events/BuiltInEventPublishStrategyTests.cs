@@ -1,5 +1,3 @@
-using RequestFlow;
-
 namespace RequestFlow.Tests.Unit.Events;
 
 public sealed class BuiltInEventPublishStrategyTests

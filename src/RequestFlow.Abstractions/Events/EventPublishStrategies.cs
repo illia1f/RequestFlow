@@ -8,9 +8,9 @@ internal static class EventPublishStrategies
 {
     public static Task SequentialAsync(
         EventDelivery delivery,
-        CancellationToken cancellationToken,
-        bool stopOnFirstFailure)
-        => WalkSequentiallyAsync(delivery, cancellationToken, stopOnFirstFailure);
+        bool stopOnFirstFailure,
+        CancellationToken cancellationToken)
+        => WalkSequentiallyAsync(delivery, stopOnFirstFailure, cancellationToken);
 
     public static Task ParallelAsync(
         EventDelivery delivery,
@@ -19,8 +19,8 @@ internal static class EventPublishStrategies
 
     private static async Task WalkSequentiallyAsync(
         EventDelivery delivery,
-        CancellationToken cancellationToken,
-        bool stopOnFirstFailure)
+        bool stopOnFirstFailure,
+        CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
             throw delivery.Canceled(null, delivery.Count, cancellationToken);

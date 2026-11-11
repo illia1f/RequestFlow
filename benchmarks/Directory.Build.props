@@ -2,7 +2,8 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Verification records document only some of their positional parameters. -->
+    <NoWarn>$(NoWarn);CS1573</NoWarn>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup>

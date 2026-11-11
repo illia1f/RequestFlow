@@ -28,7 +28,7 @@ public static class BenchmarkVerification
     /// </summary>
     public static string[] StreamNames(int stages, int count, bool early = false)
         => [.. RequestNames(stages), .. Enumerable.Range(0, early ? 1 : count).Select(index => TraceNames.ItemPrefix + index),
-            .. early ? Array.Empty<string>() : new[] { TraceNames.StreamComplete }, TraceNames.StreamDispose];
+            .. early ? [] : new[] { TraceNames.StreamComplete }, TraceNames.StreamDispose];
 
     public static string[] EventNames(int handlers)
         => Enumerable.Range(1, handlers)
@@ -166,7 +166,7 @@ public static class BenchmarkVerification
                 BenchmarkObservation first = ObserveMethod(instance, method, parameters, expectation);
                 BenchmarkObservation second = ObserveMethod(instance, method, parameters, expectation);
 
-                ScopeVerification.VerifyAcrossCalls(first, second, expectation);
+                ScopeVerification.VerifyAcrossCalls(first, second);
 
                 expectation.Verify(first);
                 expectation.Verify(second);
@@ -346,7 +346,7 @@ public static class BenchmarkVerification
     {
         MemberInfo[] members = type.GetMembers(BindingFlags.Public | BindingFlags.Instance)
             .Where(member => member.GetCustomAttribute<ParamsAttribute>() is not null).ToArray();
-        IEnumerable<Dictionary<string, object?>> sets = [new Dictionary<string, object?>()];
+        IEnumerable<Dictionary<string, object?>> sets = [[]];
 
         foreach (MemberInfo member in members)
         {

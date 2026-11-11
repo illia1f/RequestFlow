@@ -1,5 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
 
@@ -152,6 +152,7 @@ public sealed class LevelTests
     {
         internal CancellationToken Token;
 
+        [SuppressMessage("Style", "IDE0060", Justification = "Matches the LevelEntry<TResponse> delegate.")]
         public Task<string> EnterAsync(
             object request, IServiceProvider services, CancellationToken cancellationToken)
         {

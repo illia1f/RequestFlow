@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 
 namespace RequestFlow;
@@ -13,6 +14,7 @@ public sealed class EventPublishCanceledException : OperationCanceledException
     /// <exception cref="ArgumentException"/>
     /// <exception cref="ArgumentNullException"/>
     /// <exception cref="ArgumentOutOfRangeException"/>
+    [SuppressMessage("Design", "CA1068", Justification = "Public since 1.0; reordering the parameters breaks callers.")]
     public EventPublishCanceledException(
         Type eventType,
         CancellationToken token,
@@ -20,16 +22,16 @@ public sealed class EventPublishCanceledException : OperationCanceledException
         int skippedHandlerCount)
         : this(
             ValidateEventType(eventType),
-            token,
             EventFailures.Copy(failures),
-            ValidateSkippedHandlerCount(skippedHandlerCount))
+            ValidateSkippedHandlerCount(skippedHandlerCount),
+            token)
     { }
 
     private EventPublishCanceledException(
         Type eventType,
-        CancellationToken token,
         EventHandlerFailure[] failures,
-        int skippedHandlerCount)
+        int skippedHandlerCount,
+        CancellationToken token)
         : base(BuildMessage(eventType, failures, skippedHandlerCount), BuildInnerException(failures), token)
     {
         EventType = eventType;

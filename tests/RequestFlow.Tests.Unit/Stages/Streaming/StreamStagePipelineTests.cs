@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit.Stages;
 
@@ -169,11 +168,10 @@ public sealed class StreamStagePipelineTests
             Started++;
             Trace.Add("handler");
 
-            return Iterate(request, cancellationToken);
+            return Iterate(request);
         }
 
-        private static async IAsyncEnumerable<int> Iterate(
-            Tail request, [EnumeratorCancellation] CancellationToken cancellationToken)
+        private static async IAsyncEnumerable<int> Iterate(Tail request)
         {
             for (int i = 0; i < request.Count; i++)
             {

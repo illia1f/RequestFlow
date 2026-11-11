@@ -3,7 +3,6 @@
 #if NET8_0_OR_GREATER
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit.Stages;
 
@@ -106,7 +105,7 @@ public sealed class StreamChainAllocationTests
 
     private static async Task DrainAsync(IStreamDispatcher dispatcher, int items, CancellationToken cancellationToken)
     {
-        await foreach (int item in dispatcher.Stream(new Ticks(items), cancellationToken))
+        await foreach (int _ in dispatcher.Stream(new Ticks(items), cancellationToken))
         { }
     }
 

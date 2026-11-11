@@ -1,6 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
-using RequestFlow.Cqrs;
 
 namespace RequestFlow.Cqrs.Tests.Unit;
 

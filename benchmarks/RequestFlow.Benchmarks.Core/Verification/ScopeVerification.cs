@@ -39,7 +39,7 @@ internal static class ScopeVerification
             label + " completed before disposing its operation scope.");
     }
 
-    public static void VerifyAcrossCalls(BenchmarkObservation first, BenchmarkObservation second, BenchmarkExpectation expectation)
+    public static void VerifyAcrossCalls(BenchmarkObservation first, BenchmarkObservation second)
     {
         ScopeLifetime lifetime = For(first.BenchmarkType);
 

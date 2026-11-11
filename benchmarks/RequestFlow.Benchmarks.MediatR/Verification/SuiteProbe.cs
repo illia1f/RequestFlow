@@ -57,66 +57,66 @@ public static class SuiteProbe
     private static void VerifyRequestLifetimes(bool report)
     {
         foreach (CompletionKind completion in Params<CompletionKind>(typeof(MediatRTaskRetainedScopeBenchmarks), nameof(MediatRTaskRetainedScopeBenchmarks.Completion)))
-        foreach (int stages in Params<int>(typeof(MediatRTaskRetainedScopeBenchmarks), nameof(MediatRTaskRetainedScopeBenchmarks.StageCount)))
-        {
-            VerifyPair<IRequestDispatcher, ISender>(
-                $"Task, completion={completion}, stages={stages}", RequestNames(stages), report,
-                RequestFlowSetup.Library, RequestFlowSetup.TaskServices(stages, MediatRSetup.DispatcherLifetime),
-                (dispatcher, trace, token) => ExpectResult(dispatcher.SendAsync<int>(new TaskRequest(completion) { Trace = trace }, token)),
-                MediatRLibrary, MediatRSetup.TaskServices(stages),
-                (sender, trace, token) => ExpectResult(sender.Send(new MediatRTaskRequest(completion) { Trace = trace }, token)),
-                dispatcherLifetime: MediatRSetup.DispatcherLifetime);
-        }
+            foreach (int stages in Params<int>(typeof(MediatRTaskRetainedScopeBenchmarks), nameof(MediatRTaskRetainedScopeBenchmarks.StageCount)))
+            {
+                VerifyPair<IRequestDispatcher, ISender>(
+                    $"Task, completion={completion}, stages={stages}", RequestNames(stages), report,
+                    RequestFlowSetup.Library, RequestFlowSetup.TaskServices(stages, MediatRSetup.DispatcherLifetime),
+                    (dispatcher, trace, token) => ExpectResult(dispatcher.SendAsync<int>(new TaskRequest(completion) { Trace = trace }, token)),
+                    MediatRLibrary, MediatRSetup.TaskServices(stages),
+                    (sender, trace, token) => ExpectResult(sender.Send(new MediatRTaskRequest(completion) { Trace = trace }, token)),
+                    dispatcherLifetime: MediatRSetup.DispatcherLifetime);
+            }
 
         foreach (CompletionKind completion in Params<CompletionKind>(typeof(MediatRVoidRequestRetainedScopeBenchmarks), nameof(MediatRVoidRequestRetainedScopeBenchmarks.Completion)))
-        foreach (int stages in Params<int>(typeof(MediatRVoidRequestRetainedScopeBenchmarks), nameof(MediatRVoidRequestRetainedScopeBenchmarks.StageCount)))
-        {
-            VerifyPair<IRequestDispatcher, ISender>(
-                $"void request, completion={completion}, stages={stages}", RequestNames(stages), report,
-                RequestFlowSetup.Library, RequestFlowSetup.TaskVoidRequestServices(stages, MediatRSetup.DispatcherLifetime),
-                (dispatcher, trace, token) => dispatcher.SendAsync(new TaskVoidRequest(completion) { Trace = trace }, token),
-                MediatRLibrary, MediatRSetup.VoidRequestServices(stages),
-                (sender, trace, token) => sender.Send(new MediatRVoidRequest(completion) { Trace = trace }, token),
-                dispatcherLifetime: MediatRSetup.DispatcherLifetime);
-        }
+            foreach (int stages in Params<int>(typeof(MediatRVoidRequestRetainedScopeBenchmarks), nameof(MediatRVoidRequestRetainedScopeBenchmarks.StageCount)))
+            {
+                VerifyPair<IRequestDispatcher, ISender>(
+                    $"void request, completion={completion}, stages={stages}", RequestNames(stages), report,
+                    RequestFlowSetup.Library, RequestFlowSetup.TaskVoidRequestServices(stages, MediatRSetup.DispatcherLifetime),
+                    (dispatcher, trace, token) => dispatcher.SendAsync(new TaskVoidRequest(completion) { Trace = trace }, token),
+                    MediatRLibrary, MediatRSetup.VoidRequestServices(stages),
+                    (sender, trace, token) => sender.Send(new MediatRVoidRequest(completion) { Trace = trace }, token),
+                    dispatcherLifetime: MediatRSetup.DispatcherLifetime);
+            }
     }
 
     private static void VerifyStreamLifetimes(bool report)
     {
         foreach (int stages in Params<int>(typeof(MediatRStreamRetainedScopeBenchmarks), nameof(MediatRStreamRetainedScopeBenchmarks.StageCount)))
-        foreach (int count in Params<int>(typeof(MediatRStreamRetainedScopeBenchmarks), nameof(MediatRStreamRetainedScopeBenchmarks.ItemCount)))
-        foreach (CompletionKind completion in Params<CompletionKind>(typeof(MediatRStreamRetainedScopeBenchmarks), nameof(MediatRStreamRetainedScopeBenchmarks.Completion)))
-        foreach (bool early in new[] { false, true })
-        {
-            VerifyPair<IStreamDispatcher, ISender>(
-                $"Stream, items={count}, completion={completion}, stages={stages}, early={early}",
-                StreamNames(stages, count, early: early), report,
-                RequestFlowSetup.Library, RequestFlowSetup.StreamServices(stages, MediatRSetup.DispatcherLifetime),
-                (dispatcher, trace, token) => ReadStream(
-                    dispatcher.Stream(new StreamRequest(count, completion) { Trace = trace }, token), count, early, token),
-                MediatRLibrary, MediatRSetup.StreamServices(stages),
-                (sender, trace, token) => ReadStream(
-                    sender.CreateStream(new MediatRStreamRequest(count, completion) { Trace = trace }, token), count, early, token),
-                dispatcherLifetime: MediatRSetup.DispatcherLifetime);
-        }
+            foreach (int count in Params<int>(typeof(MediatRStreamRetainedScopeBenchmarks), nameof(MediatRStreamRetainedScopeBenchmarks.ItemCount)))
+                foreach (CompletionKind completion in Params<CompletionKind>(typeof(MediatRStreamRetainedScopeBenchmarks), nameof(MediatRStreamRetainedScopeBenchmarks.Completion)))
+                    foreach (bool early in new[] { false, true })
+                    {
+                        VerifyPair<IStreamDispatcher, ISender>(
+                            $"Stream, items={count}, completion={completion}, stages={stages}, early={early}",
+                            StreamNames(stages, count, early: early), report,
+                            RequestFlowSetup.Library, RequestFlowSetup.StreamServices(stages, MediatRSetup.DispatcherLifetime),
+                            (dispatcher, trace, token) => ReadStream(
+                                dispatcher.Stream(new StreamRequest(count, completion) { Trace = trace }, token), count, early, token),
+                            MediatRLibrary, MediatRSetup.StreamServices(stages),
+                            (sender, trace, token) => ReadStream(
+                                sender.CreateStream(new MediatRStreamRequest(count, completion) { Trace = trace }, token), count, early, token),
+                            dispatcherLifetime: MediatRSetup.DispatcherLifetime);
+                    }
     }
 
     private static void VerifyEventLifetimes(bool report)
     {
         foreach ((Type benchmark, bool parallel) in new[]
             { (typeof(MediatREventSequentialRetainedScopeBenchmarks), false), (typeof(MediatREventParallelRetainedScopeBenchmarks), true) })
-        foreach (CompletionKind completion in Params<CompletionKind>(benchmark, nameof(MediatREventSequentialRetainedScopeBenchmarks.Completion)))
-        foreach (int handlers in Params<int>(benchmark, nameof(MediatREventSequentialRetainedScopeBenchmarks.HandlerCount)))
-        {
-            VerifyPair<IEventPublisher, IPublisher>(
-                $"Event, completion={completion}, handlers={handlers}, parallel={parallel}", EventNames(handlers), report,
-                RequestFlowSetup.Library, RequestFlowSetup.EventServices(handlers, parallel, MediatRSetup.DispatcherLifetime),
-                (publisher, trace, token) => publisher.PublishAsync(new EventMessage(completion) { Trace = trace }, token),
-                MediatRLibrary, MediatRSetup.EventServices(handlers, parallel: parallel),
-                (publisher, trace, token) => publisher.Publish(new MediatREvent(completion) { Trace = trace }, token),
-                ordered: !parallel,
-                dispatcherLifetime: MediatRSetup.DispatcherLifetime);
-        }
+            foreach (CompletionKind completion in Params<CompletionKind>(benchmark, nameof(MediatREventSequentialRetainedScopeBenchmarks.Completion)))
+                foreach (int handlers in Params<int>(benchmark, nameof(MediatREventSequentialRetainedScopeBenchmarks.HandlerCount)))
+                {
+                    VerifyPair<IEventPublisher, IPublisher>(
+                        $"Event, completion={completion}, handlers={handlers}, parallel={parallel}", EventNames(handlers), report,
+                        RequestFlowSetup.Library, RequestFlowSetup.EventServices(handlers, parallel, MediatRSetup.DispatcherLifetime),
+                        (publisher, trace, token) => publisher.PublishAsync(new EventMessage(completion) { Trace = trace }, token),
+                        MediatRLibrary, MediatRSetup.EventServices(handlers, parallel: parallel),
+                        (publisher, trace, token) => publisher.Publish(new MediatREvent(completion) { Trace = trace }, token),
+                        ordered: !parallel,
+                        dispatcherLifetime: MediatRSetup.DispatcherLifetime);
+                }
     }
 
     private static void VerifyCatalogs(bool report)

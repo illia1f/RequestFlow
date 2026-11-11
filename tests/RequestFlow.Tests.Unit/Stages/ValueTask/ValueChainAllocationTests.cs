@@ -1,7 +1,6 @@
 // .NET Framework has no GC.GetAllocatedBytesForCurrentThread, so the modern targets own this fixture.
 #if NET8_0_OR_GREATER
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 using Xunit.Abstractions;
 
 namespace RequestFlow.Tests.Unit;

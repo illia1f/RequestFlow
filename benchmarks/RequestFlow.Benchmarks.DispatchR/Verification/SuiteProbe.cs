@@ -59,87 +59,87 @@ public static class SuiteProbe
     private static void VerifyRequestLifetimes(bool report)
     {
         foreach (int stages in Params<int>(typeof(DispatchRTaskRetainedScopeBenchmarks), nameof(DispatchRTaskRetainedScopeBenchmarks.StageCount)))
-        foreach (CompletionKind completion in Params<CompletionKind>(
-            typeof(DispatchRTaskRetainedScopeBenchmarks), nameof(DispatchRTaskRetainedScopeBenchmarks.Completion)))
-        {
-            VerifyDispatchRPair<global::RequestFlow.IRequestDispatcher>(
-                $"Task, completion={completion}, stages={stages}", RequestNames(stages), report,
-                RequestFlowSetup.TaskServices(stages),
-                (dispatcher, trace, token) => ExpectResult(dispatcher.SendAsync<int>(new TaskRequest(completion) { Trace = trace }, token)),
-                DispatchRSetup.TaskServices(stages),
-                (mediator, trace, token) => ExpectResult(mediator.Send(new DispatchRTaskRequest(completion) { Trace = trace }, token)));
-        }
+            foreach (CompletionKind completion in Params<CompletionKind>(
+                typeof(DispatchRTaskRetainedScopeBenchmarks), nameof(DispatchRTaskRetainedScopeBenchmarks.Completion)))
+            {
+                VerifyDispatchRPair<global::RequestFlow.IRequestDispatcher>(
+                    $"Task, completion={completion}, stages={stages}", RequestNames(stages), report,
+                    RequestFlowSetup.TaskServices(stages),
+                    (dispatcher, trace, token) => ExpectResult(dispatcher.SendAsync<int>(new TaskRequest(completion) { Trace = trace }, token)),
+                    DispatchRSetup.TaskServices(stages),
+                    (mediator, trace, token) => ExpectResult(mediator.Send(new DispatchRTaskRequest(completion) { Trace = trace }, token)));
+            }
 
         foreach (int stages in Params<int>(typeof(DispatchRVoidRequestRetainedScopeBenchmarks), nameof(DispatchRVoidRequestRetainedScopeBenchmarks.StageCount)))
-        foreach (CompletionKind completion in Params<CompletionKind>(
-            typeof(DispatchRVoidRequestRetainedScopeBenchmarks), nameof(DispatchRVoidRequestRetainedScopeBenchmarks.Completion)))
-        {
-            VerifyDispatchRPair<global::RequestFlow.IRequestDispatcher>(
-                $"Void request, completion={completion}, stages={stages}", RequestNames(stages), report,
-                RequestFlowSetup.TaskVoidRequestServices(stages),
-                (dispatcher, trace, token) => dispatcher.SendAsync(new TaskVoidRequest(completion) { Trace = trace }, token),
-                DispatchRSetup.VoidRequestServices(stages),
-                (mediator, trace, token) => mediator.Send(new DispatchRVoidRequest(completion) { Trace = trace }, token));
-        }
+            foreach (CompletionKind completion in Params<CompletionKind>(
+                typeof(DispatchRVoidRequestRetainedScopeBenchmarks), nameof(DispatchRVoidRequestRetainedScopeBenchmarks.Completion)))
+            {
+                VerifyDispatchRPair<global::RequestFlow.IRequestDispatcher>(
+                    $"Void request, completion={completion}, stages={stages}", RequestNames(stages), report,
+                    RequestFlowSetup.TaskVoidRequestServices(stages),
+                    (dispatcher, trace, token) => dispatcher.SendAsync(new TaskVoidRequest(completion) { Trace = trace }, token),
+                    DispatchRSetup.VoidRequestServices(stages),
+                    (mediator, trace, token) => mediator.Send(new DispatchRVoidRequest(completion) { Trace = trace }, token));
+            }
 
         foreach (int stages in Params<int>(typeof(DispatchRValueRetainedScopeBenchmarks), nameof(DispatchRValueRetainedScopeBenchmarks.StageCount)))
-        foreach (CompletionKind completion in Params<CompletionKind>(
-            typeof(DispatchRValueRetainedScopeBenchmarks), nameof(DispatchRValueRetainedScopeBenchmarks.Completion)))
-        {
-            VerifyDispatchRPair<global::RequestFlow.IValueRequestDispatcher>(
-                $"Value, completion={completion}, stages={stages}", RequestNames(stages), report,
-                RequestFlowSetup.ValueServices(stages),
-                (dispatcher, trace, token) => ExpectResult(dispatcher.SendAsync<int>(new ValueRequest(completion) { Trace = trace }, token)),
-                DispatchRSetup.ValueServices(stages),
-                (mediator, trace, token) => ExpectResult(mediator.Send(new DispatchRValueRequest(completion) { Trace = trace }, token)));
-        }
+            foreach (CompletionKind completion in Params<CompletionKind>(
+                typeof(DispatchRValueRetainedScopeBenchmarks), nameof(DispatchRValueRetainedScopeBenchmarks.Completion)))
+            {
+                VerifyDispatchRPair<global::RequestFlow.IValueRequestDispatcher>(
+                    $"Value, completion={completion}, stages={stages}", RequestNames(stages), report,
+                    RequestFlowSetup.ValueServices(stages),
+                    (dispatcher, trace, token) => ExpectResult(dispatcher.SendAsync<int>(new ValueRequest(completion) { Trace = trace }, token)),
+                    DispatchRSetup.ValueServices(stages),
+                    (mediator, trace, token) => ExpectResult(mediator.Send(new DispatchRValueRequest(completion) { Trace = trace }, token)));
+            }
 
         foreach (int stages in Params<int>(typeof(DispatchRValueVoidRequestRetainedScopeBenchmarks), nameof(DispatchRValueVoidRequestRetainedScopeBenchmarks.StageCount)))
-        foreach (CompletionKind completion in Params<CompletionKind>(
-            typeof(DispatchRValueVoidRequestRetainedScopeBenchmarks), nameof(DispatchRValueVoidRequestRetainedScopeBenchmarks.Completion)))
-        {
-            VerifyDispatchRPair<global::RequestFlow.IValueRequestDispatcher>(
-                $"Value void request, completion={completion}, stages={stages}", RequestNames(stages), report,
-                RequestFlowSetup.ValueVoidRequestServices(stages),
-                (dispatcher, trace, token) => dispatcher.SendAsync(new ValueVoidRequest(completion) { Trace = trace }, token).AsTask(),
-                DispatchRSetup.ValueVoidRequestServices(stages),
-                (mediator, trace, token) => mediator.Send(new DispatchRValueVoidRequest(completion) { Trace = trace }, token).AsTask());
-        }
+            foreach (CompletionKind completion in Params<CompletionKind>(
+                typeof(DispatchRValueVoidRequestRetainedScopeBenchmarks), nameof(DispatchRValueVoidRequestRetainedScopeBenchmarks.Completion)))
+            {
+                VerifyDispatchRPair<global::RequestFlow.IValueRequestDispatcher>(
+                    $"Value void request, completion={completion}, stages={stages}", RequestNames(stages), report,
+                    RequestFlowSetup.ValueVoidRequestServices(stages),
+                    (dispatcher, trace, token) => dispatcher.SendAsync(new ValueVoidRequest(completion) { Trace = trace }, token).AsTask(),
+                    DispatchRSetup.ValueVoidRequestServices(stages),
+                    (mediator, trace, token) => mediator.Send(new DispatchRValueVoidRequest(completion) { Trace = trace }, token).AsTask());
+            }
     }
 
     private static void VerifyStreamLifetimes(bool report)
     {
         foreach (int stages in Params<int>(typeof(DispatchRStreamRetainedScopeBenchmarks), nameof(DispatchRStreamRetainedScopeBenchmarks.StageCount)))
-        foreach (int count in Params<int>(typeof(DispatchRStreamRetainedScopeBenchmarks), nameof(DispatchRStreamRetainedScopeBenchmarks.ItemCount)))
-        foreach (CompletionKind completion in Params<CompletionKind>(typeof(DispatchRStreamRetainedScopeBenchmarks), nameof(DispatchRStreamRetainedScopeBenchmarks.Completion)))
-        foreach (bool early in new[] { false, true })
-        {
-            VerifyDispatchRPair<global::RequestFlow.IStreamDispatcher>(
-                $"Stream, items={count}, completion={completion}, stages={stages}, early={early}",
-                StreamNames(stages, count, early: early), report,
-                RequestFlowSetup.StreamServices(stages),
-                (dispatcher, trace, token) => ReadStream(
-                    dispatcher.Stream(new StreamRequest(count, completion) { Trace = trace }, token), count, early, token),
-                DispatchRSetup.StreamServices(stages),
-                (mediator, trace, token) => ReadStream(
-                    mediator.CreateStream(new DispatchRStreamRequest(count, completion) { Trace = trace }, token), count, early, token));
-        }
+            foreach (int count in Params<int>(typeof(DispatchRStreamRetainedScopeBenchmarks), nameof(DispatchRStreamRetainedScopeBenchmarks.ItemCount)))
+                foreach (CompletionKind completion in Params<CompletionKind>(typeof(DispatchRStreamRetainedScopeBenchmarks), nameof(DispatchRStreamRetainedScopeBenchmarks.Completion)))
+                    foreach (bool early in new[] { false, true })
+                    {
+                        VerifyDispatchRPair<global::RequestFlow.IStreamDispatcher>(
+                            $"Stream, items={count}, completion={completion}, stages={stages}, early={early}",
+                            StreamNames(stages, count, early: early), report,
+                            RequestFlowSetup.StreamServices(stages),
+                            (dispatcher, trace, token) => ReadStream(
+                                dispatcher.Stream(new StreamRequest(count, completion) { Trace = trace }, token), count, early, token),
+                            DispatchRSetup.StreamServices(stages),
+                            (mediator, trace, token) => ReadStream(
+                                mediator.CreateStream(new DispatchRStreamRequest(count, completion) { Trace = trace }, token), count, early, token));
+                    }
     }
 
     private static void VerifyEventLifetimes(bool report)
     {
         foreach (CompletionKind completion in Params<CompletionKind>(
             typeof(DispatchREventSequentialRetainedScopeBenchmarks), nameof(DispatchREventSequentialRetainedScopeBenchmarks.Completion)))
-        foreach (int handlers in Params<int>(
-            typeof(DispatchREventSequentialRetainedScopeBenchmarks), nameof(DispatchREventSequentialRetainedScopeBenchmarks.HandlerCount)))
-        {
-            VerifyDispatchRPair<global::RequestFlow.IEventPublisher>(
-                $"Event, completion={completion}, handlers={handlers}, parallel=False", EventNames(handlers), report,
-                RequestFlowSetup.EventServices(handlers, parallel: false),
-                (publisher, trace, token) => publisher.PublishAsync(new EventMessage(completion) { Trace = trace }, token),
-                DispatchRSetup.EventServices(handlers),
-                (mediator, trace, token) => mediator.Publish(new DispatchREvent(completion) { Trace = trace }, token).AsTask());
-        }
+            foreach (int handlers in Params<int>(
+                typeof(DispatchREventSequentialRetainedScopeBenchmarks), nameof(DispatchREventSequentialRetainedScopeBenchmarks.HandlerCount)))
+            {
+                VerifyDispatchRPair<global::RequestFlow.IEventPublisher>(
+                    $"Event, completion={completion}, handlers={handlers}, parallel=False", EventNames(handlers), report,
+                    RequestFlowSetup.EventServices(handlers, parallel: false),
+                    (publisher, trace, token) => publisher.PublishAsync(new EventMessage(completion) { Trace = trace }, token),
+                    DispatchRSetup.EventServices(handlers),
+                    (mediator, trace, token) => mediator.Publish(new DispatchREvent(completion) { Trace = trace }, token).AsTask());
+            }
     }
 
     private static void VerifyCatalogs(bool report)
