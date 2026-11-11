@@ -81,22 +81,20 @@ internal sealed class RequestFlowRegistry
     public void AddEventStrategyDeclarations(
         IReadOnlyList<EventStrategyDeclaration> declarations)
     {
+    nextDeclaration:
         foreach (EventStrategyDeclaration declaration in declarations)
         {
-            bool duplicate = false;
             foreach (EventStrategyDeclaration existing in _eventStrategyDeclarations)
             {
                 if (existing.DeclaredEventType == declaration.DeclaredEventType
                     && existing.StrategyType == declaration.StrategyType
                     && existing.Lifetime == declaration.Lifetime)
                 {
-                    duplicate = true;
-                    break;
+                    continue nextDeclaration;
                 }
             }
 
-            if (!duplicate)
-                _eventStrategyDeclarations.Add(declaration);
+            _eventStrategyDeclarations.Add(declaration);
         }
     }
 
