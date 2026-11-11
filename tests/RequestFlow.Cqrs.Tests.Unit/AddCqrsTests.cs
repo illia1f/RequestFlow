@@ -61,6 +61,20 @@ public sealed class AddCqrsTests : IDisposable
     }
 
     [Fact]
+    public void Given_Registered_Cqrs_When_Resolving_Task_Dispatchers_Then_Neither_Implements_The_Other_Side()
+    {
+        _queries.ShouldNotBeAssignableTo<ICommandDispatcher>();
+        _commands.ShouldNotBeAssignableTo<IQueryDispatcher>();
+    }
+
+    [Fact]
+    public void Given_Registered_Cqrs_When_Resolving_Value_Dispatchers_Then_Neither_Implements_The_Other_Side()
+    {
+        _valueQueries.ShouldNotBeAssignableTo<IValueCommandDispatcher>();
+        _valueCommands.ShouldNotBeAssignableTo<IValueQueryDispatcher>();
+    }
+
+    [Fact]
     public async Task Given_Registered_Cqrs_When_Streaming_Query_Then_Yields_Query_Handler_Items()
     {
         List<string> items = [];
@@ -232,11 +246,11 @@ public sealed class AddCqrsRegistrationTests
             d.ServiceType == typeof(IStreamQueryDispatcher) && d.Lifetime == ServiceLifetime.Transient);
         services.ShouldContain(d =>
             d.ServiceType == typeof(IValueCommandDispatcher)
-            && d.ImplementationType == typeof(CqrsValueDispatcher)
+            && d.ImplementationType == typeof(CqrsValueCommandDispatcher)
             && d.Lifetime == ServiceLifetime.Transient);
         services.ShouldContain(d =>
             d.ServiceType == typeof(IValueQueryDispatcher)
-            && d.ImplementationType == typeof(CqrsValueDispatcher)
+            && d.ImplementationType == typeof(CqrsValueQueryDispatcher)
             && d.Lifetime == ServiceLifetime.Transient);
     }
 

@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 
 namespace RequestFlow.Cqrs;
 
-internal sealed class CqrsValueDispatcher(IValueRequestDispatcher dispatcher)
-    : IValueCommandDispatcher, IValueQueryDispatcher
+internal sealed class CqrsValueCommandDispatcher(IValueRequestDispatcher dispatcher)
+    : IValueCommandDispatcher
 {
     private readonly IValueRequestDispatcher _dispatcher =
         dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
@@ -28,15 +28,5 @@ internal sealed class CqrsValueDispatcher(IValueRequestDispatcher dispatcher)
         ThrowHelper.ThrowIfNull(command);
 
         return _dispatcher.SendAsync(command, cancellationToken);
-    }
-
-    /// <inheritdoc />
-    public ValueTask<TResponse> SendAsync<TResponse>(
-        IValueQuery<TResponse> query,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowHelper.ThrowIfNull(query);
-
-        return _dispatcher.SendAsync(query, cancellationToken);
     }
 }

@@ -23,10 +23,10 @@ public static class CqrsRequestFlowBuilderExtensions
         if (builder is null)
             throw new ArgumentNullException(nameof(builder));
 
-        builder.Services.TryAddTransient<ICommandDispatcher, CqrsDispatcher>();
-        builder.Services.TryAddTransient<IQueryDispatcher, CqrsDispatcher>();
-        builder.Services.TryAddTransient<IValueCommandDispatcher, CqrsValueDispatcher>();
-        builder.Services.TryAddTransient<IValueQueryDispatcher, CqrsValueDispatcher>();
+        builder.Services.TryAddTransient<ICommandDispatcher, CqrsCommandDispatcher>();
+        builder.Services.TryAddTransient<IQueryDispatcher, CqrsQueryDispatcher>();
+        builder.Services.TryAddTransient<IValueCommandDispatcher, CqrsValueCommandDispatcher>();
+        builder.Services.TryAddTransient<IValueQueryDispatcher, CqrsValueQueryDispatcher>();
         builder.Services.TryAddTransient<IStreamQueryDispatcher, CqrsStreamDispatcher>();
 
         builder.Services.TryAddEnumerable(
