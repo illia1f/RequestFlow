@@ -4,7 +4,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 The `release` workflow uses the section matching the pushed tag as the GitHub Release body. A missing section fails the build before publishing. Before tagging, rename `[Unreleased]` to the release version and add its date.
 
-## [Unreleased]
+## [1.0.1] - 2026-11-11
 
 ### Fixed
 
@@ -189,7 +189,7 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
-[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0...HEAD
+[1.0.1]: https://github.com/illia1f/RequestFlow/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.9...v1.0.0
 [1.0.0-preview.9]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.8...v1.0.0-preview.9
 [1.0.0-preview.8]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.7...v1.0.0-preview.8

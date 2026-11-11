@@ -2,7 +2,7 @@
 
 Anything past v1 is direction, not commitment.
 
-Release: [1.0.0](CHANGELOG.md#100---2026-10-17).
+Release: [1.0.1](CHANGELOG.md#101---2026-11-11).
 
 ## v1.0
 
