@@ -200,7 +200,7 @@ public async Task PublishAsync(
 `CancellationToken.None` means "use the publishing token" for `StartAsync` and `RunAsync`. Pass a real strategy-owned or application-lifetime token to detach work:
 
 ```csharp
-public sealed class DetachedStrategy(CancellationToken lifetimeToken)
+public sealed class DetachedStrategy(IHostApplicationLifetime lifetime)
     : IEventPublishStrategy
 {
     public async Task PublishAsync(
@@ -211,7 +211,7 @@ public sealed class DetachedStrategy(CancellationToken lifetimeToken)
             throw delivery.Canceled(null, delivery.Count, cancellationToken);
 
         for (int i = 0; i < delivery.Count; i++)
-            _ = ObserveAsync(delivery, i, lifetimeToken);
+            _ = ObserveAsync(delivery, i, lifetime.ApplicationStopping);
 
         await Task.CompletedTask;
     }
@@ -228,6 +228,8 @@ public sealed class DetachedStrategy(CancellationToken lifetimeToken)
     }
 }
 ```
+
+`IHostApplicationLifetime` is in `Microsoft.Extensions.Hosting`, and only a host registers it: the Generic Host or ASP.NET Core. Without a host, inject a service of your own that exposes the token.
 
 Detached work may outlive the publishing scope. Do not use this pattern when handlers depend on scoped services that can be disposed after `PublishAsync` returns.
 

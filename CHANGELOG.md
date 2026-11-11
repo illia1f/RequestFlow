@@ -4,6 +4,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 
 The `release` workflow uses the section matching the pushed tag as the GitHub Release body. A missing section fails the build before publishing. Before tagging, rename `[Unreleased]` to the release version and add its date.
 
+## [Unreleased]
+
+### Fixed
+
+- `AddRequestFlow` no longer throws `InvalidOperationException` ("This service descriptor is keyed") when a keyed service is registered first and the application resolves `Microsoft.Extensions.DependencyInjection.Abstractions` 8.0.0 or 8.0.1, on .NET Framework as well as .NET.
+- An interface declared as an event publish strategy for more than one target reports `RF0013` once. The repeat no longer adds `RF0014`.
+- `ICommandDispatcher` and `IQueryDispatcher` resolve to separate classes, so a query dispatcher can no longer be cast to a command dispatcher. The ValueTask pair is split the same way.
+- The detached strategy sample in [events.md](docs/events.md#detach-entry-work-from-the-publishing-token) takes `IHostApplicationLifetime`, which a hosted application registers. The earlier constructor took a `CancellationToken`, which the container cannot resolve.
+
+### Performance
+
+- Publication allocates less for a `ParallelPublishStrategy` event with no applicable handler. Cancellation and completion behavior are unchanged.
+
 ## [1.0.0] - 2026-10-17
 
 First stable release.
@@ -176,6 +189,7 @@ First public preview.
 - `RequestFlow.Cqrs.Abstractions` and `RequestFlow.Cqrs`: command and query contracts with typed dispatchers, registered through `AddCqrs`, for codebases that want the split enforced by the compiler.
 - `provider.ValidateRequestFlow()` to force validation at startup instead of at the first dispatch.
 
+[Unreleased]: https://github.com/illia1f/RequestFlow/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.9...v1.0.0
 [1.0.0-preview.9]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.8...v1.0.0-preview.9
 [1.0.0-preview.8]: https://github.com/illia1f/RequestFlow/compare/v1.0.0-preview.7...v1.0.0-preview.8
