@@ -4,10 +4,7 @@ using System.Threading.Tasks;
 
 namespace RequestFlow.Cqrs;
 
-/// <summary>
-/// Default <see cref="ICommandDispatcher"/> and <see cref="IQueryDispatcher"/> forwarding to <see cref="IRequestDispatcher"/>.
-/// </summary>
-internal sealed class CqrsDispatcher(IRequestDispatcher dispatcher) : ICommandDispatcher, IQueryDispatcher
+internal sealed class CqrsCommandDispatcher(IRequestDispatcher dispatcher) : ICommandDispatcher
 {
     private readonly IRequestDispatcher _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
@@ -25,13 +22,5 @@ internal sealed class CqrsDispatcher(IRequestDispatcher dispatcher) : ICommandDi
         ThrowHelper.ThrowIfNull(command);
 
         return _dispatcher.SendAsync(command, cancellationToken);
-    }
-
-    /// <inheritdoc />
-    public Task<TResponse> SendAsync<TResponse>(IQuery<TResponse> query, CancellationToken cancellationToken = default)
-    {
-        ThrowHelper.ThrowIfNull(query);
-
-        return _dispatcher.SendAsync(query, cancellationToken);
     }
 }

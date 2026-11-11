@@ -59,6 +59,14 @@ jobs:
         if: github.event_name != 'pull_request'
         run: dotnet test --no-build -c Release --logger trx --collect:"XPlat Code Coverage"
 
+      # Microsoft.Extensions.DependencyInjection 8.0.0 resolves the Abstractions 8.0.1 floor that src/RequestFlow declares.
+      # The separate artifacts path keeps this build away from the outputs Pack reads.
+      - name: Test at the dependency floor
+        run: >
+          dotnet test tests/RequestFlow.Tests.Unit -c Release -f net8.0
+          -p:DependencyInjectionVersion=8.0.0
+          --artifacts-path artifacts/dependency-floor
+
       - name: Pack
         run: dotnet pack --no-build -c Release -o artifacts/packages
 

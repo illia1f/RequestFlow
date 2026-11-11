@@ -27,6 +27,20 @@ public sealed class EventStrategyRuleTests
     }
 
     [Fact]
+    public void Given_An_Interface_Strategy_Declared_For_Two_Targets_When_Validating_Then_Reports_RF0013_Once()
+    {
+        RequestFlowValidationProblem problem = Validate(
+            [typeof(TestEvent), typeof(MultiInterfaceEvent)],
+            [
+                Strategy(typeof(TestEvent), typeof(IInvalidStrategy)),
+                Strategy(typeof(MultiInterfaceEvent), typeof(IInvalidStrategy)),
+            ]).ShouldHaveSingleItem();
+
+        problem.Code.ShouldBe("RF0013");
+        problem.Subject.ShouldBe(typeof(IInvalidStrategy));
+    }
+
+    [Fact]
     public void Given_Two_Different_Global_Strategies_When_Validating_Then_Reports_RF0119()
     {
         RequestFlowValidationProblem problem = Validate(

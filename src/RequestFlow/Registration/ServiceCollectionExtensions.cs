@@ -147,8 +147,12 @@ public static class ServiceCollectionExtensions
     {
         foreach (var descriptor in services)
         {
-            if (descriptor.ImplementationInstance is RequestFlowRegistry existing)
+            // ImplementationInstance throws on a keyed descriptor in Microsoft.Extensions.DependencyInjection.Abstractions 8.0.0 and 8.0.1.
+            if (descriptor.ServiceType == typeof(RequestFlowRegistry)
+                && descriptor.ImplementationInstance is RequestFlowRegistry existing)
+            {
                 return existing;
+            }
         }
 
         var registry = new RequestFlowRegistry();

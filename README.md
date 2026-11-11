@@ -17,7 +17,7 @@ Supports Task and ValueTask requests, stages, streams, and events. Additionally,
 > dotnet add package RequestFlow
 > ```
 
-See the [1.0.0 release notes](https://github.com/illia1f/RequestFlow/blob/main/CHANGELOG.md#100---2026-10-14) for changes since preview.9.
+See the [1.0.0 release notes](https://github.com/illia1f/RequestFlow/blob/main/CHANGELOG.md#100---2026-10-17) for changes since preview.9.
 
 **[Getting started: define a request, register its handler, and send it](https://github.com/illia1f/RequestFlow/blob/main/docs/getting-started.md).**
 

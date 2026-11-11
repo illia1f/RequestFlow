@@ -62,8 +62,11 @@ internal sealed class EventStrategyRule(EventStrategyResolution resolution)
         foreach (EventStrategyModel strategy in strategies)
         {
             Type strategyType = strategy.StrategyType;
-            if (strategyType.IsInterface && reportedInterfaces.Add(strategyType))
+            if (strategyType.IsInterface)
             {
+                if (!reportedInterfaces.Add(strategyType))
+                    continue;
+
                 yield return new RequestFlowValidationProblem(
                     ProblemCodes.EventStrategyIsInterface,
                     $"Event publish strategy '{strategyType.FullName}' is an interface, so the " +
