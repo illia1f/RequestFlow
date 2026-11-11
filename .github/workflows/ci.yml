@@ -32,10 +32,11 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          # global.json pins the SDK to 10.0.100. 8.0.x is here for the net8.0 test runtime.
+          # global.json pins the SDK to 11.0.100. 8.0.x and 10.0.x are here for the net8.0 and net10.0 test runtimes.
           dotnet-version: |
             8.0.x
             10.0.x
+            11.0.x
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
