@@ -16,7 +16,7 @@ Three BenchmarkDotNet suites, all on .NET 10:
 
 ## Quick start
 
-Requires the .NET 10 SDK. Run from the repository root:
+Requires the .NET 11 SDK and the .NET 10 runtime. Run from the repository root:
 
 ```powershell
 dotnet restore benchmarks/RequestFlow.Benchmarks.MediatR -p:RestoreLockedMode=true
@@ -129,7 +129,7 @@ After the run:
 
 Use Visual Studio for exploration only. Publish from the command line.
 
-1. Open `RequestFlow.slnx` in a Visual Studio version that supports the .NET 10 SDK and `.slnx` solutions.
+1. Open `RequestFlow.slnx` in a Visual Studio version that supports the .NET 11 SDK and `.slnx` solutions.
 2. In the `benchmarks` solution folder, set `RequestFlow.Benchmarks.MediatR` as the startup project.
 3. Select the **Release** configuration.
 4. Pick a launch profile: **Verify comparison** (`probe`), **Smoke test** (`--smoke` on the Task retained-scope class only), or **Full comparison** (`--filter *`).

@@ -2,8 +2,8 @@
 
 ## Setup
 
-- .NET 10 SDK (`global.json` pins the major version)
-- .NET 8 runtime (tests also run on `net8.0`)
+- .NET 11 SDK (`global.json` pins the major version)
+- .NET 8 and .NET 10 runtimes (tests also run on `net8.0` and `net10.0`)
 - On Windows, tests also run on .NET Framework (the `net462` target), so the library's oldest build gets tested too. Nothing to install: the 4.8 runtime that ships with Windows runs them.
 
 ```
