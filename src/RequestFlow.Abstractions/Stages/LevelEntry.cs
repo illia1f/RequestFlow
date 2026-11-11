@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace RequestFlow;
 
 /// <summary>
-/// Enters one level of a frozen stage chain: a stage, or the handler beneath the last one. 
+/// Enters one level of a frozen stage chain: a stage, or the handler beneath the last one.
 /// A <see cref="Continuation{TResponse}"/> holds one of these and calls it again on every <see cref="Continuation{TResponse}.InvokeAsync"/>.
 /// </summary>
 /// <remarks>

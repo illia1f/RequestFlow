@@ -2,7 +2,6 @@
 // there and the other two targets cover it.
 #if NET8_0_OR_GREATER
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
 

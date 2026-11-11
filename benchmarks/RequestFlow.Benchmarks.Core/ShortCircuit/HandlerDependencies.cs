@@ -3,7 +3,7 @@ namespace RequestFlow.Benchmarks.Core;
 public sealed class CommandBuffer(DependencyState state) : DependencyComponent(state, "command-buffer")
 {
     public byte[] Bytes { get; } = state.Settings.BufferBytes == 0
-        ? Array.Empty<byte>()
+        ? []
         : new byte[state.Settings.BufferBytes];
 }
 

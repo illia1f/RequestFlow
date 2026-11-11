@@ -1,7 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 #if NET8_0_OR_GREATER
 using System.Runtime.CompilerServices;
 #endif
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
 
@@ -252,6 +252,7 @@ public sealed class ContinuationTests
         internal object? Request;
         internal CancellationToken Token;
 
+        [SuppressMessage("Style", "IDE0060", Justification = "Matches the LevelEntry<TResponse> delegate.")]
         public Task<string> EnterAsync(
             object request, IServiceProvider services, CancellationToken cancellationToken)
         {

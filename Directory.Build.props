@@ -5,6 +5,10 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Repo-wide rather than src-only: IDE0005 (unused usings) only runs on build when doc comments are parsed. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <!-- src opts back in. Keeps tests, fixtures, and samples out of dotnet pack. -->
     <IsPackable>false</IsPackable>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>

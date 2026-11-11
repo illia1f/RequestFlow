@@ -1,7 +1,6 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using RequestFlow;
-using System.Runtime.CompilerServices;
 
 namespace RequestFlow.Tests.Unit;
 

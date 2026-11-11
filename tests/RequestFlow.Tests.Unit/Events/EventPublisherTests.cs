@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace RequestFlow.Tests.Unit.Events;
 

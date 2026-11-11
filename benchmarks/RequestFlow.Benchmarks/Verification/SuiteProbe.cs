@@ -15,9 +15,9 @@ public static class SuiteProbe
         {
             [typeof(ChainLevelBenchmarks)] = parameters => BenchmarkExpectation.Request(
                     stages: (int)parameters[nameof(ChainLevelBenchmarks.StageCount)]!) with
-                {
-                    VoidMethods = [nameof(ChainLevelBenchmarks.TaskVoidChain), nameof(ChainLevelBenchmarks.ValueVoidChain)],
-                },
+            {
+                VoidMethods = [nameof(ChainLevelBenchmarks.TaskVoidChain), nameof(ChainLevelBenchmarks.ValueVoidChain)],
+            },
             [typeof(VoidCompletionBenchmarks)] = parameters => BenchmarkExpectation.VoidRequest(
                 stages: (bool)parameters[nameof(VoidCompletionBenchmarks.WithPipeline)]! ? 1 : 0),
             [typeof(ShortCircuitRetainedScopeBenchmarks)] = ShortCircuitWorkload.Expectation,

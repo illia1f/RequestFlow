@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
 
@@ -84,7 +83,7 @@ public sealed class ChainExecutionTests
         using var cts = new CancellationTokenSource();
         var stage = new TokenCapturingStage();
         object[] stages = [stage];
-        var sut = PingChainWithToken(cts.Token, stages);
+        var sut = PingChainWithToken(stages, cts.Token);
 
         await sut.RunAsync();
 
@@ -98,7 +97,7 @@ public sealed class ChainExecutionTests
         using var entry = new CancellationTokenSource();
         using var substituted = new CancellationTokenSource();
         object[] stages = [new SubstitutingStage(substituted.Token)];
-        var sut = PingChainWithToken(entry.Token, stages);
+        var sut = PingChainWithToken(stages, entry.Token);
 
         await sut.RunAsync();
 
@@ -114,7 +113,7 @@ public sealed class ChainExecutionTests
         using var substituted = new CancellationTokenSource();
         var inner = new TokenCapturingStage();
         object[] stages = [new SubstitutingStage(substituted.Token), inner];
-        var sut = PingChainWithToken(entry.Token, stages);
+        var sut = PingChainWithToken(stages, entry.Token);
 
         await sut.RunAsync();
 
@@ -129,7 +128,7 @@ public sealed class ChainExecutionTests
         using var entry = new CancellationTokenSource();
         var inner = new TokenCapturingStage();
         object[] stages = [new SubstitutingStage(CancellationToken.None), inner];
-        var sut = PingChainWithToken(entry.Token, stages);
+        var sut = PingChainWithToken(stages, entry.Token);
 
         await sut.RunAsync();
 
@@ -667,7 +666,7 @@ public sealed class ChainExecutionTests
         IRequestHandler<Ping, string> handler, params object[] stages)
         => PingRunner(handler, stages, CancellationToken.None);
 
-    private ChainRunner<Ping, string> PingChainWithToken(CancellationToken cancellationToken, object[] stages)
+    private ChainRunner<Ping, string> PingChainWithToken(object[] stages, CancellationToken cancellationToken)
         => PingRunner(_pingHandler, stages, cancellationToken);
 
     private static ChainRunner<Ping, string> PingRunner(

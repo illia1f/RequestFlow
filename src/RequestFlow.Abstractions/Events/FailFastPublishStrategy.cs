@@ -11,5 +11,5 @@ public sealed class FailFastPublishStrategy : IEventPublishStrategy
     /// <inheritdoc/>
     public Task PublishAsync(EventDelivery delivery, CancellationToken cancellationToken)
         => EventPublishStrategies.SequentialAsync(
-            delivery, cancellationToken, stopOnFirstFailure: true);
+            delivery, stopOnFirstFailure: true, cancellationToken);
 }

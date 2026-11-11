@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
 
@@ -617,7 +616,7 @@ public sealed class StageLifetimeTests
             Overlap request, Continuation<string> next, CancellationToken cancellationToken)
         {
             Task<string> first = next.InvokeAsync();
-            Task<string>? second = null;
+            Task<string> second;
             try
             {
                 second = next.InvokeAsync();

@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using RequestFlow;
 
 namespace RequestFlow.Tests.Unit;
 
@@ -179,11 +178,10 @@ public sealed class StreamDispatcherTests
         {
             Started++;
 
-            return Iterate(request, cancellationToken);
+            return Iterate(request);
         }
 
-        private static async IAsyncEnumerable<int> Iterate(
-            Tail request, [EnumeratorCancellation] CancellationToken cancellationToken)
+        private static async IAsyncEnumerable<int> Iterate(Tail request)
         {
             for (int i = 0; i < request.Count; i++)
             {

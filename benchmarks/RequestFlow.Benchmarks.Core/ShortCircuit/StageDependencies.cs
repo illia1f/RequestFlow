@@ -13,7 +13,7 @@ public sealed class CachePolicy(DependencyState state) : DependencyComponent(sta
 public sealed class ChangeBuffer(DependencyState state) : DependencyComponent(state, "change-buffer")
 {
     public byte[] Bytes { get; } = state.Settings.BufferBytes == 0
-        ? Array.Empty<byte>()
+        ? []
         : new byte[state.Settings.BufferBytes];
 }
 

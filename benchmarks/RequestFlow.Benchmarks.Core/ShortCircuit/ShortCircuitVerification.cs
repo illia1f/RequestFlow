@@ -24,113 +24,113 @@ public static class ShortCircuitVerification
         where TMessage : ShortCircuitMessage
     {
         foreach (int bufferBytes in new[] { 0, 4096 })
-        foreach (ShortCircuitOutcome outcome in Enum.GetValues<ShortCircuitOutcome>())
-        {
-            var construction = new ConstructionTrace();
-            using ServiceProvider provider = build(bufferBytes, construction);
-
-            var prior = new List<DependencyComponent>();
-            using var cancellation = new CancellationTokenSource();
-
-            for (int scopeIndex = 0; scopeIndex < 2; scopeIndex++)
+            foreach (ShortCircuitOutcome outcome in Enum.GetValues<ShortCircuitOutcome>())
             {
-                int scopeStart = construction.Constructed.Count;
+                var construction = new ConstructionTrace();
+                using ServiceProvider provider = build(bufferBytes, construction);
 
-                using (IServiceScope scope = provider.CreateScope())
+                var prior = new List<DependencyComponent>();
+                using var cancellation = new CancellationTokenSource();
+
+                for (int scopeIndex = 0; scopeIndex < 2; scopeIndex++)
                 {
-                    TDispatcher dispatcher = scope.ServiceProvider.GetRequiredService<TDispatcher>();
+                    int scopeStart = construction.Constructed.Count;
 
-                    Require(
-                        ReferenceEquals(dispatcher, scope.ServiceProvider.GetRequiredService<TDispatcher>())
-                            == ScopeLifetimeVerification.SharesWithinScope(dispatcherLifetime),
-                        "dispatcher lifetime");
-
-                    for (int sendIndex = 0; sendIndex < 3; sendIndex++)
+                    using (IServiceScope scope = provider.CreateScope())
                     {
-                        ShortCircuitOutcome selected = sendIndex == 2 ? ShortCircuitOutcome.FullExecution : outcome;
-                        var trace = new ExecutionTrace();
-                        TMessage message = createMessage(selected);
-                        message.Trace = trace;
-
-                        int start = construction.Constructed.Count;
-                        ValueTask<int> pending = send(dispatcher, message, cancellation.Token);
-
-                        Require(pending.IsCompletedSuccessfully, "workload did not complete synchronously");
-
-                        int result = pending.GetAwaiter().GetResult();
-                        BenchmarkExpectation expectation = ShortCircuitWorkload.Expectation(selected);
-
-                        Require(result == expectation.Result, "response");
-
-                        Require(trace.Entries.Select(entry => entry.Name).SequenceEqual(expectation.Names), "execution order");
-                        Require(trace.Entries.All(entry => entry.Token == cancellation.Token), "cancellation token");
-
-                        var activated = construction.Constructed.Skip(childScopePerSend ? start : scopeStart).ToArray();
-                        string[] expected = ExpectedRoles(selected, resolution);
+                        TDispatcher dispatcher = scope.ServiceProvider.GetRequiredService<TDispatcher>();
 
                         Require(
-                            activated.Select(component => component.Role).Order().SequenceEqual(expected.Order()),
-                            "activation: " + string.Join(", ", activated.Select(component => component.Role)));
+                            ReferenceEquals(dispatcher, scope.ServiceProvider.GetRequiredService<TDispatcher>())
+                                == ScopeLifetimeVerification.SharesWithinScope(dispatcherLifetime),
+                            "dispatcher lifetime");
 
-                        Require(
-                            activated.Select(component => component.State).Distinct().Count() == 1,
-                            "dependency scope identity");
-
-                        Require(
-                            trace.Entries.All(entry => activated.Contains(entry.Component)),
-                            "executed untracked component");
-
-                        Require(!activated.Any(prior.Contains), "component crossed a scope boundary");
-
-                        Require(
-                            !activated.Any(component =>
-                                prior.Any(previous => ReferenceEquals(previous.State, component.State))),
-                            "dependency state crossed a scope boundary");
-
-                        if (!childScopePerSend && sendIndex == 1)
-                            Require(construction.Constructed.Count == start, "scoped component was reconstructed");
-
-                        Require(
-                            activated.All(component => component.IsDisposed == childScopePerSend),
-                            "premature or missing disposal");
-
-                        if (childScopePerSend)
-                            prior.AddRange(activated);
-
-                        foreach (DependencyComponent component in activated)
+                        for (int sendIndex = 0; sendIndex < 3; sendIndex++)
                         {
-                            if (component is ChangeBuffer change)
-                                Require(change.Bytes.Length == bufferBytes, "transaction buffer size");
+                            ShortCircuitOutcome selected = sendIndex == 2 ? ShortCircuitOutcome.FullExecution : outcome;
+                            var trace = new ExecutionTrace();
+                            TMessage message = createMessage(selected);
+                            message.Trace = trace;
 
-                            if (component is CommandBuffer command)
-                                Require(command.Bytes.Length == bufferBytes, "handler buffer size");
+                            int start = construction.Constructed.Count;
+                            ValueTask<int> pending = send(dispatcher, message, cancellation.Token);
+
+                            Require(pending.IsCompletedSuccessfully, "workload did not complete synchronously");
+
+                            int result = pending.GetAwaiter().GetResult();
+                            BenchmarkExpectation expectation = ShortCircuitWorkload.Expectation(selected);
+
+                            Require(result == expectation.Result, "response");
+
+                            Require(trace.Entries.Select(entry => entry.Name).SequenceEqual(expectation.Names), "execution order");
+                            Require(trace.Entries.All(entry => entry.Token == cancellation.Token), "cancellation token");
+
+                            var activated = construction.Constructed.Skip(childScopePerSend ? start : scopeStart).ToArray();
+                            string[] expected = ExpectedRoles(selected, resolution);
+
+                            Require(
+                                activated.Select(component => component.Role).Order().SequenceEqual(expected.Order()),
+                                "activation: " + string.Join(", ", activated.Select(component => component.Role)));
+
+                            Require(
+                                activated.Select(component => component.State).Distinct().Count() == 1,
+                                "dependency scope identity");
+
+                            Require(
+                                trace.Entries.All(entry => activated.Contains(entry.Component)),
+                                "executed untracked component");
+
+                            Require(!activated.Any(prior.Contains), "component crossed a scope boundary");
+
+                            Require(
+                                !activated.Any(component =>
+                                    prior.Any(previous => ReferenceEquals(previous.State, component.State))),
+                                "dependency state crossed a scope boundary");
+
+                            if (!childScopePerSend && sendIndex == 1)
+                                Require(construction.Constructed.Count == start, "scoped component was reconstructed");
+
+                            Require(
+                                activated.All(component => component.IsDisposed == childScopePerSend),
+                                "premature or missing disposal");
+
+                            if (childScopePerSend)
+                                prior.AddRange(activated);
+
+                            foreach (DependencyComponent component in activated)
+                            {
+                                if (component is ChangeBuffer change)
+                                    Require(change.Bytes.Length == bufferBytes, "transaction buffer size");
+
+                                if (component is CommandBuffer command)
+                                    Require(command.Bytes.Length == bufferBytes, "handler buffer size");
+                            }
                         }
                     }
+
+                    DependencyComponent[] completed = construction.Constructed.Skip(scopeStart).ToArray();
+
+                    foreach (DependencyComponent component in completed)
+                    {
+                        Require(component.IsDisposed && component.Scope.IsDisposed, "scope disposal");
+
+                        int expectedCount = component.Role == "authorization" ? authorizationDisposals : 1;
+
+                        Require(
+                            construction.Disposed.Count(item => ReferenceEquals(item, component)) == expectedCount,
+                            "disposal count: " + component.Role);
+                    }
+
+                    if (!childScopePerSend)
+                        prior.AddRange(completed);
                 }
 
-                DependencyComponent[] completed = construction.Constructed.Skip(scopeStart).ToArray();
-
-                foreach (DependencyComponent component in completed)
+                void Require(bool condition, string detail)
                 {
-                    Require(component.IsDisposed && component.Scope.IsDisposed, "scope disposal");
-
-                    int expectedCount = component.Role == "authorization" ? authorizationDisposals : 1;
-
-                    Require(
-                        construction.Disposed.Count(item => ReferenceEquals(item, component)) == expectedCount,
-                        "disposal count: " + component.Role);
+                    if (!condition)
+                        throw new InvalidOperationException($"{library} short circuit ({outcome}, buffer={bufferBytes}): {detail}.");
                 }
-
-                if (!childScopePerSend)
-                    prior.AddRange(completed);
             }
-
-            void Require(bool condition, string detail)
-            {
-                if (!condition)
-                    throw new InvalidOperationException($"{library} short circuit ({outcome}, buffer={bufferBytes}): {detail}.");
-            }
-        }
     }
 
     private static string[] ExpectedRoles(ShortCircuitOutcome outcome, DependencyResolution resolution)

@@ -1,8 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using RequestFlow;
-using RequestFlow.Cqrs;
 
 namespace RequestFlow.Cqrs.Tests.Unit;
 
